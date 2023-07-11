@@ -1,0 +1,1623 @@
+---
+title: "LinkPrediction"
+author: "Jackson Pullman"
+date: "2023-02-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Link Prediction Methods
+```{r}
+#Change format of covariates to merge onto edge list
+Covars_ego <- covariates %>% merge(household_wealth_data) %>%
+  rename(ego = respondent_master_id, ego_age = age_at_survey, ego_gender = gender,
+         ego_household_wealth = household_wealth_index_w3, ego_education = b0100, ego_indigenous = b0200, 
+         ego_religion = b0600, ego_length_in_village = b0800, ego_length_in_village_years = b0900,
+         ego_latitude = building_latitude, ego_longitude = building_longitude) %>%
+  mutate(ego_education = recode(ego_education, "Have not completed any type of school" = 0,
+                                "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
+                                "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
+                                "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
+         ego_indigenous = recode(ego_indigenous, "No" = 0, "Dont_Know" = 0, "Yes, Lenca" = 1, "Yes, Maya Chorti"= 1)) %>% 
+  dplyr::select(-c("village_name", "marital_name", "building_id"))
+
+Covars_alter <- covariates %>% merge(household_wealth_data) %>%
+  rename(alter = respondent_master_id, alter_age = age_at_survey, alter_gender = gender,
+         alter_household_wealth = household_wealth_index_w3, alter_education = b0100, alter_indigenous = b0200, 
+         alter_religion = b0600, alter_length_in_village = b0800, alter_length_in_village_years = b0900,
+         alter_latitude = building_latitude, alter_longitude = building_longitude) %>%
+  mutate(alter_education = recode(alter_education, "Have not completed any type of school" = 0,
+                                "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
+                                "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
+                                "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
+         alter_indigenous = recode(alter_indigenous, "No" = 0, "Dont_Know" = 0, "Yes, Lenca" = 1, "Yes, Maya Chorti"= 1)) %>% 
+  dplyr::select(-c("village_name", "marital_name", "building_id"))
+
+#Merge covariate data onto edge list
+SN_All_Covars <- merge(SN, Covars_ego, by = "ego")
+SN_All_Covars <- merge(SN_All_Covars, Covars_alter, by = "alter")
+
+#Get covariate matrix for people without a relationship
+for(v in 1:length(village_names)){
+  #Split up matrix into villages
+  SN_Village <- SN_All_Covars %>% filter(village_name_w3 == village_names[v])
+  #IDs of everyone in village
+  Village_IDs <- unique(c(as.character(SN_Village$ego), as.character(SN_Village$alter)))
+
+  Village_Pairs <- unique(SN_Village$pair_key)
+  
+  Village_NoRels <- data.frame(matrix(NA,
+                                      nrow = length(Village_IDs) * (length(Village_IDs)-1)/2 - length(Village_Pairs),
+                                      ncol = 16))
+  colnames(Village_NoRels) <- c("ego","alter","gender.mm","gender.ff", "gender.mf", "indigenous.both", "indigenous.one", "indigenous.none",
+                                "religion.same", "age_difference_abs","average_age",
+                                "wealth_difference_abs", "average_weatlh", "education_difference_abs",
+                                "average_education", "village_name_w3")
+  
+  k <- 1
+  for(i in 1:length(Village_IDs)){
+    j <- i+1
+    while(j <=  length(Village_IDs)){
+      pair <- paste((sort(str_split(paste0(Village_IDs[i], Village_IDs[j]),"")[[1]])),sep="", collapse="")
+      if(!pair %in% Village_Pairs){
+        p1 <- Covars_ego[Covars_ego$ego == Village_IDs[i],]
+        p2 <- Covars_alter[Covars_alter$alter == Village_IDs[j],]
+        Village_NoRels$ego[k] <- p1$ego
+        Village_NoRels$alter[k] <- p2$alter
+        Village_NoRels$gender.mm[k] <- p1$ego_gender == "man" & p2$alter_gender == "man"
+        Village_NoRels$gender.mf[k] <- 
+          p1$ego_gender == "man" & p2$alter_gender == "woman" | p1$ego_gender == "woman" & p2$alter_gender == "man"
+        Village_NoRels$gender.ff[k] <- p1$ego_gender == "woman" & p2$alter_gender == "woman"
+        Village_NoRels$indigenous.both[k] <- p1$ego_indigenous == 1 & p2$alter_indigenous == 1
+        Village_NoRels$indigenous.one[k] <- 
+          p1$ego_indigenous == 1 & p2$alter_indigenous == 0 | p1$ego_indigenous == 0 & p2$alter_indigenous == 1
+        Village_NoRels$indigenous.none[k] <- p1$ego_indigenous == 0 & p2$alter_indigenous == 0
+        Village_NoRels$religion.same[k] <- p1$ego_religion == p2$alter_religion
+        Village_NoRels$age_difference_abs[k] <- abs(p1$ego_age - p2$alter_age)
+        Village_NoRels$average_age[k] <- (p1$ego_age + p2$alter_age)/2
+        Village_NoRels$wealth_difference_abs[k] <- abs(p1$ego_household_wealth - p2$alter_household_wealth)
+        Village_NoRels$average_wealth[k] <- (p1$ego_household_wealth + p2$alter_household_wealth)/2
+        Village_NoRels$education_difference_abs[k] <- abs(p1$ego_education - p2$alter_education)
+        Village_NoRels$average_education[k] <- (p1$ego_education + p2$alter_education)/2
+        Village_NoRels$village_name_w3[k] <- village_names[v]
+        k <- k+1
+      }
+      j <- j+1
+    }
+  }
+  
+  if(v ==1){
+    All_NoRel_Covars <- Village_NoRels
+  }
+  else{
+    All_NoRel_Covars <- rbind(All_NoRel_Covars,Village_NoRels)
+  }
+  #Check progress
+  print(v)
+}
+#Set Un-nominated same village realtionship
+All_NoRel_Covars$relationship <- "Un-Nominated Same Village"
+
+#Attach strain sharing data to non-nominated relationships
+for(i in 1:nrow(All_NoRel_Covars)){
+  All_NoRel_Covars$strain_sharing_rate[i] <- strain_rate[rownames(strain_rate) == All_NoRel_Covars$ego[i],
+                                                         colnames(strain_rate) == All_NoRel_Covars$alter[i]]
+}
+
+#Attach species similarity for non-nominated relationships
+for(i in 1:nrow(All_NoRel_Covars)){
+  All_NoRel_Covars$bray_curtis_sim[i] <- species_bray[rownames(species_bray) == All_NoRel_Covars$ego[i],
+                                                         colnames(species_bray) == All_NoRel_Covars$alter[i]]
+}
+
+for(i in 1:nrow(All_NoRel_Covars)){
+  All_NoRel_Covars$jaccard_sim[i] <- species_jaccard_sim[rownames(species_jaccard_sim) == All_NoRel_Covars$ego[i],
+                                                         colnames(species_jaccard_sim) == All_NoRel_Covars$alter[i]]
+}
+
+
+
+#Get dataframe of relationships into format for regression
+SN_All_Covars_for_Regression <- SN_All_Covars %>% distinct(pair_key, .keep_all = TRUE) %>%
+  mutate(gender.mm = ego_gender == "man" & alter_gender == "man",
+         gender.mf = ego_gender == "woman" & alter_gender == "man" | ego_gender == "man" & alter_gender == "woman",
+         gender.ff = ego_gender == "woman" & alter_gender == "woman",
+         indigenous.both = ego_indigenous == 1 & alter_indigenous == 1,
+         indigenous.one = ego_indigenous == 1 & alter_indigenous == 0 | ego_indigenous == 0 & alter_indigenous == 1,
+         indigenous.none = ego_indigenous == 0 & alter_indigenous == 0,
+         religion.same = ego_religion == alter_religion,
+         age_difference_abs = abs(ego_age - alter_age),
+         average_age = (ego_age + alter_age)/2,
+         wealth_difference_abs = abs(ego_household_wealth - alter_household_wealth),
+         average_wealth = (ego_household_wealth + alter_household_wealth)/2,
+         education_difference_abs = abs(ego_education - alter_education),
+         average_education = (ego_education + alter_education)/2)
+
+#Make dataframe with only non-kin in different house
+SN_Non_Kin_Dif_House_Covars_for_Regression <- SN_All_Covars_for_Regression %>%
+  filter(!(pair_key %in% family_house_pairs))
+
+
+#select predictors
+SN_All_Covars_for_Regression <- SN_All_Covars_for_Regression %>%
+  mutate(related = 1) %>% 
+  dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
+         "age_difference_abs", "average_age", "wealth_difference_abs",
+         "average_wealth", "education_difference_abs","average_education",
+         "related", "strain_sharing_rate", "village_name_w3", "bray_curtis_sim", "jaccard_sim")
+
+SN_Non_Kin_Dif_House_Covars_for_Regression <- SN_Non_Kin_Dif_House_Covars_for_Regression %>%
+  mutate(related = 1) %>% 
+  dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
+         "age_difference_abs", "average_age", "wealth_difference_abs",
+         "average_wealth", "education_difference_abs","average_education",
+         "related", "strain_sharing_rate", "village_name_w3", "bray_curtis_sim", "jaccard_sim")
+
+
+
+All_NoRel_Covars_for_Regression <- All_NoRel_Covars %>%
+  mutate(related = 0) %>%
+  dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
+                "age_difference_abs", "average_age", "wealth_difference_abs",
+                "average_wealth", "education_difference_abs","average_education",
+                "related", "strain_sharing_rate", "village_name_w3", "bray_curtis_sim", "jaccard_sim")
+
+
+#Combine relationships and non relationship dataframe
+SN_All_Covars_for_Regression_complete <- SN_All_Covars_for_Regression[complete.cases(SN_All_Covars_for_Regression),]
+
+SN_Non_Kin_Dif_House_Covars_for_Regression_complete <- SN_Non_Kin_Dif_House_Covars_for_Regression[complete.cases(SN_Non_Kin_Dif_House_Covars_for_Regression),]
+
+All_for_Regression <- rbind(All_NoRel_Covars_for_Regression, SN_All_Covars_for_Regression)
+
+Non_Kin_House_for_Regression <- rbind(All_NoRel_Covars_for_Regression,
+                                      SN_Non_Kin_Dif_House_Covars_for_Regression_complete)
+
+#May want to check if this is missing completely at random or input columns
+#filter to complete cases
+All_for_Regression_complete <- All_for_Regression[complete.cases(All_for_Regression),]
+
+All_NoRel_Covars_for_Regression_complete <- All_NoRel_Covars_for_Regression[complete.cases(All_NoRel_Covars_for_Regression),]
+
+Non_Kin_House_for_Regression_complete <-
+  Non_Kin_House_for_Regression[complete.cases(Non_Kin_House_for_Regression),]
+
+edge_counts <- SN_All_Covars_for_Regression_complete %>%
+  group_by(village_name_w3) %>%
+  summarize(edge_count = sum(related)) 
+
+edge_counts <- edge_counts[match(village_names, edge_counts$village_name_w3),] %>%
+  pull(edge_count)
+
+edge_counts_nkh <- SN_Non_Kin_Dif_House_Covars_for_Regression_complete %>%
+  group_by(village_name_w3) %>%
+  summarize(edge_count = sum(related))
+
+edge_counts_nkh <- edge_counts_nkh[match(village_names, edge_counts_nkh$village_name_w3),] %>%
+  pull(edge_count)
+
+
+
+```
+
+Downsample
+```{r}
+#Downsample
+
+Downsamp1 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[1]) %>% slice_sample(n = edge_counts[1])
+Downsamp2 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[2]) %>% slice_sample(n = edge_counts[2])
+Downsamp3 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[3]) %>% slice_sample(n = edge_counts[3])
+Downsamp4 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[4]) %>% slice_sample(n = edge_counts[4])
+Downsamp5 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[5]) %>% slice_sample(n = edge_counts[5])
+Downsamp6 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[6]) %>% slice_sample(n = edge_counts[6])
+Downsamp7 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[7]) %>% slice_sample(n = edge_counts[7])
+Downsamp8 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[8]) %>% slice_sample(n = edge_counts[8])
+Downsamp9 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[9]) %>% slice_sample(n = edge_counts[9])
+Downsamp10 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[10]) %>% slice_sample(n = edge_counts[10])
+Downsamp11 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[11]) %>% slice_sample(n = edge_counts[11])
+Downsamp12 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[12]) %>% slice_sample(n = edge_counts[12])
+Downsamp13 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[13]) %>% slice_sample(n = edge_counts[13])
+Downsamp14 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[14]) %>% slice_sample(n = edge_counts[14])
+Downsamp15 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[15]) %>% slice_sample(n = edge_counts[15])
+Downsamp16 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[16]) %>% slice_sample(n = edge_counts[16])
+Downsamp17 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[17]) %>% slice_sample(n = edge_counts[17])
+Downsamp18 <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[18]) %>% slice_sample(n = edge_counts[18])
+
+Downsamp_all <- rbind(Downsamp1,Downsamp2,Downsamp3,Downsamp4,Downsamp5,
+                      Downsamp6,Downsamp7,Downsamp8,Downsamp9,Downsamp10,Downsamp11,
+                      Downsamp12,Downsamp13,Downsamp14,Downsamp15,
+                      Downsamp16,Downsamp17,Downsamp18)
+
+Downsamp_all <- rbind(Downsamp_all, SN_All_Covars_for_Regression_complete)
+
+Downsamp_all <- Downsamp_all[complete.cases(Downsamp_all),]
+
+#Non-kin different house
+
+Downsamp1_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[1]) %>% slice_sample(n = edge_counts_nkh[1])
+Downsamp2_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[2]) %>% slice_sample(n = edge_counts_nkh[2])
+Downsamp3_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[3]) %>% slice_sample(n = edge_counts_nkh[3])
+Downsamp4_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[4]) %>% slice_sample(n = edge_counts_nkh[4])
+Downsamp5_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[5]) %>% slice_sample(n = edge_counts_nkh[5])
+Downsamp6_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[6]) %>% slice_sample(n = edge_counts_nkh[6])
+Downsamp7_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[7]) %>% slice_sample(n = edge_counts_nkh[7])
+Downsamp8_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[8]) %>% slice_sample(n = edge_counts_nkh[8])
+Downsamp9_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[9]) %>% slice_sample(n = edge_counts_nkh[9])
+Downsamp10_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[10]) %>% slice_sample(n = edge_counts_nkh[10])
+Downsamp11_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[11]) %>% slice_sample(n = edge_counts_nkh[11])
+Downsamp12_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[12]) %>% slice_sample(n = edge_counts_nkh[12])
+Downsamp13_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[13]) %>% slice_sample(n = edge_counts_nkh[13])
+Downsamp14_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[14]) %>% slice_sample(n = edge_counts_nkh[14])
+Downsamp15_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[15]) %>% slice_sample(n = edge_counts_nkh[15])
+Downsamp16_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[16]) %>% slice_sample(n = edge_counts_nkh[16])
+Downsamp17_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[17]) %>% slice_sample(n = edge_counts_nkh[17])
+Downsamp18_nkh <- All_NoRel_Covars_for_Regression_complete %>%
+  filter(village_name_w3 == village_names[18]) %>% slice_sample(n = edge_counts_nkh[18])
+
+
+Downsamp_all_nkh <- rbind(Downsamp1_nkh,Downsamp2_nkh,Downsamp3_nkh,Downsamp4_nkh,Downsamp5_nkh,
+                      Downsamp6_nkh,Downsamp7_nkh,Downsamp8_nkh,Downsamp9_nkh,Downsamp10_nkh,
+                      Downsamp11_nkh,Downsamp12_nkh,Downsamp13_nkh,Downsamp14_nkh,Downsamp15_nkh,
+                      Downsamp16_nkh,Downsamp17_nkh,Downsamp18_nkh)
+
+Downsamp_all_nkh <- rbind(Downsamp_all_nkh, SN_Non_Kin_Dif_House_Covars_for_Regression_complete)
+
+Downsamp_all_nkh <- Downsamp_all_nkh[complete.cases(Downsamp_all_nkh),]
+```
+
+
+
+```{r}
+#Test out of sample
+#Average over 5 CVs
+for(i in 1:5){
+  inds <- c(1:nrow(Downsamp_all))
+  test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all)), replace = F)
+  train1_inds <- inds[!(inds %in% test1_inds)]
+  test2_inds <- sample(train1_inds, size = floor(.5*length(train1_inds)), replace = F)
+  train2_inds <- inds[!(inds %in% test2_inds)]
+  test3_inds <- train2_inds[!(train2_inds %in% test1_inds)]
+  train3_inds <- inds[!(inds %in% test3_inds)]
+
+  train1 <- Downsamp_all[train1_inds,]
+  test1 <- Downsamp_all[test1_inds,]
+  train2 <- Downsamp_all[train2_inds,]
+  test2 <- Downsamp_all[test2_inds,]
+  train3 <- Downsamp_all[train3_inds,]
+  test3 <- Downsamp_all[test3_inds,]
+  
+  logit.test.1 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train1, family = binomial)
+  logit.test.2 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train2, family = binomial)
+  logit.test.3 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train3, family = binomial)
+  preds.1 <- predict(logit.test.1, newdata = test1, type = "response")
+  preds.2 <- predict(logit.test.2, newdata = test2, type = "response")
+  preds.3 <- predict(logit.test.3, newdata = test3, type = "response")
+  names(preds.3) <- test3_inds
+  names(preds.2) <- test2_inds
+  names(preds.1) <- test1_inds
+  preds.round <- c(preds.1, preds.2, preds.3)
+  preds.round <- preds.round[order(as.numeric(names(preds.round)))]
+  
+  logit.test.1.covars <- lme4::glmer(related ~ strain_sharing_rate + gender.mm + gender.mf +
+                        age_difference_abs + average_age + (0+strain_sharing_rate|village_name_w3),
+                              data = train1, family = binomial)
+  logit.test.2.covars <- lme4::glmer(related ~ strain_sharing_rate + gender.mm + gender.mf +
+                        age_difference_abs + average_age + (0+strain_sharing_rate|village_name_w3),
+                              data = train2, family = binomial)
+  logit.test.3.covars <- lme4::glmer(related ~ strain_sharing_rate + gender.mm + gender.mf +
+                        age_difference_abs + average_age + (0+strain_sharing_rate|village_name_w3),
+                              data = train3, family = binomial)
+  
+  preds.1.covars <- predict(logit.test.1.covars, newdata = test1, type = "response")
+  preds.2.covars <- predict(logit.test.2.covars, newdata = test2, type = "response")
+  preds.3.covars <- predict(logit.test.3.covars, newdata = test3, type = "response")
+  names(preds.3.covars) <- test3_inds
+  names(preds.2.covars) <- test2_inds
+  names(preds.1.covars) <- test1_inds
+  preds.round.covars <- c(preds.1.covars, preds.2.covars, preds.3.covars)
+  preds.round.covars <- preds.round.covars[order(as.numeric(names(preds.round.covars)))]
+  
+  logit.test.1.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                        indigenous.one + religion.same + age_difference_abs +
+                        average_age + wealth_difference_abs + average_wealth +
+                        education_difference_abs + average_education +
+                        strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train1, family = binomial)
+  logit.test.2.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                        indigenous.one + religion.same + age_difference_abs +
+                        average_age + wealth_difference_abs + average_wealth +
+                        education_difference_abs + average_education +
+                        strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train2, family = binomial)
+  logit.test.3.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                        indigenous.one + religion.same + age_difference_abs +
+                        average_age + wealth_difference_abs + average_wealth +
+                        education_difference_abs + average_education +
+                        strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train3, family = binomial)
+  
+  preds.1.all <- predict(logit.test.1.all, newdata = test1, type = "response")
+  preds.2.all <- predict(logit.test.2.all, newdata = test2, type = "response")
+  preds.3.all <- predict(logit.test.3.all, newdata = test3, type = "response")
+  names(preds.3.all) <- test3_inds
+  names(preds.2.all) <- test2_inds
+  names(preds.1.all) <- test1_inds
+  preds.round.all <- c(preds.1.all, preds.2.all, preds.3.all)
+  preds.round.all <- preds.round.all[order(as.numeric(names(preds.round.all)))]
+  
+  if(i == 1){
+    pred.all <- preds.round
+    pred.all.covars <- preds.round.covars
+    pred.all.all <- preds.round.all
+  }
+  else{
+    pred.all <- pred.all + preds.round
+    pred.all.covars <- pred.all.covars + preds.round.covars
+    pred.all.all <- pred.all.all + preds.round.all
+  }
+  
+}
+#Could make this without random effect don't have to deal with this stuff
+pred.all <- pred.all/5
+pred.all.covars <- pred.all.covars/5
+pred.all.all <- pred.all.all/5
+
+#add on predictions from strain-sharing only model
+pred.all.acc <- pred.all
+pred.all.acc[pred.all.acc >=.5] <- 1
+pred.all.acc[pred.all.acc <.5] <- 0
+
+Downsamp_all$predicted <- pred.all.acc
+
+#Create ROC object weird it got worse, could do this over multiple downsamples as well
+#I think my predictions will be fairly consistent
+logit.base.roc <- pROC::roc(Downsamp_all$related, pred.all, ci=TRUE, plot=FALSE,
+                levels=c("0","1"), direction = "<")
+
+logit.covars.roc <- pROC::roc(Downsamp_all$related, pred.all.covars, ci=TRUE, plot=FALSE,
+                levels=c("0","1"), direction = "<")
+
+logit.all.roc <- pROC::roc(Downsamp_all$related, pred.all.all, ci=TRUE, plot=FALSE,
+                levels=c("0","1"), direction = "<")
+
+pROC::auc(logit.base.roc)[1]
+pROC::auc(logit.covars.roc)[1]
+pROC::auc(logit.all.roc)[1]
+
+
+roc.list <- list("Strain-Sharing Rate" = logit.base.roc,
+                 "SSR + Age + Gender" = logit.covars.roc,
+                 "SSR + All Socio-Dem Covars" = logit.all.roc)
+
+ci.list <- lapply(roc.list, ci.se, specificities = seq(0, 1, l = 25))
+
+dat.ci.list <- lapply(ci.list, function(ciobj) 
+  data.frame(x = as.numeric(rownames(ciobj)),
+             lower = ciobj[, 1],
+             upper = ciobj[, 3]))
+
+roc.plot <- ggroc(roc.list) +
+  theme_minimal() +
+  geom_abline(slope=1, intercept = 1, linetype = "dashed", alpha=1, color = "grey") +
+  coord_equal()
+
+for(i in 1:3) {
+  roc.plot <- roc.plot + geom_ribbon(
+    data = dat.ci.list[[i]],
+    aes(x = x, ymin = lower, ymax = upper),
+    fill = i + 1,
+    alpha = 0.2,
+    inherit.aes = F) 
+  } 
+
+roc.plot <- roc.plot + 
+theme(plot.title = element_text(size=10, hjust = .5),
+      legend.position = c(0.6, 0.2),
+      legend.text = element_text(size=10),
+      text = element_text(size = 10)) + 
+      scale_color_manual(name = "AUCs:",
+                         values=c("Red", "Green", "Blue"), 
+                       labels=c(paste("Strain-Sharing Rate: ", round(logit.base.roc$auc,2),
+                                      " ± ",round(sqrt(var(logit.base.roc)),3), sep=""), 
+                                paste("SSR + Age + Gender: ", round(logit.covars.roc$auc, 2),
+                                      " ± ",round(sqrt(var(logit.covars.roc)),3), sep=""),
+                                paste("SSR + All Socio-Dem Covars: ", round(logit.all.roc$auc, 2),
+                                      " ± ",round(sqrt(var(logit.all.roc)),3), sep="")
+                                )
+                       ) +
+  ggtitle("All Social or Familial Relationships")
+
+roc.plot <- roc.plot +
+  theme_pubr(legend =  c(0.6, 0.2)) +
+  theme(plot.title = element_text(size = 10, hjust = .5)) +
+  labs_pubr()
+
+roc.plot <- roc.plot + theme(
+  plot.title = element_text(size = 10, hjust = .5),
+  legend.title = element_text(size = 8),
+  legend.text = element_text(size = 8)
+)
+
+```
+
+
+Non-Kin different house model
+```{r}
+for(i in 1:5){
+  inds <- c(1:nrow(Downsamp_all_nkh))
+  test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_nkh)), replace = F)
+  train1_inds <- inds[!(inds %in% test1_inds)]
+  test2_inds <- sample(train1_inds, size = floor(.5*length(train1_inds)), replace = F)
+  train2_inds <- inds[!(inds %in% test2_inds)]
+  test3_inds <- train2_inds[!(train2_inds %in% test1_inds)]
+  train3_inds <- inds[!(inds %in% test3_inds)]
+  
+  train1 <- Downsamp_all_nkh[train1_inds,]
+  test1 <- Downsamp_all_nkh[test1_inds,]
+  train2 <- Downsamp_all_nkh[train2_inds,]
+  test2 <- Downsamp_all_nkh[test2_inds,]
+  train3 <- Downsamp_all_nkh[train3_inds,]
+  test3 <- Downsamp_all_nkh[test3_inds,]
+  
+  logit.test.1 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train1, family = binomial)
+  logit.test.2 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train2, family = binomial)
+  logit.test.3 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train3, family = binomial)
+  preds.1 <- predict(logit.test.1, newdata = test1, type = "response")
+  preds.2 <- predict(logit.test.2, newdata = test2, type = "response")
+  preds.3 <- predict(logit.test.3, newdata = test3, type = "response")
+  names(preds.3) <- test3_inds
+  names(preds.2) <- test2_inds
+  names(preds.1) <- test1_inds
+  preds.round <- c(preds.1, preds.2, preds.3)
+  preds.round <- preds.round[order(as.numeric(names(preds.round)))]
+  logit.test.1.covars <- lme4::glmer(related ~ strain_sharing_rate + gender.mm + gender.mf +
+                        age_difference_abs + average_age + (0+strain_sharing_rate|village_name_w3),
+                              data = train1, family = binomial)
+  logit.test.2.covars <- lme4::glmer(related ~ strain_sharing_rate + gender.mm + gender.mf +
+                        age_difference_abs + average_age + (0+strain_sharing_rate|village_name_w3),
+                              data = train2, family = binomial)
+  logit.test.3.covars <- lme4::glmer(related ~ strain_sharing_rate + gender.mm + gender.mf +
+                        age_difference_abs + average_age + (0+strain_sharing_rate|village_name_w3),
+                              data = train3, family = binomial)
+  
+  preds.1.covars <- predict(logit.test.1.covars, newdata = test1, type = "response")
+  preds.2.covars <- predict(logit.test.2.covars, newdata = test2, type = "response")
+  preds.3.covars <- predict(logit.test.3.covars, newdata = test3, type = "response")
+  names(preds.3.covars) <- test3_inds
+  names(preds.2.covars) <- test2_inds
+  names(preds.1.covars) <- test1_inds
+  preds.round.covars <- c(preds.1.covars, preds.2.covars, preds.3.covars)
+  preds.round.covars <- preds.round.covars[order(as.numeric(names(preds.round.covars)))]
+  
+  logit.test.1.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                        indigenous.one + religion.same + age_difference_abs +
+                        average_age + wealth_difference_abs + average_wealth +
+                        education_difference_abs + average_education +
+                        strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train1, family = binomial)
+  logit.test.2.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                        indigenous.one + religion.same + age_difference_abs +
+                        average_age + wealth_difference_abs + average_wealth +
+                        education_difference_abs + average_education +
+                        strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train2, family = binomial)
+  logit.test.3.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                        indigenous.one + religion.same + age_difference_abs +
+                        average_age + wealth_difference_abs + average_wealth +
+                        education_difference_abs + average_education +
+                        strain_sharing_rate + (0+strain_sharing_rate|village_name_w3),
+                              data = train3, family = binomial)
+  
+  preds.1.all <- predict(logit.test.1.all, newdata = test1, type = "response")
+  preds.2.all <- predict(logit.test.2.all, newdata = test2, type = "response")
+  preds.3.all <- predict(logit.test.3.all, newdata = test3, type = "response")
+  names(preds.3.all) <- test3_inds
+  names(preds.2.all) <- test2_inds
+  names(preds.1.all) <- test1_inds
+  preds.round.all <- c(preds.1.all, preds.2.all, preds.3.all)
+  preds.round.all <- preds.round.all[order(as.numeric(names(preds.round.all)))]
+  
+  if(i == 1){
+    pred.all <- preds.round
+    pred.all.covars <- preds.round.covars
+    pred.all.all <- preds.round.all
+  }
+  else{
+    pred.all <- pred.all + preds.round
+    pred.all.covars <- pred.all.covars + preds.round.covars
+    pred.all.all <- pred.all.all + preds.round.all
+  }
+  
+}
+#Could make this without random effect don't have to deal with this stuff
+pred.all <- pred.all/5
+pred.all.covars <- pred.all.covars/5
+pred.all.all <- pred.all.all/5
+
+pred.all.acc <- pred.all
+pred.all.acc[pred.all.acc >=.5] <- 1
+pred.all.acc[pred.all.acc <.5] <- 0
+
+Downsamp_all_nkh$predicted <- pred.all.acc
+
+#Create ROC object weird it got worse, could do this over multiple downsamples as well
+#I think my predictions will be fairly consistent
+logit.base.roc <- pROC::roc(Downsamp_all_nkh$related, pred.all, ci=TRUE, plot=FALSE,
+                levels=c("0","1"), direction = "<")
+
+logit.covars.roc <- pROC::roc(Downsamp_all_nkh$related, pred.all.covars, ci=TRUE, plot=FALSE,
+                levels=c("0","1"), direction = "<")
+
+logit.all.roc <- pROC::roc(Downsamp_all_nkh$related, pred.all.all, ci=TRUE, plot=FALSE,
+                levels=c("0","1"), direction = "<")
+
+pROC::auc(logit.base.roc)[1]
+pROC::auc(logit.covars.roc)[1]
+pROC::auc(logit.all.roc)[1]
+
+roc.list <- list("Strain-Sharing Rate" = logit.base.roc,
+                 "SSR + Age + Gender" = logit.covars.roc,
+                 "SSR + All Socio-Dem Covars" = logit.all.roc)
+
+ci.list <- lapply(roc.list, ci.se, specificities = seq(0, 1, l = 25))
+
+dat.ci.list <- lapply(ci.list, function(ciobj) 
+  data.frame(x = as.numeric(rownames(ciobj)),
+             lower = ciobj[, 1],
+             upper = ciobj[, 3]))
+
+roc.plot.nkh <- ggroc(roc.list) +
+  theme_minimal() +
+  geom_abline(slope=1, intercept = 1, linetype = "dashed", alpha=1, color = "grey") +
+  coord_equal()
+
+for(i in 1:3) {
+  roc.plot.nkh <- roc.plot.nkh + geom_ribbon(
+    data = dat.ci.list[[i]],
+    aes(x = x, ymin = lower, ymax = upper),
+    fill = i + 1,
+    alpha = 0.2,
+    inherit.aes = F) 
+  } 
+
+roc.plot.nkh <- roc.plot.nkh + 
+theme(plot.title = element_text(size=10, hjust = .5),
+      legend.position = c(0.6, 0.2),
+      legend.text = element_text(size=10),
+      text = element_text(size = 10)) + 
+      scale_color_manual(name = "AUCs:",
+                         values=c("Red", "Green", "Blue"), 
+                       labels=c(paste("Strain-Sharing Rate: ", round(logit.base.roc$auc,2),
+                                      " ± ",round(sqrt(var(logit.base.roc)),3), sep=""), 
+                                paste("SSR + Age + Gender: ", round(logit.covars.roc$auc, 2),
+                                      " ± ",round(sqrt(var(logit.covars.roc)),3), sep=""),
+                                paste("SSR + All Socio-Dem Covars: ", round(logit.all.roc$auc, 2),
+                                      " ± ",round(sqrt(var(logit.all.roc)),3), sep="")
+                                )
+                       ) +
+  ggtitle("Non-Kin Different House Relationships")
+
+roc.plot.nkh <- roc.plot.nkh +
+  theme_pubr(legend =  c(0.6, 0.2)) +
+  theme(plot.title = element_text(size = 10, hjust = .5)) +
+  labs_pubr()
+
+roc.plot.nkh <- roc.plot.nkh + theme(
+  plot.title = element_text(size = 10, hjust = .5),
+  legend.title = element_text(size = 8),
+  legend.text = element_text(size = 8)
+)
+```
+
+Prediction plot all rels
+```{r}
+village_map
+#Ah that's it
+#See which villages have the best accuracy
+Downsamp_all %>% group_by(village_name_w3) %>% summarize(acc = mean(predicted == related),
+                                                         perc_pred = mean(predicted),
+                                                         perc_real = mean(related))
+
+
+Downsamp_all %>% group_by(village_name_w3) %>% summarize(acc = mean(predicted == related),
+                                                         tp = mean(predicted == 1 & related ==1))
+Downsamp_all %>% filter(related == 1)%>% group_by(village_name_w3) %>%
+  summarize(acc = mean(predicted == related))
+
+Downsamp_all_nkh %>% group_by(village_name_w3) %>% summarize(acc = mean(predicted == related))
+
+#Mariposal and Carrizalito 1 do well and Quesaras
+Downsamp_all <- Downsamp_all %>% mutate(tp = predicted == related)
+
+pred_graph <- Downsamp_all %>%
+  filter(village_name_w3 == "Carrizalito 1", related ==1) %>%
+  graph_from_data_frame(directed = FALSE) 
+
+pred_colors <- edge_attr(pred_graph, "predicted")
+E(pred_graph)$size <- pred_colors*1.5+3.5
+
+pred_colors[pred_colors == 1] <- "blue"
+pred_colors[pred_colors == 0] <- "grey"
+
+#Good ad predictig within cluster
+E(pred_graph)$color <- pred_colors
+par(mar=c(0,0,0,0))
+set.seed(1)
+layout <- layout.fruchterman.reingold(pred_graph)
+
+#svglite("../Figures/Figure3/Prediction_Network_All.svg")
+
+plot(pred_graph,
+     vertex.label = NA,
+     vertex.size = 5,
+     layout = layout,
+     edge.width = E(pred_graph)$size)
+legend("topleft",
+       legend=c("True Positive", "False Negative"),
+       col=c("blue", "grey"),
+       lty = c(1,1),
+       lwd = 2,
+       bty = "n")
+
+#dev.off()
+
+```
+
+Prediction plot nkh
+```{r}
+Downsamp_all_nkh <- Downsamp_all_nkh %>% mutate(tp = predicted == related)
+
+
+#Fuck shouldn't this be simplified
+pred_graph_nkh <- Downsamp_all_nkh %>%
+  filter(village_name_w3 == "Carrizalito 1", related ==1) %>%
+  graph_from_data_frame(directed = FALSE)
+
+
+pred_colors <- edge_attr(pred_graph_nkh, "predicted")
+E(pred_graph_nkh)$size <- pred_colors*1.5+3.5
+pred_colors[pred_colors == 1] <- "blue"
+pred_colors[pred_colors == 0] <- "grey"
+
+#Good ad predictig within cluster
+E(pred_graph_nkh)$color <- pred_colors
+
+#Set layout
+#Add missing vertices
+layout <- as.data.frame(layout)
+layout$vertex_name <- names(V(pred_graph))
+
+missing_verts <- layout$vertex_name[!(layout$vertex_name %in% names(V(pred_graph_nkh)))]
+pred_graph_nkh <- add_vertices(pred_graph_nkh,length(missing_verts), name = missing_verts)
+
+layout_nkh <- layout[match(names(V(pred_graph_nkh)),layout$vertex_name), ]
+layout_nkh <- as.matrix(layout_nkh %>% select(-vertex_name))
+layout <- as.matrix(layout %>% select(-vertex_name))
+
+par(mar=c(0,0,0,0))
+set.seed(1)
+
+#svglite("../Figures/Figure3/Prediction_Network_NKH.svg")
+
+plot(pred_graph_nkh,
+     vertex.label = NA,
+     vertex.size = 5,
+     layout = layout_nkh,
+     edge.width = E(pred_graph_nkh)$size)
+legend("topleft",
+       legend=c("True Positive", "False Negative"),
+       col=c("blue", "grey"),
+       lty = c(1,1),
+       lwd = 2,
+       bty = "n")
+
+#dev.off()
+```
+
+Make network prediction figure
+
+```{r}
+
+library("ggplotify")
+set.seed(1)
+p1_test <- as.ggplot(expression(
+  plot(
+    pred_graph,
+    vertex.label = NA,
+    vertex.size = 5,
+    layout = layout,
+    edge.width = E(pred_graph)$size,
+    vertex.color = "orange"
+  ),
+  title("All Social or Familial Relationships",
+        cex.main = .8),
+  legend(
+    x = .3,
+    y = 1,
+    legend = c("True Positive", "False Negative"),
+    col = c("blue", "grey"),
+    lty = c(1, 1),
+    lwd = 2,
+    bty = "n"
+  )
+))
+set.seed(1)
+p2_test <- as.ggplot(expression(
+  plot(
+    pred_graph_nkh,
+    vertex.label = NA,
+    vertex.size = 5,
+    layout = layout_nkh,
+    edge.width = E(pred_graph_nkh)$size,
+    vertex.color = "orange"
+  ),
+  title("Non-Kin Different House Relationships",
+        cex.main = .8),
+  legend(
+    x = .3,
+    y = 1,
+    legend = c("True Positive", "False Negative"),
+    col = c("blue", "grey"),
+    lty = c(1, 1),
+    lwd = 2,
+    bty = "n"
+  )
+)) 
+
+
+roc_test_2 <- as.ggplot(roc.plot.nkh)
+roc_test_1 <- as.ggplot(roc.plot)
+
+rocs_1 <-ggarrange(roc.plot, roc.plot.nkh, nrow = 2, labels = c("A", "C"))
+
+
+networks_1 <- ggarrange(p1_test, p2_test, nrow = 2,
+                        labels = c("B",
+                                   "D"))
+
+fig3 <- ggarrange(rocs_1, networks_1, ncol = 2)
+
+
+svglite("../FiguresNew/Figure3/fig3_full_updated.svg")
+fig3
+dev.off()
+
+
+```
+
+
+Permutation Feature Importance
+```{r}
+#head(Downsamp_all)
+#Downsamp_all_importance <- Downsamp_all %>%
+#  select(-c(ego, alter, tp, bray_curtis_sim, jaccard_sim, village_name_w3, predicted))
+
+Downsamp_all_importance <- Downsamp_all %>%
+  select(-c(ego, alter, bray_curtis_sim, jaccard_sim, village_name_w3, predicted))
+
+auc_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 10))
+colnames(auc_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
+                             "education_difference","average_education","strain_sharing_rate")
+
+#only permute within village NEED to ADD BACK
+#Damn ok, shouldn't be that hard. 
+#I think it's ok to drop mixed effect
+#Doesn't really do that much
+#Gender
+print("gender")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  gender_cols <- dat_permuted[,c("gender.mm", "gender.mf")]
+  gender_cols <- gender_cols[sample(nrow(gender_cols)),]
+  dat_permuted[,c("gender.mm", "gender.mf")] <- gender_cols
+  logit_perm <- glm(related ~ .,
+                    family = binomial, data = dat_permuted)
+  auc_perms_ssr$gender[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+
+#indigenous status
+print("indigenous status")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  indigenous_cols <- dat_permuted[,c("indigenous.both", "indigenous.one")]
+  indigenous_cols <- indigenous_cols[sample(nrow(indigenous_cols)),]
+  dat_permuted[,c("indigenous.both", "indigenous.one")] <- indigenous_cols
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$indigenous_status[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#religion
+print("religion")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$religion.same <- sample(dat_permuted$religion.same)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$religion[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#age difference
+print("age difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$age_difference_abs <- sample(dat_permuted$age_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$age_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average age
+print("average age")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_age <- sample(dat_permuted$average_age)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_age[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#wealth difference
+print("wealth difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$wealth_difference_abs <- sample(dat_permuted$wealth_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$wealth_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average wealth
+print("average wealth")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_wealth <- sample(dat_permuted$average_wealth)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_wealth[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#education
+print("education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$education_difference_abs <- sample(dat_permuted$education_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$education_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average education
+print("average education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_education <- sample(dat_permuted$average_education)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_education[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#strain sharing rate 
+print("strain sharing rate")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$strain_sharing_rate <- sample(dat_permuted$strain_sharing_rate)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$strain_sharing_rate[i] <- auc(dat_permuted$related , logit_perm$fitted.values, 
+                                              levels=c("0","1"), direction = "<")
+}
+
+#Get original logistic regression model
+logit_ssr <- glm(related ~ . ,
+                 family = binomial,
+                 data = Downsamp_all_importance)
+
+#Summary of logistic regression
+summary(logit_ssr)
+
+# #Calculate VIF for validity of permutation null
+# library(car)
+# #All relatively low, good to go
+# vif(logit_ssr)
+# vif_values <- vif(logit_ssr)
+
+#create horizontal bar chart to display each VIF value
+# par(mar=c(5.1, 4.1, 4.1, 2.1))
+# barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue", las = 2)
+
+#add vertical line at 5
+#abline(v = 5, lwd = 3, lty = 2)
+
+#Get original auc
+auc_ssr <-  auc(Downsamp_all_importance$related , logit_ssr$fitted.values,
+                levels=c("0","1"), direction = "<")
+
+#Get percent change in auc from original under permutation
+auc_perms_percent_ssr <- auc_perms_ssr
+auc_perms_percent_ssr <- (as.numeric(auc_ssr) - auc_perms_percent_ssr) / as.numeric(auc_ssr) * 100
+
+#Get mean drop and standard devation in dataframe
+auc_perms_ssr_dat <- data.frame(name = names(auc_perms_percent_ssr),
+                                value = colMeans(auc_perms_percent_ssr),
+                                sd = apply(auc_perms_percent_ssr,2,sd))
+
+#Change Name to Make More Readable
+auc_perms_ssr_dat$name <-c("Gender",
+                           "Indigenous\nStatus",
+                           "Religion",
+                           "Age\nDifference",
+                           "Average\nAge",
+                           "Wealth\nDifference",
+                           "Average\nWealth",
+                           "Education\nDifference",
+                           "Average\nEducation",
+                           "Strain-Sharing\nRate")
+
+
+
+
+#Create plot
+fi_all <- ggplot(auc_perms_ssr_dat) +
+  geom_bar(
+    aes(x = reorder(name,-value), y = value),
+    stat = "identity",
+    fill = "skyblue",
+    alpha = 0.7
+  ) +
+  geom_errorbar(
+    aes(
+      x = name,
+      ymin = value - sd,
+      ymax = value + sd
+    ),
+    width = 0.4,
+    colour = "orange",
+    alpha = 0.9,
+    linewidth = 1.3
+  ) +
+  coord_cartesian(ylim = c(0, 15)) +
+  xlab("Covariate") +
+  ylab("Average % Drop in AUC under Permutation") +
+  theme_bw() +
+  theme(axis.text.x = element_text( vjust = 1, hjust=.5, size = 8),
+        plot.title = element_text(hjust=.5)
+  ) +
+  ggtitle("All Social and Familial Relationships") +
+  theme_pubr() +
+  labs_pubr()
+
+
+
+```
+
+
+
+
+
+Permutation Inference for Non-Kin Different House
+
+```{r}
+
+#Downsamp_all_importance <- Downsamp_all_nkh %>%
+#  select(-c(ego, alter, tp, bray_curtis_sim, jaccard_sim, village_name_w3, predicted))
+
+Downsamp_all_importance <- Downsamp_all_nkh %>%
+  select(-c(ego, alter, bray_curtis_sim, jaccard_sim, village_name_w3, predicted))
+
+
+auc_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 10))
+colnames(auc_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
+                             "education_difference","average_education","strain_sharing_rate")
+
+#only permute within village NEED to ADD BACK
+#Damn ok, shouldn't be that hard. 
+#I think it's ok to drop mixed effect
+#Doesn't really do that much
+#Gender
+print("gender")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  gender_cols <- dat_permuted[,c("gender.mm", "gender.mf")]
+  gender_cols <- gender_cols[sample(nrow(gender_cols)),]
+  dat_permuted[,c("gender.mm", "gender.mf")] <- gender_cols
+  logit_perm <- glm(related ~ .,
+                    family = binomial, data = dat_permuted)
+  auc_perms_ssr$gender[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+
+#indigenous status
+print("indigenous status")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  indigenous_cols <- dat_permuted[,c("indigenous.both", "indigenous.one")]
+  indigenous_cols <- indigenous_cols[sample(nrow(indigenous_cols)),]
+  dat_permuted[,c("indigenous.both", "indigenous.one")] <- indigenous_cols
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$indigenous_status[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#religion
+print("religion")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$religion.same <- sample(dat_permuted$religion.same)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$religion[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#age difference
+print("age difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$age_difference_abs <- sample(dat_permuted$age_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$age_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average age
+print("average age")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_age <- sample(dat_permuted$average_age)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_age[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#wealth difference
+print("wealth difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$wealth_difference_abs <- sample(dat_permuted$wealth_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$wealth_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average wealth
+print("average wealth")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_wealth <- sample(dat_permuted$average_wealth)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_wealth[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#education
+print("education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$education_difference_abs <- sample(dat_permuted$education_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$education_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average education
+print("average education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_education <- sample(dat_permuted$average_education)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_education[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#strain sharing rate 
+print("strain sharing rate")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$strain_sharing_rate <- sample(dat_permuted$strain_sharing_rate)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$strain_sharing_rate[i] <- auc(dat_permuted$related , logit_perm$fitted.values, 
+                                              levels=c("0","1"), direction = "<")
+}
+
+#Get original logistic regression model
+logit_ssr <- glm(related ~ . ,
+                 family = binomial,
+                 data = Downsamp_all_importance)
+
+#Summary of logistic regression
+summary(logit_ssr)
+
+# #Calculate VIF for validity of permutation null
+# library(car)
+# #All relatively low, good to go
+# vif(logit_ssr)
+# vif_values <- vif(logit_ssr)
+# 
+# #create horizontal bar chart to display each VIF value
+# par(mar=c(5.1, 4.1, 4.1, 2.1))
+# barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue", las = 2)
+
+#add vertical line at 5
+#abline(v = 5, lwd = 3, lty = 2)
+
+#Get original auc
+auc_ssr <-  auc(Downsamp_all_importance$related , logit_ssr$fitted.values,
+                levels=c("0","1"), direction = "<")
+
+#Get percent change in auc from original under permutation
+auc_perms_percent_ssr <- auc_perms_ssr
+auc_perms_percent_ssr <- (as.numeric(auc_ssr) - auc_perms_percent_ssr) / as.numeric(auc_ssr) *100
+
+#Get mean drop and standard devation in dataframe
+auc_perms_ssr_dat <- data.frame(name = names(auc_perms_percent_ssr),
+                                value = colMeans(auc_perms_percent_ssr),
+                                sd = apply(auc_perms_percent_ssr,2,sd))
+
+#Change Name to Make More Readable
+auc_perms_ssr_dat$name <-c("Gender",
+                           "Indigenous\nStatus",
+                           "Religion",
+                           "Age\nDifference",
+                           "Average\nAge",
+                           "Wealth\nDifference",
+                           "Average\nWealth",
+                           "Education\nDifference",
+                           "Average\nEducation",
+                           "Strain-Sharing\nRate")
+
+
+#Create plot
+#Whether to downsample of not from this
+#hmmmmm
+#Also could do the other way
+fi_all_nkh <- ggplot(auc_perms_ssr_dat) +
+  geom_bar( aes(x=reorder(name, -value), y=value), stat="identity", fill="skyblue", alpha=0.7) +
+  geom_errorbar( aes(x=name, ymin=value-sd, ymax=value+sd), width=0.4, colour="orange", alpha=0.9, linewidth=1.3) +
+  coord_cartesian(ylim = c(0,15)) +
+  xlab("Covariate") +
+  ylab("Average % Drop in AUC under Permutation") +
+  theme_bw() +
+  theme(axis.text.x = element_text( vjust = 1, hjust=.5, size = 8),
+        plot.title = element_text(hjust=.5)) +
+  ggtitle("Non-Kin Different House Relationships") +
+  theme_pubr() +
+  labs_pubr()
+
+
+```
+
+
+
+
+```{r}
+fi_fig <- ggarrange(fi_all + rremove("ylab"),
+                    fi_all_nkh+ rremove("ylab"),
+                    nrow = 2,
+                    labels = c("A", "B"))
+
+
+svglite("../FiguresNew/SFigure9/sfigure9_full.svg")
+annotate_figure(fi_fig, 
+                left = text_grob("Average % Drop in AUC under Permutation",rot = 90, size = 14),
+                top = text_grob("Permutation Feature Importance", size = 14),
+                )
+dev.off()
+
+
+annotate_figure(fi_fig, 
+                left = text_grob("Average % Drop in AUC under Permutation",rot = 90, size = 14),
+                top = text_grob("Permutation Feature Importance", size = 14),
+                )
+
+```
+
+
+
+
+
+Flipping to predict similarity
+
+
+```{r}
+install.packages('betareg')
+library(betareg)
+
+hist(Downsamp_all$strain_sharing_rate, breaks = 50)
+
+Downsamp_all_importance <- Downsamp_all %>%
+  select(-c(ego, alter, tp, bray_curtis_sim, jaccard_sim, village_name_w3, predicted))
+
+auc_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 10))
+colnames(auc_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
+                             "education_difference","average_education","related")
+?betareg
+#Adjust values to be within 0 and 1
+Downsamp_all_importance$strain_sharing_rate[Downsamp_all_importance$strain_sharing_rate == 0] <- .01
+
+Downsamp_all_importance$strain_sharing_rate[Downsamp_all_importance$strain_sharing_rate == 1] <- .99
+#Downsamp_all_importance$strain_sharing_rate <- Downsamp_all_importance$strain_sharing_rate+.0001
+
+range(Downsamp_all_importance$strain_sharing_rate)
+beta.mod <- betareg(strain_sharing_rate ~ ., data = Downsamp_all_importance)
+lm.mod <- lm(strain_sharing_rate ~ ., data = Downsamp_all_importance)
+
+plot(beta.mod$fitted.values, Downsamp_all_importance$strain_sharing_rate)
+plot(lm.mod$fitted.values, Downsamp_all_importance$strain_sharing_rate)
+
+#LM actually has lower MSE
+mean((fitted(beta.mod) - Downsamp_all_importance$strain_sharing_rate)^2)
+mean((fitted(lm.mod) - Downsamp_all_importance$strain_sharing_rate)^2)
+
+plot(beta.mod$fitted.values, Downsamp_all_importance$related)
+
+plot(lm.mod$fitted.values, Downsamp_all_importance$related)
+
+plot(fitted(beta.mod),
+     residuals(beta.mod))
+
+plot(fitted(lm.mod),
+     residuals(lm.mod))
+
+
+#Gender
+print("gender")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  gender_cols <- dat_permuted[,c("gender.mm", "gender.mf")]
+  gender_cols <- gender_cols[sample(nrow(gender_cols)),]
+  dat_permuted[,c("gender.mm", "gender.mf")] <- gender_cols
+  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
+  auc_perms_ssr$gender[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
+}
+
+#indigenous status
+print("indigenous status")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  indigenous_cols <- dat_permuted[,c("indigenous.both", "indigenous.one")]
+  indigenous_cols <- indigenous_cols[sample(nrow(indigenous_cols)),]
+  dat_permuted[,c("indigenous.both", "indigenous.one")] <- indigenous_cols
+  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
+  auc_perms_ssr$indigenous_status[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
+}
+#religion
+print("religion")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$religion.same <- sample(dat_permuted$religion.same)
+  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
+  auc_perms_ssr$religion[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
+}
+#age difference
+print("age difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$age_difference_abs <- sample(dat_permuted$age_difference_abs)
+  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
+  auc_perms_ssr$age_difference[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
+}
+#average age
+print("average age")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_age <- sample(dat_permuted$average_age)
+  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
+  auc_perms_ssr$average_age[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
+}
+#wealth difference
+print("wealth difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$wealth_difference_abs <- sample(dat_permuted$wealth_difference_abs)
+  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
+  auc_perms_ssr$wealth_difference[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
+}
+#average wealth
+print("average wealth")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_wealth <- sample(dat_permuted$average_wealth)
+  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
+  auc_perms_ssr$average_wealth[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
+}
+#education
+print("education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$education_difference_abs <- sample(dat_permuted$education_difference_abs)
+  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
+  auc_perms_ssr$education_difference[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
+}
+#average education
+print("average education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_education <- sample(dat_permuted$average_education)
+  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
+  auc_perms_ssr$average_education[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
+}
+#social relationship
+print("social relationship")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$related <- sample(dat_permuted$related)
+  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
+  auc_perms_ssr$related[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
+}
+
+#Get original bet regression model
+beta.mod <- betareg(strain_sharing_rate ~ ., data = Downsamp_all_importance)
+
+mean((fitted(beta.mod) - Downsamp_all_importance$strain_sharing_rate)^2)
+#Summary of beta regression
+summary(beta.mod)
+
+# #Calculate VIF for validity of permutation null
+# library(car)
+# #All relatively low, good to go
+# vif(logit_ssr)
+# vif_values <- vif(logit_ssr)
+# 
+# #create horizontal bar chart to display each VIF value
+# par(mar=c(5.1, 4.1, 4.1, 2.1))
+# barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue", las = 2)
+# 
+# #add vertical line at 5
+# abline(v = 5, lwd = 3, lty = 2)
+
+#Get original MSE
+auc_ssr <-  mean((fitted(beta.mod) - Downsamp_all_importance$strain_sharing_rate)^2)
+
+#Get percent change in auc from original under permutation
+auc_perms_percent_ssr <- auc_perms_ssr
+auc_perms_percent_ssr <- (as.numeric(auc_ssr) - auc_perms_percent_ssr) / as.numeric(auc_ssr)
+
+#Get mean drop and standard devation in dataframe
+auc_perms_ssr_dat <- data.frame(name = names(auc_perms_percent_ssr),
+                                value = colMeans(auc_perms_percent_ssr),
+                                sd = apply(auc_perms_percent_ssr,2,sd))
+auc_perms_ssr_dat$value <- auc_perms_ssr_dat$value*(-1)
+auc_perms_ssr_dat$value <- auc_perms_ssr_dat$value *100
+#Change Name to Make More Readable
+auc_perms_ssr_dat$name <-c("Gender",
+                           "Indigenous\nStatus",
+                           "Religion",
+                           "Age\nDifference",
+                           "Average\nAge",
+                           "Wealth\nDifference",
+                           "Average\nWealth",
+                           "Education\nDifference",
+                           "Average\nEducation",
+                           "Social or \nFamilial\nRelationship")
+
+
+#Create plot
+#Whether to downsample of not from this
+#hmmmmm
+#Also could do the other way
+#May want to make this out of sample next, but this is really cool
+fi_beta_all <- ggplot(auc_perms_ssr_dat) +
+  geom_bar( aes(x=reorder(name, -value), y=value), stat="identity", fill="skyblue", alpha=0.7) +
+  geom_errorbar( aes(x=name, ymin=value-sd, ymax=value+sd), width=0.4, colour="orange", alpha=0.9, size=1.3) +
+  coord_cartesian(ylim = c(0,20)) +
+  xlab("Covariate") +
+  ylab("Average % Increase in MSE under Permutation") +
+  theme_bw() +
+  theme(axis.text.x = element_text( vjust = 1, hjust=.5, size = 8)) +
+  ggtitle("All Social and Familial Relationships") 
+```
+
+Test for species
+```{r}
+
+hist(Downsamp_all$jaccard_sim, breaks = 50)
+
+Downsamp_all_importance <- Downsamp_all %>%
+  select(-c(ego, alter, tp, strain_sharing_rate, bray_curtis_sim, village_name_w3, predicted))
+
+auc_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 10))
+colnames(auc_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
+                             "education_difference","average_education","related")
+
+#Adjust values to be within 0 and 1
+Downsamp_all_importance$jaccard_sim[Downsamp_all_importance$jaccard_sim == 0] <- .01
+
+Downsamp_all_importance$jaccard_sim[Downsamp_all_importance$jaccard_sim == 1] <- .99
+
+beta.mod <- betareg(jaccard_sim ~ ., data = Downsamp_all_importance)
+
+lm.mod <- lm(jaccard_sim ~ ., data = Downsamp_all_importance)
+
+summary(lm.mod)
+
+mean((fitted(beta.mod) - Downsamp_all_importance$jaccard_sim)^2)
+
+plot(lm.mod$fitted.values, Downsamp_all_importance$related)
+
+hist(lm.mod$fitted.values)
+plot(lm.mod$fitted.values, Downsamp_all_importance$jaccard_sim)
+plot(fitted(lm.mod),
+     residuals(lm.mod))
+
+
+#Gender
+print("gender")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  gender_cols <- dat_permuted[,c("gender.mm", "gender.mf")]
+  gender_cols <- gender_cols[sample(nrow(gender_cols)),]
+  dat_permuted[,c("gender.mm", "gender.mf")] <- gender_cols
+  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
+  auc_perms_ssr$gender[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
+}
+
+#indigenous status
+print("indigenous status")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  indigenous_cols <- dat_permuted[,c("indigenous.both", "indigenous.one")]
+  indigenous_cols <- indigenous_cols[sample(nrow(indigenous_cols)),]
+  dat_permuted[,c("indigenous.both", "indigenous.one")] <- indigenous_cols
+  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
+  auc_perms_ssr$indigenous_status[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
+}
+#religion
+print("religion")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$religion.same <- sample(dat_permuted$religion.same)
+  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
+  auc_perms_ssr$religion[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
+}
+#age difference
+print("age difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$age_difference_abs <- sample(dat_permuted$age_difference_abs)
+  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
+  auc_perms_ssr$age_difference[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
+}
+#average age
+print("average age")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_age <- sample(dat_permuted$average_age)
+  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
+  auc_perms_ssr$average_age[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
+}
+#wealth difference
+print("wealth difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$wealth_difference_abs <- sample(dat_permuted$wealth_difference_abs)
+  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
+  auc_perms_ssr$wealth_difference[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
+}
+#average wealth
+print("average wealth")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_wealth <- sample(dat_permuted$average_wealth)
+  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
+  auc_perms_ssr$average_wealth[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
+}
+#education
+print("education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$education_difference_abs <- sample(dat_permuted$education_difference_abs)
+  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
+  auc_perms_ssr$education_difference[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
+}
+#average education
+print("average education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_education <- sample(dat_permuted$average_education)
+  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
+  auc_perms_ssr$average_education[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
+}
+#social relationship
+print("social relationship")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$related <- sample(dat_permuted$related)
+  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
+  auc_perms_ssr$related[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
+}
+
+#Get original bet regression model
+beta.mod <- betareg(jaccard_sim ~ ., data = Downsamp_all_importance)
+
+mean((fitted(beta.mod) - Downsamp_all_importance$jaccard_sim)^2)
+#Summary of beta regression
+summary(beta.mod)
+
+# #Calculate VIF for validity of permutation null
+# library(car)
+# #All relatively low, good to go
+# vif(logit_ssr)
+# vif_values <- vif(logit_ssr)
+# 
+# #create horizontal bar chart to display each VIF value
+# par(mar=c(5.1, 4.1, 4.1, 2.1))
+# barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue", las = 2)
+# 
+# #add vertical line at 5
+# abline(v = 5, lwd = 3, lty = 2)
+
+#Get original MSE
+auc_ssr <-  mean((fitted(beta.mod) - Downsamp_all_importance$jaccard_sim)^2)
+
+#Get percent change in auc from original under permutation
+auc_perms_percent_ssr <- auc_perms_ssr
+auc_perms_percent_ssr <- (as.numeric(auc_ssr) - auc_perms_percent_ssr) / as.numeric(auc_ssr)
+
+#Get mean drop and standard devation in dataframe
+auc_perms_ssr_dat <- data.frame(name = names(auc_perms_percent_ssr),
+                                value = colMeans(auc_perms_percent_ssr),
+                                sd = apply(auc_perms_percent_ssr,2,sd))
+auc_perms_ssr_dat$value <- auc_perms_ssr_dat$value*(-1)
+auc_perms_ssr_dat$value <- auc_perms_ssr_dat$value *100
+#Change Name to Make More Readable
+auc_perms_ssr_dat$name <-c("Gender",
+                           "Indigenous\nStatus",
+                           "Religion",
+                           "Age\nDifference",
+                           "Average\nAge",
+                           "Wealth\nDifference",
+                           "Average\nWealth",
+                           "Education\nDifference",
+                           "Average\nEducation",
+                           "Social or \nFamilial\nRelationship")
+
+
+#Create plot
+#Whether to downsample of not from this
+#hmmmmm
+#Also could do the other way
+#May want to make this out of sample next, but this is really cool
+#WTF it get's better for most
+#Maybe AUC is a bad metrics R^2
+#Or this model is horribly misspecified
+fi_beta_all_jc <- ggplot(auc_perms_ssr_dat) +
+  geom_bar( aes(x=reorder(name, -value), y=value), stat="identity", fill="skyblue", alpha=0.7) +
+  geom_errorbar( aes(x=name, ymin=value-sd, ymax=value+sd), width=0.4, colour="orange", alpha=0.9, size=1.3) +
+  coord_cartesian(ylim = c(-2.5,2.5)) +
+  xlab("Covariate") +
+  ylab("Average % Increase in MSE under Permutation") +
+  theme_bw() +
+  theme(axis.text.x = element_text( vjust = 1, hjust=.5, size = 8)) +
+  ggtitle("All Social and Familial Relationships") 
+```
+
+
+

@@ -1,0 +1,982 @@
+---
+title: "Analysis_Species"
+author: "Jackson Pullman"
+date: "2023-02-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+shared_summary <- SN %>% 
+  distinct(pair_key, relationship, .keep_all = TRUE) %>% #Symmetrize network to avoid reccipricol nominations
+  group_by(relationship) %>%
+  summarise(Proportion_With_Shared_Species = round(mean(bray_curtis_sim>0),2),
+            Median_Bray_Curtis_Sim = round(median(bray_curtis_sim),2),
+            Median_Jaccard_Sim = round(median(jaccard_sim),2),
+            n = n()) %>%
+  arrange(desc(Median_Bray_Curtis_Sim))
+
+#Get shared strain rates for unnominated individuals in the same village
+for(i in 1:length(village_names)){
+  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
+  bc_vil <- species_bray[rownames(species_bray) %in% village_ids ,
+                         colnames(species_bray) %in% village_ids]
+  j_vil <- species_jaccard_sim[rownames(species_jaccard_sim) %in% village_ids ,
+                               colnames(species_jaccard_sim) %in% village_ids]
+  for(j in 1:nrow(SN_Village)){
+    bc_vil[rownames(bc_vil) == SN_Village$ego[i],
+           colnames(bc_vil) == SN_Village$alter[i]] <- NA
+    j_vil[rownames(j_vil) == SN_Village$ego[i],
+          colnames(j_vil) == SN_Village$alter[i]] <- NA
+    bc_vil[rownames(bc_vil) == SN_Village$alter[i],
+           colnames(bc_vil) == SN_Village$ego[i]] <- NA
+    j_vil[rownames(j_vil) == SN_Village$alter[i],
+          colnames(j_vil) == SN_Village$ego[i]] <- NA
+  }
+  bc_vil[lower.tri(bc_vil, diag = TRUE)] <- NA
+  j_vil[lower.tri(j_vil, diag = TRUE)] <- NA
+  if(i ==1){
+    unrelated_bc <- c(na.omit(unlist(as.list(bc_vil))))
+    unrelated_j <- c(na.omit(unlist(as.list(j_vil))))
+  }
+  else{
+    unrelated_bc <- c(unrelated_bc,na.omit(unlist(as.list(bc_vil))))
+    unrelated_j <- c(unrelated_j,na.omit(unlist(as.list(j_vil))))
+  }
+}
+
+#Get counts across for individuals in different villages
+species_bray_2 <- species_bray
+species_jaccard_sim_2 <- species_jaccard_sim
+
+for(i in 1:length(village_names)){
+  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
+  for(j in 1:length(village_ids)-1){
+    for(k in j:length(village_ids)){
+      species_bray_2[rownames(species_bray_2) == village_ids[j] ,
+                    colnames(species_bray_2) == village_ids[k]] <- NA
+      species_bray_2[colnames(species_bray_2) == village_ids[k] ,
+                    rownames(species_bray_2) == village_ids[j]] <- NA
+      species_jaccard_sim_2[rownames(species_jaccard_sim_2) == village_ids[j] ,
+                    colnames(species_jaccard_sim_2) == village_ids[k]] <- NA
+      species_jaccard_sim_2[colnames(species_jaccard_sim_2) == village_ids[k] ,
+                    rownames(species_jaccard_sim_2) == village_ids[j]] <- NA
+    }
+  }
+}
+#Make matrix lower triangular and in list form
+species_bray_2[lower.tri(species_bray_2, diag = TRUE)] <- NA
+species_bray_2 <- na.omit(unlist(as.list(species_bray_2)))
+#Make matrix lower triangular and in list form
+species_jaccard_sim_2[lower.tri(species_jaccard_sim_2, diag = TRUE)] <- NA
+species_jaccard_sim_2 <- na.omit(unlist(as.list(species_jaccard_sim_2)))
+
+#add on unnominated individuals and individuals in different villages to summary
+shared_summary <-
+  shared_summary %>% add_row(
+    relationship = "No Nomination - Same Village",
+    Proportion_With_Shared_Species = round(mean(unrelated_bc > 0), 2),
+    Median_Bray_Curtis_Sim = round(median(unrelated_j), 2),
+    Median_Jaccard_Sim = round(median(unrelated_j), 2),
+    n = length(unrelated_bc)
+  )
+
+shared_summary <- shared_summary %>%
+  add_row(
+    relationship = "No Nomination - Different Village",
+    Proportion_With_Shared_Species = round(mean(species_bray_2 > 0), 2),
+    Median_Bray_Curtis_Sim = round(median(species_bray_2), 2),
+    Median_Jaccard_Sim = round(median(species_jaccard_sim_2), 2),
+    n = length(species_jaccard_sim_2)
+  )
+
+
+#add on row for non-kin in a different house relationships
+#Creat non-kin and different house network for sensitivity analysis
+family_house_pairs <- unique(SN$pair_key[SN$same_building == 1 |
+                                           SN$relationship %in% c("father", "mother", "sibling", "child_over12_other_house")])
+
+SN_Non_Kin_House <- SN %>% filter(!pair_key %in% family_house_pairs)
+
+
+non_kin_different_house_row <- SN_Non_Kin_House %>%
+  distinct(pair_key, .keep_all = TRUE) %>%
+  summarise(
+    relationship = "Non-Kin and Different House",
+    Proportion_With_Shared_Species = round(mean(bray_curtis_sim > 0), 2),
+    Median_Bray_Curtis_Sim = round(median(bray_curtis_sim), 2),
+    Median_Jaccard_Sim = round(median(jaccard_sim), 2),
+    n = n()
+  ) %>%
+  arrange(desc(Median_Bray_Curtis_Sim))
+
+shared_summary <- shared_summary %>% add_row(non_kin_different_house_row)
+
+#Add on summary row for people living in the same house
+same_house <- SN %>%
+  distinct(pair_key, .keep_all = TRUE) %>%
+  filter(same_building == 1) %>%
+  summarise(
+    relationship = "Same Building",
+    Proportion_With_Shared_Species = round(mean(bray_curtis_sim > 0), 2),
+    Median_Bray_Curtis_Sim = round(median(bray_curtis_sim), 2),
+    Median_Jaccard_Sim = round(median(jaccard_sim), 2),
+    n = n()
+  ) %>%
+  arrange(desc(Median_Bray_Curtis_Sim))
+
+shared_summary <- shared_summary %>% add_row(same_house)
+
+
+names(shared_summary) <- c("Relationship",
+                           "Proportion_With_Shared_Species",
+                           "Median_Bray_Curtis_Sim",
+                           "Median_Jaccard_Sim",
+                           "Count")
+
+shared_summary <- shared_summary %>% arrange(desc(Median_Jaccard_Sim))
+
+shared_summary
+```
+
+
+```{r}
+#Get unique dataframes for all relationship types
+SN_DF_simple <- SN %>% 
+  distinct(pair_key,relationship,.keep_all = TRUE) %>% 
+  dplyr::select(relationship, jaccard_sim, bray_curtis_sim)
+
+SN_Non_Kin_House_simple <- SN_Non_Kin_House %>% 
+  distinct(pair_key,.keep_all = TRUE) %>% 
+  dplyr::select(relationship, jaccard_sim, bray_curtis_sim)
+
+SN_Non_Kin_House_simple$relationship <- "Non-Kin and Different House"
+
+SN_Same_Building_simple <- SN %>%
+  filter(same_building == 1) %>%
+  distinct(pair_key,.keep_all = TRUE) %>% 
+  dplyr::select(relationship, jaccard_sim, bray_curtis_sim)
+
+SN_Same_Building_simple$relationship <- "Same Building"
+
+same_vil_unrelated <- data.frame(relationship = rep("No Nomination - Same Village", length(unrelated_bc)),
+                                 bray_curtis_sim = unrelated_bc,
+                                jaccard_sim = unrelated_j)
+
+dif_vil_unrelated <- data.frame(relationship = rep("No Nomination - Different Village", length(species_bray_2)),
+                                bray_curtis_sim = species_bray_2,
+                                jaccard_sim = species_jaccard_sim_2)
+
+#Combine into dataframe with all relationship types relationships
+
+
+SN_All_Relationship_DF <- rbind(SN_DF_simple,SN_Non_Kin_House_simple,SN_Same_Building_simple, same_vil_unrelated, dif_vil_unrelated)
+```
+
+Bray-Curtis
+```{r}
+#Make relationship factor variable for plotting
+SN_All_Relationship_DF$relationship <- reorder(as.factor(SN_All_Relationship_DF$relationship),
+                                               -SN_All_Relationship_DF$bray_curtis_sim,
+                                               FUN = median)
+
+#Change names for plotting
+#Make sure this is correct still
+#For bray-Curtis
+levels(SN_All_Relationship_DF$relationship) <- c("Partner",
+                                                 "Same Building",
+                                                 "Father",
+                                                 "Sibling",
+                                                 "Free Time",
+                                                 "Child",
+                                                 "Personal/Private",
+                                                 
+                                                 "Mother",
+                                                 
+                                                 "Non-Kin\nDif-House",
+                                                 "Close Friend",
+                                                 "No-Nom\nSame-Vil",
+                                                 "No-Nom\nDif-Vil")
+
+#Get means by group or strain sharing rate
+#May want to change to median
+median_rels_ssr <- aggregate(bray_curtis_sim ~  relationship, SN_All_Relationship_DF, median)
+
+#Get test statistics
+kruskal.test(bray_curtis_sim ~  relationship, data = SN_All_Relationship_DF)
+nrow(SN_All_Relationship_DF)
+
+rels_pvals <- compare_means(bray_curtis_sim ~ relationship,
+                   data = SN_All_Relationship_DF,
+                   method = "wilcox.test",
+                   p.adjust.method = "BH")
+
+
+
+```
+
+```{r}
+relationships_all_plot_bc <- ggboxplot(
+  SN_All_Relationship_DF,
+  y = "bray_curtis_sim",
+  x = "relationship",
+  color = "relationship",
+  outlier.shape = NA,
+  show.legend = FALSE
+) + 
+  xlab("Relationship") +
+  ylab("Bray-Curtis Similarity") +
+  theme_minimal() +
+  coord_cartesian(ylim = c(0, .75)) +
+  theme(
+    axis.text.x = element_text(
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "none"
+  ) +
+  #stat_pvalue_manual(rels_pvals, label = "p.signif", tip.length = 0)   +
+  geom_text(data = median_rels_ssr,
+            aes(label = sprintf(
+              "%0.3f", round(bray_curtis_sim, digits = 3)
+            ),
+            y = .75,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_All_Relationship_DF$relationship),
+    "\n(N=",
+    table(SN_All_Relationship_DF$relationship),
+    ")"
+  ))
+
+
+```
+
+Jaccard
+```{r}
+#Make relationship factor variable for plotting
+SN_All_Relationship_DF$relationship <- reorder(as.factor(SN_All_Relationship_DF$relationship),
+                                               -SN_All_Relationship_DF$jaccard_sim,
+                                               FUN = median)
+
+#Change names for plotting
+#Make sure this is correct still
+#For Jaccard
+levels(SN_All_Relationship_DF$relationship) <- c("Same Building",
+                                                 
+                                                 "Father",
+                                                 "Mother",
+                                                 "Child",
+                                                 "Partner",
+                                                 "Sibling",
+                                                 "Free Time",
+                                                 "Personal/Private",
+                                                 
+                                                 
+                                                 "Non-Kin\nDif-House",
+                                                 "Close Friend",
+                                                 "No-Nom\nSame-Vil",
+                                                 "No-Nom\nDif-Vil")
+
+#Get means by group or strain sharing rate
+#May want to change to median
+median_rels_ssr <- aggregate(jaccard_sim ~  relationship, SN_All_Relationship_DF, median)
+
+#Get test statistics
+kruskal.test(jaccard_sim ~  relationship, data = SN_All_Relationship_DF)
+nrow(SN_All_Relationship_DF)
+
+rels_pvals <- compare_means(jaccard_sim ~ relationship,
+                   data = SN_All_Relationship_DF,
+                   method = "wilcox.test",
+                   p.adjust.method = "BH")
+
+# rels_pvals <- rels_pvals %>% filter(p.signif != "ns") %>%
+#   mutate(y.position = c(40,37.5,35,32.5,30,27.5))
+
+
+```
+
+```{r}
+relationships_all_plot_j <- ggboxplot(
+  SN_All_Relationship_DF,
+  y = "jaccard_sim",
+  x = "relationship",
+  color = "relationship",
+  outlier.shape = NA,
+  show.legend = FALSE
+) + 
+  xlab("Relationship") +
+  ylab("Jaccard Index") +
+  theme_minimal() +
+  coord_cartesian(ylim = c(0, .75)) +
+  theme(
+    axis.text.x = element_text(
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "none"
+  ) +
+  #stat_pvalue_manual(rels_pvals, label = "p.signif", tip.length = 0)   +
+  geom_text(data = median_rels_ssr,
+            aes(label = sprintf(
+              "%0.3f", round(jaccard_sim, digits = 3)
+            ),
+            y = .75,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_All_Relationship_DF$relationship),
+    "\n(N=",
+    table(SN_All_Relationship_DF$relationship),
+    ")"
+  ))
+
+
+```
+
+
+Meals BC
+```{r}
+#Create dictionary with frequency mappings
+Free_Time_Numeric_Dict <- c(
+  "Every day"=4,
+  "A few days a week"=3,
+  "A few days a month"=2,
+  "Rarely/never" = 1
+)
+
+Meals_Numeric_Dict <- c(
+  "Almost every day"=4,
+  "About once a week"=3,
+  "A few times a month"=2,
+  "About once a month or less" = 1
+)
+
+
+#Make frequency numeric from dictionary
+SN$a2701_numeric <- Free_Time_Numeric_Dict[SN$a2701]
+SN$a2702_numeric <- Meals_Numeric_Dict[SN$a2702]
+
+
+
+#Symmetrize network to most frequent reported contact
+SN_Symmetrized <- SN %>%
+  group_by(pair_key) %>% 
+  filter(!is.na(a2701_numeric), !is.na(a2702_numeric)) %>%
+  mutate(a2701_numeric_max = max(a2701_numeric),
+         a2702_numeric_max = max(a2702_numeric)) %>%
+  ungroup() %>% distinct(pair_key, .keep_all = TRUE)
+
+
+#Reverse map on values from survey
+SN_Symmetrized <- SN_Symmetrized %>% mutate(
+  Free_Time = case_when(
+    a2701_numeric_max == 4 ~ "Every day",
+    a2701_numeric_max == 3 ~ "A few days a week",
+    a2701_numeric_max == 2 ~ "A few days a month",
+    a2701_numeric_max == 1 ~ "Rarely/never",
+),
+Meals = case_when(
+  a2702_numeric_max == 4 ~ "Almost every day",
+  a2702_numeric_max == 3 ~ "Once a week",
+  a2702_numeric_max == 2 ~ "Few times a month",
+  a2702_numeric_max == 1 ~ "Once a month"
+))
+
+
+
+#Rarely/never category in Free time may be biased with a very low count
+#drop these since there are only 18
+table(SN_Symmetrized$Free_Time)
+table(SN_Symmetrized$Meals)
+
+SN_Symmetrized_2 <- SN_Symmetrized %>% filter(Free_Time != "Rarely/never")
+```
+
+Bray-Curtis Meals
+```{r}
+#Get median by group
+meals_ssr_median <- aggregate(bray_curtis_sim ~  Meals, SN_Symmetrized, median)
+
+
+
+#Reorder relationship factor variable for plotting
+SN_Symmetrized$Meals <- reorder(as.factor(SN_Symmetrized$Meals),
+                                -SN_Symmetrized$bray_curtis_sim,
+                                median)
+
+#Get test-statistics
+kruskal.test(bray_curtis_sim ~ Meals, data = SN_Symmetrized)
+
+nrow(SN_Symmetrized)
+
+meal_pvals <- compare_means(bray_curtis_sim ~ Meals,
+                            data = SN_Symmetrized,
+                            method = "wilcox.test",
+                            p.adjust.method = "BH")
+
+#meal_pvals <- meal_pvals %>% filter(p.signif == "ns") 
+
+#Plot differences between groups for meals based on strain sharing rate
+
+
+meals_all_plot_bc <- ggboxplot(
+  SN_Symmetrized,
+  y = "bray_curtis_sim",
+  x = "Meals",
+  outlier.shape = NA,
+  color = "Meals"
+) +
+  geom_jitter(aes(color = Meals),
+              alpha = .25,
+              width = .25,
+              show.legend = FALSE) +
+  xlab("Shared Meal Frequency") +
+  ylab("Bray Curtis Similarity") +
+  coord_cartesian(ylim = c(0, .75)) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(
+      angle = 0,
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = meals_ssr_median,
+            aes(label = sprintf(
+              "%0.3f", round(bray_curtis_sim, digits = 3)
+            ),
+            y = .75,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_Symmetrized$Meals),
+    "\n(N=",
+    table(SN_Symmetrized$Meals),
+    ")"
+  ))
+
+```
+
+
+Meals Jaccard
+```{r}
+#Get median by group
+meals_ssr_median <- aggregate(jaccard_sim ~  Meals, SN_Symmetrized, median)
+
+#Reorder relationship factor variable for plotting
+SN_Symmetrized$Meals <- reorder(as.factor(SN_Symmetrized$Meals),
+                                -SN_Symmetrized$jaccard_sim,
+                                median)
+
+#Get test-statistics
+kruskal.test(jaccard_sim ~ Meals, data = SN_Symmetrized)
+
+nrow(SN_Symmetrized)
+
+meal_pvals <- compare_means(jaccard_sim ~ Meals,
+                            data = SN_Symmetrized,
+                            method = "wilcox.test",
+                            p.adjust.method = "BH")
+
+#meal_pvals <- meal_pvals %>% filter(p.signif == "ns") 
+
+#Plot differences between groups for meals based on strain sharing rate
+
+
+meals_all_plot_j <- ggboxplot(
+  SN_Symmetrized,
+  y = "jaccard_sim",
+  x = "Meals",
+  outlier.shape = NA,
+  color = "Meals"
+) +
+  geom_jitter(aes(color = Meals),
+              alpha = .25,
+              width = .25,
+              show.legend = FALSE) +
+  xlab("Shared Meal Frequency") +
+  ylab("Jaccard Index") +
+  coord_cartesian(ylim = c(0, .75)) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(
+      angle = 0,
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = meals_ssr_median,
+            aes(label = sprintf(
+              "%0.3f", round(jaccard_sim, digits = 3)
+            ),
+            y = .75,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_Symmetrized$Meals),
+    "\n(N=",
+    table(SN_Symmetrized$Meals),
+    ")"
+  ))
+
+
+
+```
+
+
+Freetime BC
+```{r}
+free_time_ssr_median <- aggregate(bray_curtis_sim ~  Free_Time, SN_Symmetrized_2, median)
+
+#Reorder relationship factor variable for plotting
+SN_Symmetrized_2$Free_Time <- reorder(as.factor(SN_Symmetrized_2$Free_Time),
+                                              -SN_Symmetrized_2$bray_curtis_sim,
+                                               median)
+
+#Get test statistics
+kruskal.test(bray_curtis_sim ~ Free_Time, data = SN_Symmetrized_2)
+
+nrow(SN_Symmetrized_2)
+
+free_time_pvals <- compare_means(bray_curtis_sim ~ Free_Time,
+                            data = SN_Symmetrized_2,
+                            method = "wilcox.test",
+                            p.adjust.method = "BH")
+
+#free_time_pvals <- free_time_pvals %>% filter(p.signif == "ns") %>%
+ # mutate(y.position = c(25))
+
+#Plot differences between groups for meals based on strain sharing rate
+levels(SN_Symmetrized_2$Free_Time)
+
+free_time_all_plot_bc <-ggboxplot(
+  SN_Symmetrized_2,
+  y = "bray_curtis_sim",
+  x = "Free_Time",
+  outlier.shape = NA,
+  color = "Free_Time"
+) +
+  geom_jitter(aes(color = Free_Time),
+              alpha = .25,
+              width = .25,
+              show.legend = FALSE) +
+  xlab("Frequency of Contact") +
+  ylab("Bray-Curtis Similarity") +
+  coord_cartesian(ylim = c(0, .75)) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(
+      angle = 0,
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = free_time_ssr_median,
+            aes(label = sprintf(
+              "%0.3f", round(bray_curtis_sim, digits = 3)
+            ),
+            y = .75,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_Symmetrized_2$Free_Time),
+    "\n(N=",
+    table(SN_Symmetrized_2$Free_Time),
+    ")"
+  )) 
+```
+
+Freetime Jaccard
+```{r}
+free_time_ssr_median <- aggregate(jaccard_sim ~  Free_Time, SN_Symmetrized_2, median)
+
+#Reorder relationship factor variable for plotting
+SN_Symmetrized_2$Free_Time <- reorder(as.factor(SN_Symmetrized_2$Free_Time),
+                                              -SN_Symmetrized_2$jaccard_sim,
+                                               median)
+
+
+#Get test statistics
+kruskal.test(jaccard_sim ~ Free_Time, data = SN_Symmetrized_2)
+
+nrow(SN_Symmetrized_2)
+
+free_time_pvals <- compare_means(jaccard_sim ~ Free_Time,
+                            data = SN_Symmetrized_2,
+                            method = "wilcox.test",
+                            p.adjust.method = "BH")
+
+#free_time_pvals <- free_time_pvals %>% filter(p.signif == "ns") %>%
+#  mutate(y.position = c(25))
+
+#Plot differences between groups for meals based on strain sharing rate
+
+free_time_all_plot_j <-ggboxplot(
+  SN_Symmetrized_2,
+  y = "jaccard_sim",
+  x = "Free_Time",
+  outlier.shape = NA,
+  color = "Free_Time"
+) +
+  geom_jitter(aes(color = Free_Time),
+              alpha = .25,
+              width = .25,
+              show.legend = FALSE) +
+  xlab("Frequency of Contact") +
+  ylab("Jaccard Index") +
+  coord_cartesian(ylim = c(0, .75)) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(
+      angle = 0,
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = free_time_ssr_median,
+            aes(label = sprintf(
+              "%0.3f", round(jaccard_sim, digits = 3)
+            ),
+            y = .75,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_Symmetrized_2$Free_Time),
+    "\n(N=",
+    table(SN_Symmetrized_2$Free_Time),
+    ")"
+  )) 
+```
+
+Greeting type
+```{r}
+#Difference by greeting types
+SN_Greeting <- SN %>% filter(!is.na(a2701))
+#Code greetings by epidemiological riskiness as derived from our codebook
+
+SN_Greeting$a2703a[!is.na(SN_Greeting$a2703a)] <- 1
+SN_Greeting$a2703a <- as.numeric(SN_Greeting$a2703a)
+SN_Greeting$a2703b[!is.na(SN_Greeting$a2703b)] <- 2
+SN_Greeting$a2703b <- as.numeric(SN_Greeting$a2703b)
+SN_Greeting$a2703c[!is.na(SN_Greeting$a2703c)] <- 3
+SN_Greeting$a2703c <- as.numeric(SN_Greeting$a2703c)
+SN_Greeting$a2703d[!is.na(SN_Greeting$a2703d)] <- 4
+SN_Greeting$a2703d <- as.numeric(SN_Greeting$a2703d)
+SN_Greeting$a2703e[!is.na(SN_Greeting$a2703e)] <- 5
+SN_Greeting$a2703e <- as.numeric(SN_Greeting$a2703e)
+SN_Greeting$a2703f[!is.na(SN_Greeting$a2703f)] <- 6
+SN_Greeting$a2703f <- as.numeric(SN_Greeting$a2703f)
+SN_Greeting$a2703g[!is.na(SN_Greeting$a2703g)] <- 7
+SN_Greeting$a2703g <- as.numeric(SN_Greeting$a2703g)
+SN_Greeting$a2703h[!is.na(SN_Greeting$a2703h)] <- 0
+SN_Greeting$a2703h <- as.numeric(SN_Greeting$a2703h)
+SN_Greeting$a2703[!is.na(SN_Greeting$a2703)] <- 0
+SN_Greeting$a2703 <- as.numeric(SN_Greeting$a2703)
+
+SN_Greeting$a2704a[!is.na(SN_Greeting$a2704a)] <- 1
+SN_Greeting$a2704a <- as.numeric(SN_Greeting$a2704a)
+SN_Greeting$a2704b[!is.na(SN_Greeting$a2704b)] <- 2
+SN_Greeting$a2704b <- as.numeric(SN_Greeting$a2704b)
+SN_Greeting$a2704c[!is.na(SN_Greeting$a2704c)] <- 3
+SN_Greeting$a2704c <- as.numeric(SN_Greeting$a2704c)
+SN_Greeting$a2704d[!is.na(SN_Greeting$a2704d)] <- 4
+SN_Greeting$a2704d <- as.numeric(SN_Greeting$a2704d)
+SN_Greeting$a2704e[!is.na(SN_Greeting$a2704e)] <- 5
+SN_Greeting$a2704e <- as.numeric(SN_Greeting$a2704e)
+SN_Greeting$a2704f[!is.na(SN_Greeting$a2704f)] <- 6
+SN_Greeting$a2704f <- as.numeric(SN_Greeting$a2704f)
+SN_Greeting$a2704g[!is.na(SN_Greeting$a2704g)] <- 7
+SN_Greeting$a2704g <- as.numeric(SN_Greeting$a2704g)
+SN_Greeting$a2704h[!is.na(SN_Greeting$a2703h)] <- 0
+SN_Greeting$a2704h <- as.numeric(SN_Greeting$a2704h)
+SN_Greeting$a2704[!is.na(SN_Greeting$a2704)] <- 0
+SN_Greeting$a2704 <- as.numeric(SN_Greeting$a2704)
+
+
+#Get most risky greeting by nomination
+
+SN_Greeting$max_greeting <- apply(X = SN_Greeting%>% select(a2703:a2704g),
+                                  MARGIN = 1, FUN = max, na.rm = TRUE)
+
+#Group by pairs to get most risky greeting by pair
+SN_Greeting <- SN_Greeting %>%
+  group_by(pair_key) %>%
+  mutate(max_greeting = max(max_greeting)) %>%
+  ungroup() %>% distinct(pair_key, .keep_all = TRUE)
+
+#Reverse map on values from survey
+# SN_Greeting <- SN_Greeting %>% mutate(
+#   Riskiest_Greeting = case_when(
+#     max_greeting == 7 ~ "Kiss on\nthe cheek",
+#     max_greeting == 6 ~ "Hug",
+#     max_greeting == 5 ~ "Pat on\nthe back",
+#     max_greeting == 4 ~ "Handshake\nor hi-five",
+#     max_greeting == 3 ~ "Verbal salute\n(Hello)",
+#     max_greeting == 2 ~ "A gesture\n(wave, nod, etc.)",
+#     max_greeting == 1 ~ "A smile",
+#     max_greeting == 0 ~ "Other/Refused",
+#   ))
+
+
+
+SN_Greeting <- SN_Greeting %>% mutate(
+  Riskiest_Greeting = case_when(
+    max_greeting == 7 ~ "Kiss on the cheek",
+    max_greeting == 6 ~ "Hug",
+    max_greeting == 5 ~ "Pat on the back",
+    max_greeting == 4 ~ "Handshake or hi-five",
+    max_greeting == 3 ~ "Verbal salute (Hello)",
+    max_greeting == 2 ~ "A gesture (wave, nod, etc.)",
+    max_greeting == 1 ~ "A smile",
+    max_greeting == 0 ~ "Other/Refused",
+  ))
+
+#Drop other/Refused
+table(SN_Greeting$Riskiest_Greeting)
+SN_Greeting <- SN_Greeting %>% filter(Riskiest_Greeting != "Other/Refused")
+
+
+
+# SN_Greeting$Riskiest_Greeting <- factor(SN_Greeting$Riskiest_Greeting,
+#                                         levels=c("A gesture\n(wave, nod, etc.)",
+#                                                  "A smile",
+#                                                  "Verbal salute\n(Hello)",
+#                                                  "Handshake\nor hi-five",
+#                                                  "Pat on\nthe back",
+#                                                  "Hug",
+#                                                  "Kiss on\nthe cheek"))
+
+# SN_Greeting$Riskiest_Greeting <- factor(SN_Greeting$Riskiest_Greeting,
+#                                         levels=c("A gesture (wave, nod, etc.)",
+#                                                  "A smile",
+#                                                  "Verbal salute (Hello)",
+#                                                  "Handshake or hi-five",
+#                                                  "Pat on the back",
+#                                                  "Hug",
+#                                                  "Kiss on the cheek"))
+
+SN_Greeting$Riskiest_Greeting <- factor(SN_Greeting$Riskiest_Greeting,
+                                        levels=c("Kiss on the cheek",
+                                                 "Hug",
+                                                 "Pat on the back",
+                                                 "Handshake or hi-five",
+                                                 "Verbal salute (Hello)",
+                                                 "A smile",
+                                                 "A gesture (wave, nod, etc.)"))
+```
+
+Bray
+```{r}
+greeting_median <- aggregate(bray_curtis_sim ~  Riskiest_Greeting,
+                             SN_Greeting, median, na.rm = TRUE)
+
+kruskal.test(bray_curtis_sim ~ Riskiest_Greeting,
+                                 data = SN_Greeting)
+nrow(SN_Greeting)
+
+greetings_pvals <- compare_means(bray_curtis_sim ~ Riskiest_Greeting,
+                                 data = SN_Greeting,
+                                 p.adjust.method = "BH"
+                                 )
+
+greeting_plot_bc <- ggboxplot(
+  SN_Greeting,
+  y = "bray_curtis_sim",
+  x = "Riskiest_Greeting",
+  color = "Riskiest_Greeting",
+  outlier.shape = NA
+) +
+  geom_jitter(
+    aes(color = Riskiest_Greeting),
+    alpha = .25,
+    width = .25,
+    show.legend = FALSE
+  ) +
+  xlab("Greeting Type") +
+  scale_x_discrete(labels = paste0(
+    levels(as.factor(SN_Greeting$Riskiest_Greeting)),
+    "\n(N=",
+    table(SN_Greeting$Riskiest_Greeting),
+    ")"
+  )) +
+  ylab("Bray-Curtis Similarity") +
+  coord_cartesian(ylim = c(0, .75)) +
+  theme_pubr() +
+  labs_pubr() +
+  theme(
+    axis.text.x = element_text(
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = greeting_median,
+            aes(
+              label = sprintf(
+                "%0.3f", round(bray_curtis_sim, digits = 3)
+              ),
+              y = .75,
+              fontface = "bold"
+            )) +
+  font("ylab", face = "bold", size = 12)
+
+```
+
+Jaccard
+```{r}
+greeting_median <- aggregate(jaccard_sim ~  Riskiest_Greeting,
+                             SN_Greeting, median, na.rm = TRUE)
+
+kruskal.test(jaccard_sim ~ Riskiest_Greeting,
+                                 data = SN_Greeting)
+nrow(SN_Greeting)
+
+greetings_pvals <- compare_means(jaccard_sim ~ Riskiest_Greeting,
+                                 data = SN_Greeting,
+                                 p.adjust.method = "BH"
+                                 )
+
+greeting_plot_j <- ggboxplot(
+  SN_Greeting,
+  y = "jaccard_sim",
+  x = "Riskiest_Greeting",
+  color = "Riskiest_Greeting",
+  outlier.shape = NA
+) +
+  geom_jitter(
+    aes(color = Riskiest_Greeting),
+    alpha = .25,
+    width = .25,
+    show.legend = FALSE
+  ) +
+  xlab("Greeting Type") +
+  scale_x_discrete(labels = paste0(
+    levels(as.factor(SN_Greeting$Riskiest_Greeting)),
+    "\n(N=",
+    table(SN_Greeting$Riskiest_Greeting),
+    ")"
+  )) +
+  ylab("Jaccard Index") +
+  coord_cartesian(ylim = c(0, .75)) +
+  theme_pubr() +
+  labs_pubr() +
+  theme(
+    axis.text.x = element_text(
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = greeting_median,
+            aes(
+              label = sprintf(
+                "%0.3f", round(jaccard_sim, digits = 3)
+              ),
+              y = .75,
+              fontface = "bold"
+            )) +
+  font("ylab", face = "bold", size = 12)
+
+```
+
+
+
+
+
+Figures
+```{r}
+p1_bc <- ggarrange(relationships_all_plot_bc,
+                rel_scramb_p_bray,
+                labels = c("A", "B"),
+                ncol = 2, nrow = 1,
+                widths = c(3,1),
+                label.y = 1)
+
+p2_bc <- ggarrange(free_time_all_plot_bc  ,
+                    meals_all_plot_bc  ,
+                    labels = c("C", "D"),
+                    align = "h",
+                    ncol = 2,
+                    label.y = 1.11)
+
+greeting_plot_bc <- ggarrange(greeting_plot_bc,
+                           labels = c("E"),
+                           label.y = 1.11)
+
+sfig1_bc <- ggarrange(p1_bc, p2_bc,greeting_plot_bc, nrow = 3,
+          heights = c(1.5,1,1))
+
+
+svglite("../FiguresNew/SFigure2/sfigure2_full_bray.svg",
+        width = 13,
+        height = 10)
+sfig1_bc
+dev.off()
+```
+
+
+```{r}
+p1_j <- ggarrange(relationships_all_plot_j,
+                rel_scramb_p_jaccard,
+                labels = c("A", "B"),
+                ncol = 2, nrow = 1,
+                widths = c(3,1),
+                label.y = 1)
+
+p2_j <- ggarrange(free_time_all_plot_j  ,
+                    meals_all_plot_j  ,
+                    labels = c("C", "D"),
+                    align = "h",
+                    ncol = 2,
+                    label.y = 1.11)
+
+greeting_plot_j <- ggarrange(greeting_plot_j,
+                           labels = c("E"),
+                           label.y = 1.11)
+
+sfig1_j <- ggarrange(p1_j, p2_j,greeting_plot_j, nrow = 3,
+          heights = c(1.5,1,1))
+
+
+svglite("../FiguresNew/SFigure3/sfigure3_full_jaccard.svg",
+        width = 13,
+        height = 10)
+sfig1_j
+dev.off()
+
+
+
+```
+
+
+

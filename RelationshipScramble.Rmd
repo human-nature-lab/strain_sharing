@@ -1,0 +1,599 @@
+---
+title: "Relationship Scramble"
+author: "Jackson Pullman"
+date: "2022-12-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Resampling approach
+Observe median strain-sharing rate or a distribution and median strain-sharing rate under shuffles
+```{r}
+
+SN_Rels <- SN
+
+relationships <- unique(SN_Rels$relationship)
+
+SN_Rels$real <- TRUE
+
+SN_Rels <- SN_Rels %>% distinct(pair_key, relationship, .keep_all = TRUE) %>% 
+  dplyr::select(ego, alter, relationship, strain_sharing_rate,gender_ego, gender_alter ,real)
+```
+
+
+```{r}
+
+for(i in 1:length(relationships)){
+  #filter villages to desired relationship
+  for(k in 1:length(village_names)){
+    assign(paste0("sn_vil_rel_",k), get(paste0("sn_vil_",k)) %>%
+                                        filter(relationship == relationships[i]) %>%
+           distinct(pair_key, .keep_all = TRUE))
+  }
+  
+
+  #Change if relationship is spouse so the male is always the ego
+  if(relationships[i] == "Partner"){
+    for(j in 1:length(village_names)){
+      
+      vil <- get(paste0("sn_vil_rel_",j))
+      for(k in 1:nrow(vil)){
+        if(vil$gender_ego[k] == "woman"){
+        temp <- vil$ego[k]
+        vil$ego[k] <- vil$alter[k]
+        vil$alter[k] <- temp
+      }
+      }
+      
+      
+      assign(paste0("sn_vil_rel_",j),vil)
+    }
+  }
+  
+  
+  #Get graphs to scramble
+  for(k in 1:length(village_names)){
+    assign(paste0("sn_vil_rel_scram_",k),
+           get(paste0("sn_vil_rel_",k)))
+  }
+  # sn_vil_rel_scram_1 <- sn_vil_rel_1
+  # sn_vil_rel_scram_2 <- sn_vil_rel_2
+  # sn_vil_rel_scram_3 <- sn_vil_rel_3
+  # sn_vil_rel_scram_4 <- sn_vil_rel_4
+  # sn_vil_rel_scram_5 <- sn_vil_rel_5
+  # sn_vil_rel_scram_6 <- sn_vil_rel_6
+  # sn_vil_rel_scram_7 <- sn_vil_rel_7
+  # sn_vil_rel_scram_8 <- sn_vil_rel_8
+  # sn_vil_rel_scram_9 <- sn_vil_rel_9
+  
+  #Get ego lists
+  scram_egos <- c(sn_vil_rel_scram_1$ego,
+                  sn_vil_rel_scram_2$ego,
+                  sn_vil_rel_scram_3$ego,
+                  sn_vil_rel_scram_4$ego,
+                  sn_vil_rel_scram_5$ego,
+                  sn_vil_rel_scram_6$ego,
+                  sn_vil_rel_scram_7$ego,
+                  sn_vil_rel_scram_8$ego,
+                  sn_vil_rel_scram_9$ego,
+                  sn_vil_rel_scram_10$ego,
+                  sn_vil_rel_scram_11$ego,
+                  sn_vil_rel_scram_12$ego,
+                  sn_vil_rel_scram_13$ego,
+                  sn_vil_rel_scram_14$ego,
+                  sn_vil_rel_scram_15$ego,
+                  sn_vil_rel_scram_16$ego,
+                  sn_vil_rel_scram_17$ego,
+                  sn_vil_rel_scram_18$ego)
+  
+  
+  
+  for(j in 1:100){
+    #Scramble relationships
+    sn_vil_rel_scram_1$alter <- sample(sn_vil_rel_scram_1$alter)
+    sn_vil_rel_scram_2$alter <- sample(sn_vil_rel_scram_2$alter)
+    sn_vil_rel_scram_3$alter <- sample(sn_vil_rel_scram_3$alter)
+    sn_vil_rel_scram_4$alter <- sample(sn_vil_rel_scram_4$alter)
+    sn_vil_rel_scram_5$alter <- sample(sn_vil_rel_scram_5$alter)
+    sn_vil_rel_scram_6$alter <- sample(sn_vil_rel_scram_6$alter)
+    sn_vil_rel_scram_7$alter <- sample(sn_vil_rel_scram_7$alter)
+    sn_vil_rel_scram_8$alter <- sample(sn_vil_rel_scram_8$alter)
+    sn_vil_rel_scram_9$alter <- sample(sn_vil_rel_scram_9$alter)
+    sn_vil_rel_scram_10$alter <- sample(sn_vil_rel_scram_10$alter)
+    sn_vil_rel_scram_11$alter <- sample(sn_vil_rel_scram_11$alter)
+    sn_vil_rel_scram_12$alter <- sample(sn_vil_rel_scram_12$alter)
+    sn_vil_rel_scram_13$alter <- sample(sn_vil_rel_scram_13$alter)
+    sn_vil_rel_scram_14$alter <- sample(sn_vil_rel_scram_14$alter)
+    sn_vil_rel_scram_15$alter <- sample(sn_vil_rel_scram_15$alter)
+    sn_vil_rel_scram_16$alter <- sample(sn_vil_rel_scram_16$alter)
+    sn_vil_rel_scram_17$alter <- sample(sn_vil_rel_scram_17$alter)
+    sn_vil_rel_scram_18$alter <- sample(sn_vil_rel_scram_18$alter)
+    
+    #Get scrambled alter list
+    #May want to order this so that we're also scrambling the genders, fine for now
+    #It's done by scrambling like this for parent child and spouse, but while network scramble for the other
+    scram_alters <- c(sn_vil_rel_scram_1$alter,
+              sn_vil_rel_scram_2$alter,
+              sn_vil_rel_scram_3$alter,
+              sn_vil_rel_scram_4$alter,
+              sn_vil_rel_scram_5$alter,
+              sn_vil_rel_scram_6$alter,
+              sn_vil_rel_scram_7$alter,
+              sn_vil_rel_scram_8$alter,
+              sn_vil_rel_scram_9$alter,
+              sn_vil_rel_scram_10$alter,
+              sn_vil_rel_scram_11$alter,
+              sn_vil_rel_scram_12$alter,
+              sn_vil_rel_scram_13$alter,
+              sn_vil_rel_scram_14$alter,
+              sn_vil_rel_scram_15$alter,
+              sn_vil_rel_scram_16$alter,
+              sn_vil_rel_scram_17$alter,
+              sn_vil_rel_scram_18$alter)
+    
+    #Get observed strain sharing rate
+    ssr_scram <- rep(NA, length(scram_alters))
+    for(k in 1:length(scram_alters)){
+      ssr_scram[k] <- strain_rate[rownames(strain_rate) == scram_egos[k],
+                                  colnames(strain_rate) == scram_alters[k]]
+    }
+    
+    scram_dat <- data.frame(ego = scram_egos,
+                            alter = scram_alters,
+                            relationship = rep(relationships[i], length(ssr_scram)),
+                            strain_sharing_rate = ssr_scram,
+                            gender_ego = rep(NA, length(ssr_scram)), #Auxiliary
+                            gender_alter = rep(NA, length(ssr_scram)),
+                            real = rep(FALSE, length(ssr_scram)))
+    
+    SN_Rels <- rbind(SN_Rels, scram_dat)
+
+  }
+  
+  print(i)
+  
+}
+
+#add in same house scramble and non-kin different house scramble
+#Probably should mark this relationship as same building
+sn_vil_rel_1 <- sn_vil_1 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_2 <- sn_vil_2 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_3 <- sn_vil_3 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_4 <- sn_vil_4 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_5 <- sn_vil_5 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_6 <- sn_vil_6 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_7 <- sn_vil_7 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_8 <- sn_vil_8 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_9 <- sn_vil_9 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_10 <- sn_vil_10 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_11 <- sn_vil_11 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_12 <- sn_vil_12 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_13 <- sn_vil_13 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_14 <- sn_vil_14 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_15 <- sn_vil_15 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_16 <- sn_vil_16 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_17 <- sn_vil_17 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_18 <- sn_vil_18 %>% filter(same_building == 1) %>%
+  distinct(pair_key, .keep_all = TRUE)
+
+
+sn_vil_rel_1$relationship <- "Same Building"
+sn_vil_rel_2$relationship <- "Same Building"
+sn_vil_rel_3$relationship <- "Same Building"
+sn_vil_rel_4$relationship <- "Same Building"
+sn_vil_rel_5$relationship <- "Same Building"
+sn_vil_rel_6$relationship <- "Same Building"
+sn_vil_rel_7$relationship <- "Same Building"
+sn_vil_rel_8$relationship <- "Same Building"
+sn_vil_rel_9$relationship <- "Same Building"
+sn_vil_rel_10$relationship <- "Same Building"
+sn_vil_rel_11$relationship <- "Same Building"
+sn_vil_rel_12$relationship <- "Same Building"
+sn_vil_rel_13$relationship <- "Same Building"
+sn_vil_rel_14$relationship <- "Same Building"
+sn_vil_rel_15$relationship <- "Same Building"
+sn_vil_rel_16$relationship <- "Same Building"
+sn_vil_rel_17$relationship <- "Same Building"
+sn_vil_rel_18$relationship <- "Same Building"
+
+
+add_rels <- data.frame(rbind(sn_vil_rel_1, sn_vil_rel_2, sn_vil_rel_3, sn_vil_rel_4,
+                             sn_vil_rel_5, sn_vil_rel_6, sn_vil_rel_7, sn_vil_rel_8,
+                             sn_vil_rel_9, sn_vil_rel_10,
+                             sn_vil_rel_11, sn_vil_rel_12, sn_vil_rel_13, sn_vil_rel_14,
+                             sn_vil_rel_15, sn_vil_rel_16, sn_vil_rel_17, sn_vil_rel_18)) %>%
+  select(ego, alter, relationship, strain_sharing_rate, gender_ego, gender_alter)
+
+add_rels$real <- TRUE
+
+SN_Rels <- rbind(SN_Rels, add_rels)
+
+
+#Get graphs to scramble
+# sn_vil_rel_scram_1 <- sn_vil_rel_1
+# sn_vil_rel_scram_2 <- sn_vil_rel_2
+# sn_vil_rel_scram_3 <- sn_vil_rel_3
+# sn_vil_rel_scram_4 <- sn_vil_rel_4
+# sn_vil_rel_scram_5 <- sn_vil_rel_5
+# sn_vil_rel_scram_6 <- sn_vil_rel_6
+# sn_vil_rel_scram_7 <- sn_vil_rel_7
+# sn_vil_rel_scram_8 <- sn_vil_rel_8
+# sn_vil_rel_scram_9 <- sn_vil_rel_9
+
+for(k in 1:length(village_names)){
+    assign(paste0("sn_vil_rel_scram_",k),
+           get(paste0("sn_vil_rel_",k)))
+  }
+
+#Get ego lists
+scram_egos <- c(
+  sn_vil_rel_scram_1$ego,
+  sn_vil_rel_scram_2$ego,
+  sn_vil_rel_scram_3$ego,
+  sn_vil_rel_scram_4$ego,
+  sn_vil_rel_scram_5$ego,
+  sn_vil_rel_scram_6$ego,
+  sn_vil_rel_scram_7$ego,
+  sn_vil_rel_scram_8$ego,
+  sn_vil_rel_scram_9$ego,
+  sn_vil_rel_scram_10$ego,
+  sn_vil_rel_scram_11$ego,
+  sn_vil_rel_scram_12$ego,
+  sn_vil_rel_scram_13$ego,
+  sn_vil_rel_scram_14$ego,
+  sn_vil_rel_scram_15$ego,
+  sn_vil_rel_scram_16$ego,
+  sn_vil_rel_scram_17$ego,
+  sn_vil_rel_scram_18$ego
+)
+
+
+
+for(j in 1:100){
+  #Scramble relationships
+    sn_vil_rel_scram_1$alter <- sample(sn_vil_rel_scram_1$alter)
+    sn_vil_rel_scram_2$alter <- sample(sn_vil_rel_scram_2$alter)
+    sn_vil_rel_scram_3$alter <- sample(sn_vil_rel_scram_3$alter)
+    sn_vil_rel_scram_4$alter <- sample(sn_vil_rel_scram_4$alter)
+    sn_vil_rel_scram_5$alter <- sample(sn_vil_rel_scram_5$alter)
+    sn_vil_rel_scram_6$alter <- sample(sn_vil_rel_scram_6$alter)
+    sn_vil_rel_scram_7$alter <- sample(sn_vil_rel_scram_7$alter)
+    sn_vil_rel_scram_8$alter <- sample(sn_vil_rel_scram_8$alter)
+    sn_vil_rel_scram_9$alter <- sample(sn_vil_rel_scram_9$alter)
+    sn_vil_rel_scram_10$alter <- sample(sn_vil_rel_scram_10$alter)
+    sn_vil_rel_scram_11$alter <- sample(sn_vil_rel_scram_11$alter)
+    sn_vil_rel_scram_12$alter <- sample(sn_vil_rel_scram_12$alter)
+    sn_vil_rel_scram_13$alter <- sample(sn_vil_rel_scram_13$alter)
+    sn_vil_rel_scram_14$alter <- sample(sn_vil_rel_scram_14$alter)
+    sn_vil_rel_scram_15$alter <- sample(sn_vil_rel_scram_15$alter)
+    sn_vil_rel_scram_16$alter <- sample(sn_vil_rel_scram_16$alter)
+    sn_vil_rel_scram_17$alter <- sample(sn_vil_rel_scram_17$alter)
+    sn_vil_rel_scram_18$alter <- sample(sn_vil_rel_scram_18$alter)
+    
+    #Get scrambled alter list
+    #May want to order this so that we're also scrambling the genders, fine for now
+    #It's done by scrambling like this for parent child and spouse, but while network scramble for the other
+    scram_alters <- c(sn_vil_rel_scram_1$alter,
+              sn_vil_rel_scram_2$alter,
+              sn_vil_rel_scram_3$alter,
+              sn_vil_rel_scram_4$alter,
+              sn_vil_rel_scram_5$alter,
+              sn_vil_rel_scram_6$alter,
+              sn_vil_rel_scram_7$alter,
+              sn_vil_rel_scram_8$alter,
+              sn_vil_rel_scram_9$alter,
+              sn_vil_rel_scram_10$alter,
+              sn_vil_rel_scram_11$alter,
+              sn_vil_rel_scram_12$alter,
+              sn_vil_rel_scram_13$alter,
+              sn_vil_rel_scram_14$alter,
+              sn_vil_rel_scram_15$alter,
+              sn_vil_rel_scram_16$alter,
+              sn_vil_rel_scram_17$alter,
+              sn_vil_rel_scram_18$alter)
+  
+  #Get observed strain sharing rate
+  ssr_scram <- rep(NA, length(scram_alters))
+  for(k in 1:length(scram_alters)){
+    ssr_scram[k] <- strain_rate[rownames(strain_rate) == scram_egos[k],
+                                colnames(strain_rate) == scram_alters[k]]
+  }
+  
+  scram_dat <- data.frame(ego = scram_egos,
+                          alter = scram_alters,
+                          relationship = rep("Same Building", length(ssr_scram)),
+                          strain_sharing_rate = ssr_scram,
+                          gender_ego = rep(NA, length(ssr_scram)), #Auxiliary
+                          gender_alter = rep(NA, length(ssr_scram)),
+                          real = rep(FALSE, length(ssr_scram)))
+  
+  SN_Rels <- rbind(SN_Rels, scram_dat)
+}
+
+#Get non-kin different house
+
+sn_vil_rel_1 <- sn_vil_1 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_2 <- sn_vil_2 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_3 <- sn_vil_3 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_4 <- sn_vil_4 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_5 <- sn_vil_5 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_6 <- sn_vil_6 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_7 <- sn_vil_7 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_8 <- sn_vil_8 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_9 <- sn_vil_9 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_10 <- sn_vil_10 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_11 <- sn_vil_11 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_12 <- sn_vil_12 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_13 <- sn_vil_13 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_14 <- sn_vil_14 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_15 <- sn_vil_15 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_16 <- sn_vil_16 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_17 <- sn_vil_17 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+sn_vil_rel_18 <- sn_vil_18 %>% filter(!pair_key %in% family_house_pairs) %>%
+  distinct(pair_key, .keep_all = TRUE)
+
+
+sn_vil_rel_1$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_2$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_3$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_4$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_5$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_6$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_7$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_8$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_9$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_10$relationship <-"Non-Kin Dif-House"
+sn_vil_rel_11$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_12$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_13$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_14$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_15$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_16$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_17$relationship <- "Non-Kin Dif-House"
+sn_vil_rel_18$relationship <- "Non-Kin Dif-House"
+
+
+
+
+add_rels <- data.frame(rbind(sn_vil_rel_1, sn_vil_rel_2, sn_vil_rel_3, sn_vil_rel_4,
+                             sn_vil_rel_5, sn_vil_rel_6, sn_vil_rel_7, sn_vil_rel_8,
+                             sn_vil_rel_9, sn_vil_rel_10,
+                             sn_vil_rel_11, sn_vil_rel_12, sn_vil_rel_13, sn_vil_rel_14,
+                             sn_vil_rel_15, sn_vil_rel_16, sn_vil_rel_17, sn_vil_rel_18)) %>%
+  select(ego, alter, relationship, strain_sharing_rate, gender_ego, gender_alter)
+
+add_rels$real <- TRUE
+
+SN_Rels <- rbind(SN_Rels, add_rels)
+
+#Get graphs to scramble
+for(k in 1:length(village_names)){
+    assign(paste0("sn_vil_rel_scram_",k),
+           get(paste0("sn_vil_rel_",k)))
+  }
+
+#Get ego lists
+scram_egos <- c(
+  sn_vil_rel_scram_1$ego,
+  sn_vil_rel_scram_2$ego,
+  sn_vil_rel_scram_3$ego,
+  sn_vil_rel_scram_4$ego,
+  sn_vil_rel_scram_5$ego,
+  sn_vil_rel_scram_6$ego,
+  sn_vil_rel_scram_7$ego,
+  sn_vil_rel_scram_8$ego,
+  sn_vil_rel_scram_9$ego,
+  sn_vil_rel_scram_10$ego,
+  sn_vil_rel_scram_11$ego,
+  sn_vil_rel_scram_12$ego,
+  sn_vil_rel_scram_13$ego,
+  sn_vil_rel_scram_14$ego,
+  sn_vil_rel_scram_15$ego,
+  sn_vil_rel_scram_16$ego,
+  sn_vil_rel_scram_17$ego,
+  sn_vil_rel_scram_18$ego
+)
+
+
+for(j in 1:100){
+  #Scramble relationships
+   sn_vil_rel_scram_1$alter <- sample(sn_vil_rel_scram_1$alter)
+    sn_vil_rel_scram_2$alter <- sample(sn_vil_rel_scram_2$alter)
+    sn_vil_rel_scram_3$alter <- sample(sn_vil_rel_scram_3$alter)
+    sn_vil_rel_scram_4$alter <- sample(sn_vil_rel_scram_4$alter)
+    sn_vil_rel_scram_5$alter <- sample(sn_vil_rel_scram_5$alter)
+    sn_vil_rel_scram_6$alter <- sample(sn_vil_rel_scram_6$alter)
+    sn_vil_rel_scram_7$alter <- sample(sn_vil_rel_scram_7$alter)
+    sn_vil_rel_scram_8$alter <- sample(sn_vil_rel_scram_8$alter)
+    sn_vil_rel_scram_9$alter <- sample(sn_vil_rel_scram_9$alter)
+    sn_vil_rel_scram_10$alter <- sample(sn_vil_rel_scram_10$alter)
+    sn_vil_rel_scram_11$alter <- sample(sn_vil_rel_scram_11$alter)
+    sn_vil_rel_scram_12$alter <- sample(sn_vil_rel_scram_12$alter)
+    sn_vil_rel_scram_13$alter <- sample(sn_vil_rel_scram_13$alter)
+    sn_vil_rel_scram_14$alter <- sample(sn_vil_rel_scram_14$alter)
+    sn_vil_rel_scram_15$alter <- sample(sn_vil_rel_scram_15$alter)
+    sn_vil_rel_scram_16$alter <- sample(sn_vil_rel_scram_16$alter)
+    sn_vil_rel_scram_17$alter <- sample(sn_vil_rel_scram_17$alter)
+    sn_vil_rel_scram_18$alter <- sample(sn_vil_rel_scram_18$alter)
+    
+    #Get scrambled alter list
+    #May want to order this so that we're also scrambling the genders, fine for now
+    #It's done by scrambling like this for parent child and spouse, but while network scramble for the other
+    scram_alters <- c(sn_vil_rel_scram_1$alter,
+              sn_vil_rel_scram_2$alter,
+              sn_vil_rel_scram_3$alter,
+              sn_vil_rel_scram_4$alter,
+              sn_vil_rel_scram_5$alter,
+              sn_vil_rel_scram_6$alter,
+              sn_vil_rel_scram_7$alter,
+              sn_vil_rel_scram_8$alter,
+              sn_vil_rel_scram_9$alter,
+              sn_vil_rel_scram_10$alter,
+              sn_vil_rel_scram_11$alter,
+              sn_vil_rel_scram_12$alter,
+              sn_vil_rel_scram_13$alter,
+              sn_vil_rel_scram_14$alter,
+              sn_vil_rel_scram_15$alter,
+              sn_vil_rel_scram_16$alter,
+              sn_vil_rel_scram_17$alter,
+              sn_vil_rel_scram_18$alter)
+  
+  #Get observed strain sharing rate
+  ssr_scram <- rep(NA, length(scram_alters))
+  for(k in 1:length(scram_alters)){
+    ssr_scram[k] <- strain_rate[rownames(strain_rate) == scram_egos[k],
+                                colnames(strain_rate) == scram_alters[k]]
+  }
+  
+  scram_dat <- data.frame(ego = scram_egos,
+                          alter = scram_alters,
+                          relationship = rep("Non-Kin Dif-House", length(ssr_scram)),
+                          strain_sharing_rate = ssr_scram,
+                          gender_ego = rep(NA, length(ssr_scram)), #Auxiliary
+                          gender_alter = rep(NA, length(ssr_scram)),
+                          real = rep(FALSE, length(ssr_scram)))
+  
+  SN_Rels <- rbind(SN_Rels, scram_dat)
+}
+
+
+```
+
+```{r}
+#Create plot of strain sharing rate by relationship
+#Make relationship factor variable for plottin
+#manually reorder factor levels to match relationships plot
+SN_Rels$relationship <- factor(SN_Rels$relationship,
+                               levels=c("Partner", "Same Building", "Mother",
+                                        "Child", 
+                                        "Father", "Spend Free Time",
+                                        "Personal or Private Relationship","Sibling",
+                                        "Non-Kin Dif-House", "Closest Friend"))
+
+
+#Change names for plotting
+levels(SN_Rels$relationship) <- c(
+  "Partner",
+  "Same Building",
+  "Mother",
+  "Child",
+  "Father",
+  "Free Time",
+  "Personal/Private",
+  "Sibling",
+  "Non-Kin Dif-House",
+  "Close Friend"
+)
+
+#Get means by group or strain sharing rate
+median_ssr <- aggregate(strain_sharing_rate ~  relationship,
+                       SN_Rels %>% filter(real == TRUE),
+                       median, na.rm = TRUE)
+
+names(SN_Rels) <- c("ego","alter","relationship",
+                    "strain_sharing_rate","gender_ego","gender_alter","real")
+
+
+
+#names(SN_Rels)[names(SN_Rels) == "relationship"] <- "Relationship"
+#names(SN_Rels)[names(SN_Rels) == "strain_sharing_rate"] <- "Strain Sharing Rate"
+#names(SN_Rels)[names(SN_Rels) == "real"] <- "Distribution"
+#Change based on species
+#names(SN_Rels)[names(SN_Rels) == "strain_sharing_rate"] <- "Bray Curtis Distance"
+
+SN_Rels$real[SN_Rels$real == TRUE] <- "Observed"
+SN_Rels$real[SN_Rels$real == FALSE] <- "Scrambled"
+
+
+rel_scramb_pvals <- compare_means(
+  strain_sharing_rate ~ real,
+  data = SN_Rels,
+  group.by = "relationship",
+  p.adjust.method = "BH",
+  method = "wilcox.test"
+)
+
+#names(rel_scramb_pvals)[1] <-"Relationship"
+
+rel_scramb_pvals <- rel_scramb_pvals %>%
+  mutate(y.position = 25)
+rel_scramb_pvals$p.format <- paste("p",rel_scramb_pvals$p.format)
+
+
+
+rel_scramb_p <- ggboxplot(
+  SN_Rels,
+  x = "real",
+  y = "strain_sharing_rate",
+  color = "real",
+  short.panel.labs = TRUE,
+  outlier.shape = NA,
+  facet.by = "relationship",
+  ncol = 2
+) +
+  scale_fill_manual(values = c("lightblue", "pink")) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_text(size = 10),
+    legend.title = element_blank(),
+    strip.text.x = element_text(margin = margin(0, 0, 0, 0, "cm")),
+    strip.background = element_rect(colour = "grey", fill = "white"),
+    legend.position = "bottom"
+  ) +
+  coord_cartesian(ylim = c(0, 40)) +
+  scale_y_continuous(breaks = c(0, 20, 40)) +
+  xlab("Permutation Null Comparisons") +
+  ylab("Strain-Sharing Rate (%)") +
+  stat_pvalue_manual(rel_scramb_pvals, label = "p.format",
+                     tip.length = 0, label.size = 3, remove.bracket = TRUE)+
+  font("ylab", face = "bold", size = 12) +
+  font("xlab", face = "bold", size = 10)
+
+
+
+
+svglite("../FiguresNew/SFigure1/sfigure1_full.svg")
+rel_scramb_p
+dev.off()
+```
+
+
+
+

@@ -1,0 +1,1571 @@
+---
+title: "CentralitySharing"
+author: "Jackson Pullman"
+date: "2022-12-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+library(ggplotify)
+```
+
+
+Calculate Diversity
+```{r}
+#Calculate diversity indices
+richness  <- rowSums(species_data > 0)
+shannon <- vegan::diversity(species_data, index = "shannon")
+invsimpson <- vegan::diversity(species_data, index = "invsimpson")
+diversity_df <- data.frame(respondent_master_id = names(richness),
+                           richness = unname(richness),
+                           shannon = unname(shannon),
+                           invsimpson = unname(invsimpson))
+
+
+```
+
+Calculate Centrality and Similarity
+```{r}
+count <- 0
+#Where are we losing the people from?
+length(unique(c(SN$ego, SN$alter)))
+#From the few villages we dropped?
+for(i in 1:length(village_names)){
+  sn_vil <- SN %>% filter(village_name_w3 == village_names[i])
+  sn_vil_all <- all_edges %>% filter(village_name_w3 == village_names[i])
+  village_ids <- unique(c(sn_vil$ego, sn_vil$alter))
+  count <- count + length(village_ids)
+  sn_vil <- simplify(graph_from_data_frame(sn_vil, directed = FALSE))
+  sn_vil_all <- simplify(graph_from_data_frame(sn_vil_all, directed = FALSE))
+  
+  #crossclique_vil <- centiserve::crossclique(sn_vil)
+  eigen_vil <- eigen_centrality(sn_vil)$vector
+  between_vil <- igraph::betweenness(sn_vil, normalized = TRUE)
+  degree_vil <- igraph::degree(sn_vil)
+  clustering_coef <- igraph::transitivity(sn_vil, type = "local", isolates = 'zero')
+  names(clustering_coef) <- names(V(sn_vil))
+
+  eigen_vil_all <- eigen_centrality(sn_vil_all)$vector
+  eigen_vil_all <- eigen_vil_all[match(names(eigen_vil), names(eigen_vil_all))]
+  between_vil_all <- igraph::betweenness(sn_vil_all, normalized = TRUE)
+  between_vil_all <- between_vil_all[match(names(between_vil), names(between_vil_all))]
+  degree_vil_all <- igraph::degree(sn_vil_all)
+  degree_vil_all <- degree_vil_all[match(names(degree_vil), names(degree_vil_all))]
+  clustering_coef_all <- igraph::transitivity(sn_vil_all, type = "local", isolates = 'zero')
+  names(clustering_coef_all) <- names(V(sn_vil_all))
+  clustering_coef_all <- clustering_coef_all[match(names(clustering_coef), names(clustering_coef_all))]
+
+  
+  strain_vil <- strain_rate[rownames(strain_rate) %in% village_ids,
+                            colnames(strain_rate) %in% village_ids]
+  diag(strain_vil) <- NA
+  strain_sim <- colMeans(strain_vil,na.rm = TRUE)
+  
+  strain_sim <- strain_sim[match(names(eigen_vil), names(strain_sim))]
+  
+  if(i == 1){
+    centrality_df <- data.frame(respondent_master_id = names(V(sn_vil)),
+                                eigen_c = unname(eigen_vil),
+                                between_c = unname(between_vil),
+                                degree_c = unname(degree_vil),
+                                cluster_coef = unname(clustering_coef),
+                                eigen_c_all = unname(eigen_vil_all),
+                                between_c_all = unname(between_vil_all),
+                                degree_c_all = unname(degree_vil_all),
+                                cluster_coef_all = unname(clustering_coef_all),
+                                village = rep(village_names[i], length(eigen_vil)),
+                                strain_sim_all = unname(strain_sim)
+                                )
+  }
+  else{
+    centrality_df <- rbind(centrality_df,
+                                data.frame(respondent_master_id = names(V(sn_vil)),
+                                eigen_c = unname(eigen_vil),
+                                between_c = unname(between_vil),
+                                degree_c = unname(degree_vil),
+                                cluster_coef = unname(clustering_coef),
+                                eigen_c_all = unname(eigen_vil_all),
+                                between_c_all = unname(between_vil_all),
+                                degree_c_all = unname(degree_vil_all),
+                                cluster_coef_all = unname(clustering_coef_all),
+                                village = rep(village_names[i], length(eigen_vil)),
+                                strain_sim_all = unname(strain_sim)
+                                ))
+  }
+}
+
+```
+
+
+Merge data to SN
+```{r}
+
+diversity_df_ego <- diversity_df
+names(diversity_df_ego) <- paste0(names(diversity_df_ego),"_ego")
+names(diversity_df_ego)[1] <- "ego"
+diversity_df_alter <- diversity_df
+names(diversity_df_alter) <- paste0(names(diversity_df_alter),"_alter")
+names(diversity_df_alter)[1] <- "alter"
+
+SN_richness <- merge(SN, diversity_df_ego) %>% merge(diversity_df_alter)
+
+SN_Graph_all <- graph_from_data_frame(SN_richness %>% distinct(pair_key,.keep_all = TRUE),
+                                      directed = FALSE)
+sim_deg_one <- c()
+name_vec <- c()
+#richness_deg_one <- c()
+
+for( i in 1:length(V(SN_Graph_all))){
+  test_incident <- incident(SN_Graph_all, V(SN_Graph_all)[i])
+  name_vec <-c(name_vec, names(V(SN_Graph_all)[i]))
+  sim_deg_one <- c(sim_deg_one, mean(edge_attr(SN_Graph_all, "strain_sharing_rate", test_incident)))
+  vert_neighbors <- names(neighbors(SN_Graph_all, V(SN_Graph_all)[i]))
+  #richness_deg_one <- c(richness_deg_one, diversity_df %>%
+  #                        filter(respondent_master_id %in% vert_neighbors) %>%
+  #                        pull(richness) %>%
+  #                        mean())
+}
+
+
+sim_deg_one_df <- data.frame(sim_deg_one = sim_deg_one,
+                            respondent_master_id = name_vec)#,
+                            #richness_deg_one = richness_deg_one)
+#centrality_sim_df <- centrality_df
+centrality_sim_df <- merge(centrality_df,sim_deg_one_df)
+centrality_sim_df <- merge(centrality_sim_df, diversity_df)
+centrality_sim_df_covars <- merge(centrality_sim_df, covariates)
+centrality_sim_df_covars_all <- merge(centrality_sim_df_covars, shiv_covar_df)
+
+#We lose 240 people for not having covariates, look into this
+head(centrality_sim_df_covars_all)
+dim(centrality_sim_df_covars_all)
+dim(centrality_sim_df_covars)
+
+```
+
+
+Calculate average similarity to first degree by clustering coefficient
+```{r}
+#Want to filter to people who have more than one connection, that might be driving it
+median(centrality_sim_df$sim_deg_one[centrality_sim_df$cluster_coef_all <= .25], na.rm = TRUE)
+
+median(centrality_sim_df$sim_deg_one[centrality_sim_df$cluster_coef_all >= .25 &
+                                       centrality_sim_df$cluster_coef_all <= .5], na.rm = TRUE)
+
+median(centrality_sim_df$sim_deg_one[centrality_sim_df$cluster_coef_all >= .5 &
+                                       centrality_sim_df$cluster_coef_all <= .75], na.rm = TRUE)
+median(centrality_sim_df$sim_deg_one[centrality_sim_df$cluster_coef_all >= .75], na.rm = TRUE)
+
+centrality_sim_df$cluster_bucket <- case_when(
+  centrality_sim_df$cluster_coef_all <= .25 ~ "0 - .25",
+  centrality_sim_df$cluster_coef_all <= .5 ~ ".25 - .5",
+  centrality_sim_df$cluster_coef_all <= .75 ~ ".5 - .75",
+  centrality_sim_df$cluster_coef_all <= 1 ~ ".75 - 1"
+  )
+
+cluster_pvals <- compare_means(sim_deg_one ~ cluster_bucket,
+                               centrality_sim_df,
+                               p.adjust.method = "BH")
+
+cluster_pvals <- cluster_pvals %>%
+  filter(p.signif != "ns") %>%
+  mutate(y.position = c(25, 27.5,30,32.5,35))
+
+cluster_pvals$p.adj <- paste0("p = ",cluster_pvals$p.adj)
+
+cluster_bucket_fig <- ggboxplot(
+  centrality_sim_df,
+  x = "cluster_bucket",
+  y = "sim_deg_one",
+  outlier.shape = NA,
+  color = "cluster_bucket",
+  show.legend = FALSE
+) +
+  # geom_jitter(
+  #   aes(color = cluster_bucket),
+  #   alpha = .5,
+  #   width = .25,
+  #   show.legend = FALSE
+  # ) +
+  stat_pvalue_manual(cluster_pvals, label = "p.adj", tip.length = 0) +
+  xlab("Clustering Coefficient") +
+  ylab("Average Strain-Sharing Rate\nWith First Degree Connections (%)") +
+  theme_pubr() +
+  labs_pubr() +
+  theme(legend.position = "none") +
+  coord_cartesian(ylim = c(0,40))
+?stat_pvalue_manual
+```
+
+Make some plots
+```{r}
+
+
+richness_plot <-
+  ggplot(centrality_sim_df, aes(x = richness_deg_one, y = richness)) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  ylab("Host Species Richness") +
+  xlab("Average Richness of Connections 1st Degree Connections") +
+  theme_minimal()
+
+deg_c_sharing_all <-
+  ggplot(centrality_sim_df, aes(x = degree_c, y = strain_sim_all)) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  ylab("Average Strain-Sharing Rate\nWith All Village Members (%)") +
+  xlab("Degree Centrality") +
+  theme_pubr() +
+  labs_pubr()
+
+
+richness_deg_c <- ggplot(centrality_sim_df, aes(x = degree_c, y = richness)) +
+  geom_point() +
+  ylab("Host Species Richness") +
+  xlab("Degree Centrality") +
+  theme_minimal()
+
+shannon_deg_c <- ggplot(centrality_sim_df, aes(x = degree_c, y = shannon)) +
+  geom_point() +
+  ylab("Host Shannon Diversity") +
+  xlab("Degree Centrality") +
+  theme_minimal()
+
+invsimpson_deg_c <- ggplot(centrality_sim_df, aes(x = degree_c, y = invsimpson)) +
+  geom_point() +
+  ylab("Host Inverse Simpson Diversity") +
+  xlab("Degree Centrality") +
+  theme_minimal()
+
+# richness_friend_r <- ggplot(centrality_sim_df,
+#                             aes(x = richness_deg_one, y = richness)) +
+#   geom_point() +
+#   stat_smooth(method = "lm",
+#               formula = y ~ x,
+#               geom = "smooth") +
+#   ylab("Host Species Richness") +
+#   xlab("Average Richness of Connections 1st Degree Connections") +
+#   theme_minimal()
+# 
+# 
+# ggarrange(richness_deg_c, richness_friend_r, nrow = 1)
+
+deg_c_sharing_first <-
+  ggplot(centrality_sim_df, aes(x = degree_c, y = sim_deg_one)) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  ylab("Average Strain-Sharing Rate\nWith First Degree Connections (%)") +
+  xlab("Degree Centrality") +
+  theme_pubr() +
+  labs_pubr()
+
+
+clustering_coef_fig <-
+  ggplot(centrality_sim_df, aes(x = cluster_coef_all, y = sim_deg_one)) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  ylab("Average Strain-Sharing Rate with First Degree Connections") +
+  xlab("Degree Centrality") +
+  theme_minimal()
+
+#Color plots by Rarity of species?
+deg_c_sharing_fig <- ggarrange(deg_c_sharing_all,deg_c_sharing_first,
+                               labels = c("4a", "4b"))
+
+annotate_figure(deg_c_sharing_fig,
+                bottom = text_grob("Degree Centrality",
+                                   size = 12))
+
+#Don't think I feel comfortable putting these out, maybe just stick to the others
+species_pop_deg_c <-
+  ggplot(centrality_sim_df, aes(x = degree_c, y = avg_species_prev)) +
+  geom_point() +
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  ylab("Average Prevalence of Host Species") +
+  xlab("Degree Centrality") +
+  theme_minimal()
+
+```
+
+No diversity reelationship
+```{r}
+svglite("../Figures/SFigure10/sfigure10_full.svg")
+
+ggarrange(richness_deg_c, shannon_deg_c, invsimpson_deg_c,
+          labels = c("A", "B", "C"), nrow = 1)
+dev.off()
+
+
+```
+
+
+
+
+igraph plots of prevalence
+Plot color coded, if you contain many prevalent species or rare species
+
+Make some cool plots
+```{r}
+village_names
+set.seed(22)
+test <- sn_vil_graph_15
+
+
+vertex_attr(test)$similarity <- centrality_sim_df$strain_sim_all[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)]
+
+
+palette <- heat.colors(3)
+
+palette <- rev(palette)
+
+
+#Trichotomize sharing
+vertex_attr(test)$color <- case_when(
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .33) ~ palette[1],
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .66) ~ palette[2],
+  TRUE ~ palette[3],
+)
+
+vertex_attr(test)$size <- (centrality_sim_df$degree_c[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)] +1)/3
+
+par(mar=c(0,0,0,0))
+set.seed(22)
+plot(test,
+     vertex.label = NA,
+     layout = layout_with_fr)
+legend('topleft',
+       legend = c(">= 4.6% (Top Tertile)",
+                  ">= 3.9% (Middle Tertile)",
+                  ">= 0% (Bottom Tertile)"),
+       #fill = rev(palette),
+       pt.bg  = rev(palette),
+       pch    = 21,
+       cex    = 1,
+       border = NA,
+       bty    = "n",
+       title = "Average Strain-Sharing Rate With\nAll Village Members")
+#Village 4 is good for first degree
+
+set.seed(22)
+strain_sim_cent_network <- as.ggplot(expression(
+  plot(
+    test,
+    vertex.label = NA,
+    layout = layout_with_fr(test)
+  ),
+  legend(x = -.5,
+         y = 1.4,
+    #'topleft',
+    legend = c(">= 4.6% (Top Tertile)",
+                  ">= 3.9% (Middle Tertile)",
+                  ">= 0% (Bottom Tertile)"),
+    pt.bg  = rev(palette),
+    pch    = 21,
+    cex    = .75,
+    bty    = "n",
+    y.intersp = 1.25,
+    title = "Average Strain-Sharing Rate With\nAll Village Members"
+  )
+))
+
+
+#test <- get(paste0("sn_vil_graph_",i))
+#test <- sn_vil_graph_7
+set.seed(22)
+#test <- sn_vil_graph_6
+vertex_attr(test)$similarity <- centrality_sim_df$sim_deg_one[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)]
+#vertex_attr(test)$similarity <- #centrality_sim_df$strain_sim_all[match(names(V(test)),
+#                                           centrality_sim_df$respondent_master_id)]
+
+#paletteFunc <- colorRampPalette(c('red', 'blue'))
+
+#palette <- paletteFunc(length(V(test)))
+#palette <- paletteFunc(3)
+palette <- heat.colors(3)
+palette <- rev(palette)
+#palette <- heat.colors(length(V(test)))
+#palette <- rev(palette)
+
+vertex_attr(test)$color <- palette[order(vertex_attr(test)$similarity)]
+
+#Trichotomize sharing
+vertex_attr(test)$color <- case_when(
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .33) ~ palette[1],
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .66) ~ palette[2],
+  TRUE ~ palette[3],
+)
+
+vertex_attr(test)$size <- (centrality_sim_df$degree_c[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)] +1)/3
+
+set.seed(22)
+plot(test,
+     vertex.label = NA,
+#     vertex.size = 5,
+     layout = layout_with_fr(test))
+legend('topleft',
+       legend = c(">= 9.7% (Top Tertile)",
+                  ">= 7.3% (Middle Tertile)",
+                  ">= 0% (Bottom Tertile)"),
+       pt.bg  = rev(palette),
+       pch    = 21,
+       cex    = 1,
+       bty    = "n",
+       title = "Average Strain-Sharing Rate With\nFirst Degree Connections")
+
+set.seed(22)
+sim_deg_one_network <- as.ggplot(expression(
+  plot(
+    test,
+    vertex.label = NA,
+    layout = layout_with_fr
+  ),
+  legend(x = -.5,
+         y = 1.4,
+    #'topleft',
+    legend = c(">= 9.7% (Top Tertile)",
+                  ">= 7.3% (Middle Tertile)",
+                  ">= 0% (Bottom Tertile)"),
+    pt.bg  = rev(palette),
+    pch    = 21,
+    cex    = .75,
+    bty    = "n",
+    y.intersp = 1.25,
+    title = "Average Strain-Sharing Rate With\nFirst Degree Connections"
+  )
+))
+
+```
+
+```{r}
+
+
+sim_scatter_fig <- ggarrange(deg_c_sharing_all,
+          deg_c_sharing_first,
+          nrow = 2,
+          labels = c("B", "D"))
+
+sim_network_fig <- ggarrange(strain_sim_cent_network,
+          sim_deg_one_network,
+          nrow = 2,
+          labels = c("C", "E"))
+
+#This comes from Sharing_by_degree
+ssr_by_degree_plot <- ggarrange(ssr_by_degree_plot, labels = "A")
+
+svglite("../FiguresNew/Figure4/full_fig4_test.svg",
+        width = 14,
+        height = 8)
+ggarrange(ssr_by_degree_plot,sim_scatter_fig, sim_network_fig,nrow = 1)
+dev.off()
+
+ggarrange(ssr_by_degree_plot,sim_scatter_fig, sim_network_fig,nrow = 1)
+```
+
+
+
+
+
+
+test different graphs
+```{r}
+
+for(i in 1:length(village_names)){
+set.seed(1)
+
+test <- get(paste0("sn_vil_graph_",i))
+#test <- sn_vil_graph_7
+#test <- sn_vil_graph_4
+#vertex_attr(test)$similarity <- centrality_sim_df$sim_deg_one[match(names(V(test)),
+#                                           centrality_sim_df$respondent_master_id)]
+vertex_attr(test)$similarity <- centrality_sim_df$strain_sim_all[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)]
+
+paletteFunc <- colorRampPalette(c('red', 'blue'))
+
+#palette <- paletteFunc(length(V(test)))
+palette <- paletteFunc(3)
+palette <- heat.colors(3)
+#Trichotomize sharing
+vertex_attr(test)$color <- case_when(
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .33) ~ palette[1],
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .66) ~ palette[2],
+  TRUE ~ palette[3],
+)
+
+vertex_attr(test)$size <- centrality_sim_df$degree_c[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)] +1
+
+#par(mar=c(0,0,0,0)+1)
+set.seed(1)
+plot(test,
+     vertex.label = NA,
+#     vertex.size = 5,
+     layout = layout_with_fr)
+legend('topleft',
+       legend = c("High (Top Tertile)","Medium (Middle Tertile)", "Low (Bottom Tertile)"),
+       pt.bg  = palette,
+       pch    = 21,
+       cex    = 1,
+       bty    = "n",
+       title = "Average Strain-Sharing Rate With\nAll Village Members")
+#Village 4 is good for first degree
+
+
+#test <- get(paste0("sn_vil_graph_",i))
+#test <- sn_vil_graph_7
+set.seed(1)
+#test <- sn_vil_graph_4
+vertex_attr(test)$similarity <- centrality_sim_df$sim_deg_one[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)]
+#vertex_attr(test)$similarity <- #centrality_sim_df$strain_sim_all[match(names(V(test)),
+#                                           centrality_sim_df$respondent_master_id)]
+
+paletteFunc <- colorRampPalette(c('red', 'blue'))
+
+#palette <- paletteFunc(length(V(test)))
+palette <- paletteFunc(3)
+palette <- heat.colors(3)
+#Trichotomize sharing
+vertex_attr(test)$color <- case_when(
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .33) ~ palette[1],
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .66) ~ palette[2],
+  TRUE ~ palette[3],
+)
+
+vertex_attr(test)$size <- centrality_sim_df$degree_c[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)] +1
+
+set.seed(1)
+plot(test,
+     vertex.label = NA,
+#     vertex.size = 5,
+     layout = layout_with_fr)
+legend('topleft',
+       legend = c("Lowest Third", "Middle Third", "Top Third"),
+       pt.bg  = palette,
+       pch    = 21,
+       cex    = 1,
+       bty    = "n",
+       title = "Average Similarity to First Degree Connections")
+
+set.seed(1)
+# sim_deg_one_network <- as.ggplot(expression(
+#   plot(
+#     test,
+#     vertex.label = NA,
+#     vertex.size = 5,
+#     layout = layout_with_fr
+#   ),
+#   legend(x = -1.25,
+#          y = 1.25,
+#     #'topleft',
+#     legend = c("Lowest Third", "Middle Third", "Top Third"),
+#     pt.bg  = palette,
+#     pch    = 21,
+#     cex    = .75,
+#     bty    = "n",
+#     y.intersp = 1.5,
+#     title = "Average Strain-Sharing Rate With\nFirst Degree Connections"
+#   )
+# ))
+}
+
+```
+
+
+
+
+
+
+
+
+```{r}
+#Non-shiv covariates
+
+
+lm.1 <- lmerTest::lmer(sim_deg_one ~ cluster_coef_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ (1|village_name),
+             data = centrality_sim_df_covars)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(sim_deg_one ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ (1|village),
+             data = centrality_sim_df_covars)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(sim_deg_one ~ between_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ (1|village),
+             data = centrality_sim_df_covars)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ (1|village),
+             data = centrality_sim_df_covars)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(strain_sim_all ~ between_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ (1|village),
+             data = centrality_sim_df_covars)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(strain_sim_all ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ (1|village),
+             data = centrality_sim_df_covars)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ (1|village),
+             data = centrality_sim_df_covars)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c + age_at_survey +household_wealth_index_w3  + birth_in_village+
+                         gender+ (1|village),
+             data = centrality_sim_df_covars)
+
+
+#All covariates
+
+
+
+lm.1 <- lmerTest::lmer(sim_deg_one ~ cluster_coef_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc + BMI +(1|village_name),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(sim_deg_one ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc + BMI +(1|village),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(sim_deg_one ~ between_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc + BMI +(1|village),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc + BMI +(1|village),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(strain_sim_all ~ between_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc + BMI +(1|village),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(strain_sim_all ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc + BMI +(1|village),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc + BMI  +(1|village),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+
+lm.1 <- lmerTest::lmer(invsimpson ~ between_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc + BMI  +(1|village),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+names(centrality_sim_df_covars_all)
+
+```
+
+
+Check whether more central people are similar,
+control for  assortativity
+
+```{r}
+?mutate
+centrality_sim_df_covars_all <- centrality_sim_df_covars_all %>%
+  mutate(tertile_bucket)
+```
+
+
+
+
+
+Check average similarity based on time spent in villagee
+```{r}
+library(ggpubr)
+ggplot(centrality_sim_df_covars %>% filter(b0800 !="Dont_Know"),
+       aes(x = b0800, y = strain_sim_all)) +
+  geom_boxplot() +
+  stat_compare_means(comparisons = list(c("More than a year", "Less than a year"),
+                                     c("More than a year", "Since birth"),
+                                     c("Less than a year", "Since birth")))
+
+wilcox.test(centrality_sim_df_covars$strain_sim_all[centrality_sim_df_covars$b0800 == "Since birth"],
+            centrality_sim_df_covars$strain_sim_all[centrality_sim_df_covars$b0800 != "Since birth"],
+            alternative = "greater")
+
+immigrant_df <- centrality_sim_df_covars %>% filter(!(b0800 %in% c("Dont_Know", "Less than a year")))
+
+
+lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c + age_at_survey +household_wealth_index_w3 +
+                         gender+  b0800+ (1|village),
+             data = immigrant_df)
+
+summary(lm.1)
+
+immigrant_df_time <- centrality_sim_df_covars %>% filter(time_in_vil <= 5)
+
+lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c + age_at_survey +household_wealth_index_w3 +
+                         gender+  time_in_vil+ (1|village),
+             data = immigrant_df_time)
+
+#This is negative, super weird
+#To be looked into
+summary(lm.1)
+
+wilcox.test(immigrant_df_time$strain_sim_all[immigrant_df_time$time_in_vil == 1],
+            immigrant_df_time$strain_sim_all[immigrant_df_time$time_in_vil == 2])
+
+
+
+
+
+```
+
+
+
+
+
+See if women are different compositionally than men
+
+```{r}
+names(centrality_sim_df_covars)
+#No difference in diversity
+wilcox.test(richness~ gender, data = centrality_sim_df_covars)
+wilcox.test(invsimpson~ gender, data = centrality_sim_df_covars)
+wilcox.test(shannon~ gender, data = centrality_sim_df_covars)
+
+#Potentially overall compositionwise. Fuck need to do some other ordination shit
+
+
+
+```
+
+
+
+
+
+See if women share more to their direct contacts than men
+```{r}
+library(ggplot2)
+
+#SN$strain_sharing_rate <- SN$strain_sharing_rate/100
+
+#Maybe I'm cutting out people who only nominate those without microbiome info
+#I shouldn't do that hmmm there's definitely a case, maybe a few
+#Make the graph first, then drop nodes with no microbiome inof
+SN_Graph_all <- graph_from_data_frame(SN %>% distinct(pair_key, .keep_all = TRUE),
+                                               directed = FALSE)
+#May want to remove the mother child connections here
+woman_list_strain <- c()
+man_list_strain <- c()
+
+woman_list_bray <- c()
+man_list_bray <- c()
+
+woman_list_jaccard <- c()
+man_list_jaccard <- c()
+
+sum(hmb_census$respondent_master_id == names(V(SN_Graph_all)[i]))
+
+for( i in 1:length(V(SN_Graph_all))){
+  test_incident <- incident(SN_Graph_all, V(SN_Graph_all)[i])
+  
+  if(hmb_census$gender[hmb_census$respondent_master_id == names(V(SN_Graph_all)[i])] == "woman"){
+    woman_list_strain <- c(woman_list_strain,
+                    mean(edge_attr(SN_Graph_all, "strain_sharing_rate", test_incident)))
+    woman_list_bray <- c(woman_list_bray,
+                    mean(edge_attr(SN_Graph_all, "bray_curtis_sim", test_incident)))
+    woman_list_jaccard <- c(woman_list_jaccard,
+                    mean(edge_attr(SN_Graph_all, "jaccard_sim", test_incident)))
+  }
+  
+  else{
+     man_list_strain <- c(man_list_strain,
+                   mean(edge_attr(SN_Graph_all, "strain_sharing_rate", test_incident)))
+     man_list_bray <- c(man_list_bray,
+                    mean(edge_attr(SN_Graph_all, "bray_curtis_sim", test_incident)))
+     man_list_jaccard <- c(man_list_jaccard,
+                    mean(edge_attr(SN_Graph_all, "jaccard_sim", test_incident)))
+  }
+}
+
+
+man_woman_df <- data.frame("Strain_Sharing_Rate" = c(man_list_strain, woman_list_strain),
+                           "Bray_Curtis_Similarity" = c(man_list_bray, woman_list_bray),
+                           "Jaccard_Similarity" = c(man_list_jaccard, woman_list_jaccard),
+                           "Gender" = c(rep("Male", length(man_list_strain)),
+                                        rep("Female", length(woman_list_strain))))
+
+
+
+head(man_woman_df)
+
+# Assume your data frame is named dat
+man_woman_df.m = reshape2::melt(man_woman_df %>% select(-Jaccard_Similarity), id.var=c("Gender"))
+
+man_woman_df.m = reshape2::melt(man_woman_df, id.var=c("Gender"))
+
+
+levels(man_woman_df.m$variable) <- c("Strain-Sharing Rate", "Bray-Curtis Similarity", "Jaccard Similarity")
+
+medians_mw <- aggregate(value~variable + Gender, data = man_woman_df.m, median, na.rm = TRUE)
+
+#Want all pairwise comparisons
+man_woman_df.m$all_group <- paste0(man_woman_df.m$Gender, man_woman_df.m$variable)
+mw_share_pvals <- compare_means(value ~all_group, data = man_woman_df.m)
+
+mw_share_pvals <- mw_share_pvals[c(1,10,15),] 
+
+mw_share_pvals$p.adj <- mw_share_pvals$p %>% p.adjust(method = "BH")
+
+mw_share_pvals$p.adj
+
+# If you want the two levels of event plotted side by side
+mw_share <- ggplot(man_woman_df.m, aes(Gender, value, colour=variable)) +
+  facet_wrap(. ~ variable, scales = "free") +
+  geom_boxplot(width=0.7, show.legend = FALSE) +
+  theme_minimal() +
+  stat_compare_means(comparisons = list(c("Female", "Male")),
+    method = "wilcox.test",
+    label.y = .6,
+    size = 3,
+    tip.length = 0) +
+  geom_text(data = medians_mw,
+            aes(label = sprintf("%0.2f", round(value, digits = 2)),
+                y = value + 0.02),
+            show.legend = FALSE)+
+  theme(axis.title.y =element_blank(),
+        axis.title.x =element_blank(),
+        plot.title = element_text(hjust = .5))+
+  ggtitle("Average Microbiome Similarity to Direct Connections by Gender")
+
+# mw_share <- ggplot(man_woman_df, aes(x = Gender, fill = Gender)) +
+#   geom_boxplot(outlier.shape = NA, show.legend = FALSE) +
+#   facet_grid(rows = vars(Strain_Sharing_Rate, Bray_Curtis_Similarity, Jaccard_Similarity)) +
+#   coord_cartesian(ylim = c(0, 1)) +
+#   #stat_compare_means(method = "wilcox.test",label.y = .3) +
+#   theme_minimal() +
+#   ylab("Average Strain-Sharing Rate to Direct Links") +
+#   ggtitle("Average Strain-Sharing Rate to Direct Links") +
+#   theme(plot.title = element_text(hjust = .5, size = 10))
+```
+
+
+
+
+```{r}
+#Remove spouse_pairs_inherently gendered
+spouse_pairs <- SN %>% filter(relationship == "Partner") %>% pull(pair_key) %>% unique()
+SN_no_spouse <- SN %>% filter(!(pair_key %in% spouse_pairs)) %>% distinct(pair_key, .keep_all = TRUE)
+
+
+SN_no_spouse$pair_gender <- paste0(SN_no_spouse$gender_ego, SN_no_spouse$gender_alter)
+
+SN_no_spouse$pair_gender <- case_when(
+  SN_no_spouse$pair_gender == "womanman" | SN_no_spouse$pair_gender == "manwoman" ~ "Female - Male",
+  SN_no_spouse$pair_gender == "manman" ~ "Male - Male",
+  SN_no_spouse$pair_gender == "womanwoman" ~ "Female - Female"
+)
+
+SN$pair_gender <- paste0(SN$gender_ego, SN$gender_alter)
+
+SN$pair_gender <- case_when(
+  SN$pair_gender == "womanman" | SN$pair_gender == "manwoman" ~ "Female - Male",
+  SN$pair_gender == "manman" ~ "Male - Male",
+  SN$pair_gender == "womanwoman" ~ "Female - Female"
+)
+
+my_comparisons <- list( c("Female - Male", "Male - Male"),
+                        c("Female - Male", "Female - Female"),
+                        c("Male - Male", "Female - Female") )
+
+means_gender <- aggregate(strain_sharing_rate ~  pair_gender, SN_no_spouse, median, na.rm = TRUE)
+
+
+
+```
+
+
+
+
+```{r}
+SN_tri_gender <- SN_no_spouse %>%
+  filter(!(relationship %in% c("Partner", "Mother", "Father", "Child"))) %>%
+  distinct(pair_key, relationship, .keep_all = TRUE)
+
+
+ann_text <- aggregate(strain_sharing_rate ~  relationship + pair_gender,
+                     SN_tri_gender, median, na.rm = TRUE)
+ann_text_2 <- aggregate(strain_sharing_rate ~  relationship + pair_gender,
+                     SN_tri_gender, length)
+ann_text_3 <- aggregate(strain_sharing_rate ~  relationship + pair_gender,
+                     SN_tri_gender, median, na.rm = TRUE)
+
+names(ann_text_2) <- c("relationship", "pair_gender", "count")
+
+ann_text <- merge(ann_text, ann_text_2)
+
+ann_text$lab <- paste0(as.character(round(ann_text$strain_sharing_rate,3)),
+                       "\n(N = ", ann_text$count, ")")
+
+
+#Want to have FDR control here
+gender_split_share <- ggboxplot(SN_tri_gender, color = "pair_gender",
+                                x = "pair_gender", y = "strain_sharing_rate",
+                                facet.by = "relationship",outlier.shape = NA) +
+  coord_cartesian(ylim = c(0,.35)) +
+  theme(#axis.text.x = element_text(angle = 45, hjust=1),
+    axis.text.x = element_blank(),
+    legend.title = element_blank(),
+    legend.position= "bottom",
+    legend.margin=margin(0,0,0,0, unit='cm')) +
+  stat_compare_means(label.y = c(.20,.25,.30),
+                     comparisons = my_comparisons) +
+  xlab("") +
+  ylab("Strain-Sharing Rate") +
+  geom_text(data = ann_text, label = ann_text$lab,
+            size = 3)
+
+```
+
+
+```{r}
+ann_text <- aggregate(bray_curtis_sim ~  relationship + pair_gender,
+                     SN_tri_gender, median)
+ann_text_2 <- aggregate(bray_curtis_sim ~  relationship + pair_gender,
+                     SN_tri_gender, length)
+
+
+names(ann_text_2) <- c("relationship", "pair_gender", "count")
+
+ann_text <- merge(ann_text, ann_text_2)
+
+ann_text$lab <- paste0(as.character(round(ann_text$bray_curtis_sim,3)),
+                       "\n(N = ", ann_text$count, ")")
+
+
+#Want to have FDR control here
+#May need to do this manually
+ggboxplot(SN_tri_gender, color = "pair_gender",
+                                x = "pair_gender", y = "bray_curtis_sim",
+                                facet.by = "relationship",outlier.shape = NA) +
+  coord_cartesian(ylim = c(0,.8)) +
+  theme(#axis.text.x = element_text(angle = 45, hjust=1),
+    axis.text.x = element_blank(),
+    legend.title = element_blank(),
+    legend.position= "bottom",
+    legend.margin=margin(0,0,0,0, unit='cm')) +
+  stat_compare_means(label.y = c(.6,.65,.7),
+                     comparisons = my_comparisons,
+                     method.args = list(method.args = list(p.adjust.method = "BH"))) +
+  xlab("") +
+  ylab("Bray-Curtis Similarity") +
+  geom_text(data = ann_text, label = ann_text$lab,
+            size = 3)
+```
+
+Much of this effect is driven by brothers vs sisters. Some sociological analysis?
+Let's get the species level results
+
+
+```{r}
+ann_text <- aggregate(jaccard_sim ~  relationship + pair_gender,
+                     SN_tri_gender, median)
+ann_text_2 <- aggregate(jaccard_sim ~  relationship + pair_gender,
+                     SN_tri_gender, length)
+
+
+names(ann_text_2) <- c("relationship", "pair_gender", "count")
+
+ann_text <- merge(ann_text, ann_text_2)
+
+ann_text$lab <- paste0(as.character(round(ann_text$jaccard_sim,3)),
+                       "\n(N = ", ann_text$count, ")")
+
+#compare_means(jaccard_sim ~  relationship + pair_gender,
+#                     SN_tri_gender,
+ #             p.adjust.method = "BH")
+
+
+#Want to have FDR control here
+#Can add this in later
+ggboxplot(SN_tri_gender, color = "pair_gender",
+                                x = "pair_gender", y = "jaccard_sim",
+                                facet.by = "relationship",outlier.shape = NA) +
+  coord_cartesian(ylim = c(.1,.8)) +
+  theme(#axis.text.x = element_text(angle = 45, hjust=1),
+    axis.text.x = element_blank(),
+    legend.title = element_blank(),
+    legend.position= "bottom",
+    legend.margin=margin(0,0,0,0, unit='cm')) +
+  stat_compare_means(label.y = c(.6,.65,.7),
+                     comparisons = my_comparisons,
+                     method.args = list(method.args = list(p.adjust.method = "BH"))) +
+  xlab("") +
+  ylab("Jaccard Similarity") +
+  geom_text(data = ann_text, label = ann_text$lab,
+            size = 3)
+
+#adjust p-value with Bonferroni
+wilcox.test(SN_tri_gender$bray_curtis_sim[SN_tri_gender$pair_gender == "Male - Male" &
+                                            SN_tri_gender$relationship == "Sibling"],
+            SN_tri_gender$bray_curtis_sim[SN_tri_gender$pair_gender == "Female - Female" &
+                                            SN_tri_gender$relationship == "Sibling"])$p.value * 12*3
+
+# tri_gender_df.m <- SN_tri_gender %>% select(bray_curtis_sim, jaccard_sim, strain_sharing_rate, pair_gender)
+# tri_gender_df.m <- reshape2::melt(tri_gender_df.m, id.var=c("pair_gender"))
+# head(tri_gender_df.m)
+# tri_gender_df.m$all_group <- paste0(tri_gender_df.m$pair_gender,tri_gender_df.m$variable)
+# 
+# tri_gender_df_pvals <- compare_means(value ~ all_group, data = tri_gender_df.m)
+# 
+# tri_gender_df_pvals $>$ filter(group1 == )
+```
+
+
+
+```{r}
+gender_split_share <-ggboxplot(SN_tri_gender, color = "pair_gender",
+          x = "pair_gender", y = "bray_curtis_sim",
+          facet.by = "relationship",outlier.shape = NA) +
+  coord_cartesian(ylim = c(0.25,1.1)) +
+  theme(#axis.text.x = element_text(angle = 45, hjust=1),
+    axis.text.x = element_blank(),
+        legend.title = element_blank()) +
+  stat_compare_means(label.y = c(.85,.9,.95),
+                     comparisons = my_comparisons) +
+  xlab("") +
+  ylab("Bray-Curtis Distance") +
+  geom_text(data = ann_text, label = ann_text$lab)
+
+
+```
+
+Make nice plot
+```{r}
+
+gender_fig <- ggarrange(gender_split_share +
+                   #rremove("xlab") +
+                   rremove("ylab"),
+          ggarrange(mw_share +
+                      rremove("ylab") ,
+                    parent_share +
+                      rremove("ylab") ,
+                    labels = c("7B", "7C"),
+                    align = "h",
+                    ncol = 2,
+                    label.y = 1.05),
+          nrow = 2, 
+          labels = "7A",
+          label.y = .95,
+          heights = c(2,1))
+
+annotate_figure(gender_fig, 
+                left = text_grob("Strain-Sharing Rate",
+                                 rot = 90,
+                                 size = 12),
+                top = text_grob("Gender Differences in Strain-Sharing",
+                                size = 12))
+
+annotate_figure(gender_fig, 
+                left = text_grob("Bray-Curtis Dissimilarity",
+                                 rot = 90,
+                                 size = 12),
+                top = text_grob("Gender Differences in Species-Similarity",
+                                size = 12))
+```
+
+Mother-Child sharing by father sharing and age differential
+
+```{r}
+SN_parent <- SN %>%
+  filter(relationship %in% c("Child","Mother", "Father"))
+
+SN_parent <- SN_parent %>% distinct(pair_key, .keep_all = TRUE)
+
+for(i in 1:nrow(SN_parent)){
+  if(SN_parent$relationship[i] == "Mother"){
+    SN_parent$relationship[i] <- "Child"
+    SN_parent$gender_ego[i] <- "Mother"
+    SN_parent$age_at_survey_alter[i] <- SN_parent$age_at_survey_ego[i]
+  }
+  else if(SN_parent$relationship[i] == "Father"){
+    SN_parent$relationship[i] <- "Child"
+    SN_parent$gender_ego[i] <- "Father"
+    SN_parent$age_at_survey_alter[i] <- SN_parent$age_at_survey_ego[i]
+  }
+}
+SN_parent$gender_ego[SN_parent$gender_ego == "woman"] <- "Mother"
+SN_parent$gender_ego[SN_parent$gender_ego == "man"] <- "Father"
+
+
+mc_scatter_ssr <- ggscatter(SN_parent %>% filter(gender_ego == "Mother"),
+          x = "age_at_survey_alter", y = "strain_sharing_rate",
+          add = "reg.line",  # Add regressin line
+          add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+          conf.int = TRUE) +
+  coord_cartesian(ylim = c(0,.75)) +
+  stat_cor(method = "pearson", label.x = 20, label.y = .75,
+           aes(label = paste(after_stat(rr.label), ..p.label.., sep = "~`,`~"))) +
+  xlab("Child Age") +
+  ylab("Strain-Sharing Rate") +
+  ggtitle("Mother-Child Strain-Sharing Rate by Child's Age") +
+  theme(plot.title = element_text(size = 10))
+
+mc_scatter_bc <- ggscatter(SN_parent %>% filter(gender_ego == "Mother"),
+          x = "age_at_survey_alter", y = "bray_curtis_sim",
+          add = "reg.line",  # Add regressin line
+          add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+          conf.int = TRUE) + 
+  coord_cartesian(ylim = c(0,.75)) +
+  stat_cor(method = "pearson", label.x = 20, label.y = .75,
+           aes(label = paste(after_stat(rr.label), ..p.label.., sep = "~`,`~"))) +
+  xlab("Child Age") +
+  ylab("Bray-Curtis Similarity") +
+  ggtitle("Mother-Child Bray-Curtis Similarity by Child's Age")+
+  theme(plot.title = element_text(size = 10))
+  
+
+
+mc_scatter_j <- ggscatter(SN_parent %>% filter(gender_ego == "Mother"),
+          x = "age_at_survey_alter", y = "jaccard_sim",
+          add = "reg.line",  # Add regressin line
+          add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+          conf.int = TRUE) + 
+  coord_cartesian(ylim = c(0,.75)) +
+  stat_cor(method = "pearson", label.x = 20, label.y = .75,
+           aes(label = paste(after_stat(rr.label), ..p.label.., sep = "~`,`~"))) +
+  xlab("Child Age") +
+  ylab("Jaccard Similarity") +
+  ggtitle("Mother-Child Jaccard Similarity by Child's Age")+
+  theme(plot.title = element_text(size = 10))
+
+
+
+fc_scatter_ssr <- ggscatter(SN_parent %>% filter(gender_ego == "Father"),
+          x = "age_at_survey_alter", y = "strain_sharing_rate",
+          add = "reg.line",  # Add regressin line
+          add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+          conf.int = TRUE) +
+  coord_cartesian(ylim = c(0,.75)) +
+  stat_cor(method = "pearson", label.x = 20, label.y = .75,
+           aes(label = paste(after_stat(rr.label), ..p.label.., sep = "~`,`~"))) +
+  xlab("Child Age") +
+  ylab("Strain-Sharing Rate") +
+  ggtitle("Father-Child Strain-Sharing Rate by Child's Age") +
+  theme(plot.title = element_text(size = 10))
+
+fc_scatter_bc <- ggscatter(SN_parent %>% filter(gender_ego == "Father"),
+          x = "age_at_survey_alter", y = "bray_curtis_sim",
+          add = "reg.line",  # Add regressin line
+          add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+          conf.int = TRUE) + 
+  coord_cartesian(ylim = c(0,.75)) +
+  stat_cor(method = "pearson", label.x = 20, label.y = .75,
+           aes(label = paste(after_stat(rr.label), ..p.label.., sep = "~`,`~"))) +
+  xlab("Child Age") +
+  ylab("Bray-Curtis Similarity") +
+  ggtitle("Father-Child Bray-Curtis Similarity by Child's Age")+
+  theme(plot.title = element_text(size = 10))
+  
+
+
+fc_scatter_j <- ggscatter(SN_parent %>% filter(gender_ego == "Father"),
+          x = "age_at_survey_alter", y = "jaccard_sim",
+          add = "reg.line",  # Add regressin line
+          add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+          conf.int = TRUE) + 
+  coord_cartesian(ylim = c(0,.75)) +
+  stat_cor(method = "pearson", label.x = 20, label.y = .75,
+           aes(label = paste(after_stat(rr.label), ..p.label.., sep = "~`,`~"))) +
+  xlab("Child Age") +
+  ylab("Jaccard Similarity") +
+  ggtitle("Father-Child Jaccard Similarity by Child's Age")+
+  theme(plot.title = element_text(size = 10))
+
+
+parent_share_ssr <-ggplot(SN_parent, aes(x = gender_ego,
+                                     y = strain_sharing_rate,
+                                     fill = gender_ego)) +
+  geom_boxplot(outlier.shape = NA, show.legend = FALSE) +
+  stat_compare_means(label.y = .40) +
+  coord_cartesian(ylim = c(0,.50)) +
+  ylab("Strain-Sharing Rate (%)") +
+  xlab("Parent Gender") +
+  ggtitle("Child to Parent Strain-Sharing Rate") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5, size = 10)) +
+  theme_pubr()
+
+parent_share_bc <-ggplot(SN_parent, aes(x = gender_ego,
+                                     y = bray_curtis_sim,
+                                     fill = gender_ego)) +
+  geom_boxplot(outlier.shape = NA, show.legend = FALSE) +
+  stat_compare_means(label.y = .75) +
+  coord_cartesian(ylim = c(0,1)) +
+  ylab("Bray-Curtis Similarity") +
+  xlab("Parent Gender") +
+  ggtitle("Child to Parent Bray-Curtis Similarity") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5, size = 10)) +
+  theme_pubr()
+
+parent_share_j <-ggplot(SN_parent, aes(x = gender_ego,
+                                     y = jaccard_sim,
+                                     fill = gender_ego)) +
+  geom_boxplot(outlier.shape = NA, show.legend = FALSE) +
+  stat_compare_means(label.y = .75) +
+  coord_cartesian(ylim = c(0,1)) +
+  ylab("Jaccard Similarity") +
+  xlab("Parent Gender") +
+  ggtitle("Child to Parent Jaccard Similarity") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5, size = 10)) +
+  theme_pubr()
+
+
+```
+
+
+```{r}
+sfig5_1 <- ggarrange(mc_scatter_ssr, mc_scatter_bc, mc_scatter_j, ncol = 3, labels = c("A", "B", "C"))
+
+sfig5_2 <- ggarrange(fc_scatter_ssr, fc_scatter_bc, fc_scatter_j, ncol = 3, labels = c("D", "E", "F"))
+
+sfig5_3 <- ggarrange(parent_share_ssr, parent_share_bc, parent_share_j, ncol = 3, labels = c("G", "H", "I"))
+
+
+svglite("../FiguresNew/SFigure6/sfigure6_full.svg",
+        width = 12, height = 10)
+ggarrange(sfig5_1, sfig5_2,sfig5_3, ncol = 1)
+dev.off()
+
+# ggarrange(mc_scatter_ssr, mc_scatter_bc, mc_scatter_j,
+#           fc_scatter_ssr, fc_scatter_bc, fc_scatter_j,
+#           labels = c("A", "B", "C", "D", "E", "F"),ncol = 3)
+```
+
+
+```{r}
+SN_parent %>%
+  group_by(alter) %>%
+  summarize(n = n(),
+            strain_sharing_rate,
+            gender_ego) %>%
+  filter(n == 2) %>%
+  mutate(mother_rate = strain_sharing_rate[gender_ego == "Mother"],
+         father_rate = strain_sharing_rate[gender_ego == "Father"]) %>%
+  distinct(alter, .keep_all = TRUE) %>%
+  select(mother_rate, father_rate) %>%
+  ungroup() %>%
+  ggplot(aes(x = mother_rate, y = father_rate)) +
+  geom_point()+
+  geom_smooth(method = lm)
+  
+  
+#We can observe same phenomenon that they do, don't think we need to include it,
+#Also there's definitely. a way to get more data by including children nominations
+
+```
+
+
+
+
+
+Extra
+```{r}
+ggplot(SN_no_spouse, aes(x = pair_gender, y = strain_sharing_rate, fill = pair_gender))+
+  geom_boxplot(outlier.shape = NA,show.legend = FALSE) +
+  coord_cartesian(ylim = c(0,.5)) +
+  stat_compare_means(method = "wilcox.test", 
+                     comparisons = my_comparisons,
+                     label.y = c(.3,.35,.4)) +
+  geom_text(data = means_gender,
+            aes(label = round(strain_sharing_rate,3),
+                y = strain_sharing_rate + 0.005)) + 
+  theme_minimal() +
+  ylab("Strain-Sharing Rate") +
+  xlab("Gender")
+
+#Same for species
+ggplot(SN_no_spouse, aes(x = pair_gender, y = strain_sharing_rate, fill = pair_gender))+
+  geom_boxplot(outlier.shape = NA,show.legend = FALSE) +
+  #coord_cartesian(ylim = c(0,.5)) +
+  stat_compare_means(method = "wilcox.test", 
+                     comparisons = my_comparisons,
+                     label.y = c(.85,.9,.95)) +
+  geom_text(data = means_gender,
+            aes(label = round(strain_sharing_rate,3),
+                y = strain_sharing_rate + 0.02)) + 
+  theme_minimal() +
+  ylab("Bray-Curtis Distance") +
+  xlab("Gender")
+
+
+SN_mother <- SN %>%
+  filter(relationship == "Mother")
+
+
+SN_mother$gender_ego[SN_mother$gender_ego == "man"] <- "Male"
+SN_mother$gender_ego[SN_mother$gender_ego == "woman"] <- "Female"
+SN_mother$gender_alter[SN_mother$gender_alter == "man"] <- "Male"
+SN_mother$gender_alter[SN_mother$gender_alter == "woman"] <- "Female"
+
+SN_father <- SN %>%
+  filter(relationship == "Father")
+
+SN_father$gender_ego[SN_father$gender_ego == "man"] <- "Male"
+SN_father$gender_ego[SN_father$gender_ego == "woman"] <- "Female"
+SN_father$gender_alter[SN_father$gender_alter == "man"] <- "Male"
+SN_father$gender_alter[SN_father$gender_alter == "woman"] <- "Female"
+
+#Weird ok
+table(SN_mother$gender_alter)
+#Maybe this should be removed or lumped into social interaction?
+
+ggplot(SN_mother, aes(x = gender_ego, y = strain_sharing_rate)) +
+  geom_boxplot(outlier.shape = NA, ) +
+  stat_compare_means(label.y = .35) +
+  coord_cartesian(ylim = c(0,.4)) +
+  ylab("Strain-Sharing Rate") +
+  xlab("Child Gender") +
+  ggtitle("Child to Mother")
+
+ggplot(SN_father, aes(x = gender_ego, y = strain_sharing_rate)) +
+  geom_boxplot(outlier.shape = NA) +
+  stat_compare_means(label.y = .3) +
+  coord_cartesian(ylim = c(0,.4)) +
+  ylab("Strain-Sharing Rate") +
+  xlab("Child Gender") +
+  ggtitle("Father to Child")
+
+ggplot(SN_mother, aes(x = gender_ego, y = strain_sharing_rate)) +
+  geom_boxplot(outlier.shape = NA, ) +
+  stat_compare_means(label.y = .35) +
+  #coord_cartesian(ylim = c(0,.4)) +
+  ylab("Bray-Curtis Distance") +
+  xlab("Child Gender") +
+  ggtitle("Child to Mother")
+
+ggplot(SN_father, aes(x = gender_ego, y = strain_sharing_rate)) +
+  geom_boxplot(outlier.shape = NA) +
+  stat_compare_means(label.y = .3) +
+  #coord_cartesian(ylim = c(0,.4)) +
+  ylab("Bray-Curtis Distance") +
+  xlab("Child Gender") +
+  ggtitle("Father to Child")
+
+```
+
+
+```{r}
+parent_share <-ggplot(SN_parent, aes(x = gender_ego,
+                                     y = strain_sharing_rate,
+                                     fill = gender_ego)) +
+  geom_boxplot(outlier.shape = NA, show.legend = FALSE) +
+  stat_compare_means(label.y = .3) +
+  coord_cartesian(ylim = c(0,1)) +
+  ylab("Strain") +
+  xlab("Parent Gender") +
+  ggtitle("Child to Parent Bray-Curtis Distance") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = .5, size = 10))
+```
+
+
+```{r}
+#Base effect
+full_centrality_df <- merge(full_centrality_df,diversity_df)
+
+dim(full_centrality_df)
+plot(richness ~ degree_c, data = full_centrality_df)
+cor.test(full_centrality_df$richness, full_centrality_df$degree_c)
+
+ggplot(building_diversity, aes(x = building_count, y = shannon)) +
+  geom_point() +                                     
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  ylab("Shannon Diversity") +
+  xlab("Household Size") +
+  theme_minimal()
+
+lm.1 <- lmerTest::lmer(richness ~ building_count + (1|village_name),
+                       building_diversity)
+summary(lm.1)
+
+lm.2 <- lmerTest::lmer(shannon ~ building_count + (1|village_name),
+                       building_diversity)
+summary(lm.2)
+
+lm.3 <- lmerTest::lmer(invsimpson ~ building_count + (1|village_name),
+                       building_diversity)
+summary(lm.3)
+
+
+
+building_diversity_covars <- merge(building_diversity, covariates)
+
+lm.1 <- lmerTest::lmer(richness ~ building_count + age_at_survey +household_wealth_index_w3 +
+                         gender+ (1|village_name),
+             data = building_diversity_covars)
+summary(lm.1)
+
+ggplot(building_diversity_covars, aes(x = household_wealth_index_w3, y = richness)) +
+  geom_point() +                                     
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  ylab("richness") +
+  xlab("household_wealth_index_w3") +
+  theme_minimal()
+
+ggplot(building_diversity_covars, aes(x = household_wealth_index_w3, y = building_count)) +
+  geom_point() +                                     
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  ylab("building_count") +
+  xlab("household_wealth_index_w3") +
+  theme_minimal()
+
+#Wealthier houses have more people
+#Larger houses tend to have people with more diverse microbiomes (slighlty)
+
+
+lm.2 <- lmerTest::lmer(invsimpson ~ building_count + age_at_survey +household_wealth_index_w3 +
+                         gender+ (1|village_name),
+                       data = building_diversity_covars)
+summary(lm.2)
+lm.3 <- lmerTest::lmer(shannon ~ building_count + + age_at_survey +household_wealth_index_w3 +
+                         gender+ (1|village_name),
+                       data = building_diversity_covars)
+summary(lm.3)
+
+
+building_diversity_covars_all <- merge(building_diversity_covars, shiv_covars)
+
+
+lm.1 <- lmerTest::lmer(richness ~ building_count + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc_shiv + BMI_shiv +(1|village_name),
+             data = building_diversity_covars_all)
+summary(lm.1)
+lm.2 <- lmerTest::lmer(invsimpson ~ building_count + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc_shiv + BMI_shiv +(1|village_name) ,
+                       data = building_diversity_covars_all)
+summary(lm.2)
+lm.3 <- lmerTest::lmer(shannon ~ building_count + age_at_survey +household_wealth_index_w3 +
+                         gender+ dna_conc_shiv + BMI_shiv + +(1|village_name) ,
+                       data = building_diversity_covars_all)
+summary(lm.3)
+
+#Now it's incredibly not significant, I want to check this out.
+#Should I include an interaction?
+
+```
+
+See if larger buildings have more overall richness
+```{r}
+
+species_data_building <- species_data
+species_data_building <- species_data_building[rownames(species_data_building) %in%
+                                                 hmb_census$respondent_master_id,]
+rownames(species_data_building) <- hmb_census$building_id[match(rownames(species_data_building),
+                                                                hmb_census$respondent_master_id)]
+
+
+species_data_building_df <- rowsum(species_data_building, row.names(species_data_building))
+
+
+building_richness <- rowSums(species_data_building_df > 0)
+
+
+building_diversity_covars$building_richness <- building_richness[match(building_diversity_covars$building_id,names(building_richness))]
+
+building_richness <- building_diversity_covars %>% distinct(building_id, .keep_all = TRUE)
+
+lm.1 <- lmerTest::lmer(building_richness ~ building_count +household_wealth_index_w3 + (1|village_name),
+             data = building_richness)
+summary(lm.1)
+
+ggplot(building_richness, aes(x = building_count, y = building_richness)) +
+  geom_point() +                                     
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  ylab("Number of Unique Species in Household") +
+  xlab("Household Size") +
+  theme_minimal()
+
+
+
+```
+
+
+
+Socially central have more popular species. NO
+```{r}
+species_pop_vil_all <- c()
+for(i in 1:length(village_names)){
+  sn_vil <- all_edges %>% filter(village_name_w3 == village_names[i])
+  village_ids <- unique(c(sn_vil$ego, sn_vil$alter))
+  sn_vil <- simplify(graph_from_data_frame(sn_vil, directed = FALSE))
+  species_vil <- species_data[rownames(species_data) %in% village_ids,]
+  species_pop_vil <- species_vil
+  species_pop_vil[species_pop_vil>0] <- 1
+  species_pop_vil <- colMeans(species_pop_vil)
+  for(j in 1:nrow(species_vil)){
+    for(k in 1:ncol(species_vil)){
+      if(species_vil[j,k]>0){
+        species_vil[j,k] <- species_pop_vil[k]
+      }
+      else{
+        species_vil[j,k] <- NA
+      }
+    }
+  }
+  
+  species_pop_vil <- rowMeans(species_vil, na.rm = TRUE)
+  species_pop_vil_all <- c(species_pop_vil_all, species_pop_vil)
+  
+}
+
+centrality_sim_df$avg_species_prev <- species_pop_vil_all[match(centrality_sim_df$respondent_master_id,
+                                                                names(species_pop_vil_all))]
+
+cor.test(centrality_sim_df$avg_species_prev,
+         centrality_sim_df$degree_c)
+
+lm.1 <- lmerTest::lmer(avg_species_prev ~ eigen_c + (1|village),
+                       centrality_sim_df)
+summary(lm.1)
+
+```
+
+
+

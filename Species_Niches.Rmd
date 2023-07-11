@@ -1,0 +1,697 @@
+---
+title: "Species_Niches"
+author: "Jackson Pullman"
+date: "2023-02-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+For Kruskal Wallis want communities to have more than 5
+```{r}
+set.seed(1)
+#Make sure to change this back to non overall graph
+#Get social network clustering for each village
+# sn_cluster_1 <- cluster_louvain(sn_vil_graph_1)
+# sn_cluster_2 <- cluster_louvain(sn_vil_graph_2)
+# sn_cluster_3 <- cluster_louvain(sn_vil_graph_3)
+# sn_cluster_4 <- cluster_louvain(sn_vil_graph_4)
+# sn_cluster_5 <- cluster_louvain(sn_vil_graph_5)
+# sn_cluster_6 <- cluster_louvain(sn_vil_graph_6)
+# sn_cluster_7 <- cluster_louvain(sn_vil_graph_7)
+# sn_cluster_8 <- cluster_louvain(sn_vil_graph_8)
+# sn_cluster_9 <- cluster_louvain(sn_vil_graph_9)
+# 
+# sn_member_1 <- membership(sn_cluster_1) + 100
+# sn_member_2 <- membership(sn_cluster_2) + 200
+# sn_member_3 <- membership(sn_cluster_3) + 300
+# sn_member_4 <- membership(sn_cluster_4) + 400
+# sn_member_5 <- membership(sn_cluster_5) + 500
+# sn_member_6 <- membership(sn_cluster_6) + 600
+# sn_member_7 <- membership(sn_cluster_7) + 700
+# sn_member_8 <- membership(sn_cluster_8) + 800
+# sn_member_9 <- membership(sn_cluster_9) + 900
+
+
+
+
+#KW approach
+niche_frame_kw <- data.frame(matrix(NA, nrow = length(village_names), ncol = ncol(species_data)))
+colnames(niche_frame_kw) <- colnames(species_data)
+for(j in 1:ncol(species_data)){
+ #j <-651
+  species_for_niche <- species_data[,j]
+  for(i in 1:length(village_names)){
+   # i <- 6
+    clusters <- get(paste0("sn_member_",i))
+    clusters_samp_size <- table(clusters)
+    clusters_samp_size <- clusters_samp_size[clusters_samp_size>=5]
+    clusters <- clusters[clusters %in% names(clusters_samp_size)]
+    ordered_species <- species_for_niche[match(names(clusters), names(species_for_niche))]
+    #Randomization for p-values
+    #ordered_species <- sample(ordered_species)
+    if(sum(abs(ordered_species) >0) >=5){
+      test <- kruskal.test(ordered_species, as.vector(clusters))
+      niche_frame_kw[i,j] <- test$p.value
+    }
+  }
+}
+sum(!is.na(niche_frame_kw))
+
+hist_dat_pvals <- data.frame(pvals = (niche_frame_kw %>% as.matrix %>% as.vector))
+
+niche_hist <-
+  gghistogram(hist_dat_pvals, x = "pvals", fill = "#E7B800") +
+  theme_pubr() +
+  labs_pubr() +
+  xlab("P-Values") +
+  ylab("Frequency") +
+  ggtitle("P-Value Distribution of Species Niches") +
+  theme(plot.title = element_text(hjust = .5))
+```
+
+Randomized p-value distribution
+```{r}
+#KW approach
+niche_frame_kw_rand <- data.frame(matrix(NA, nrow = length(village_names), ncol = ncol(species_data)))
+colnames(niche_frame_kw_rand) <- colnames(species_data)
+for(j in 1:ncol(species_data)){
+ #j <-651
+  species_for_niche <- species_data[,j]
+  for(i in 1:length(village_names)){
+   # i <- 6
+    clusters <- get(paste0("sn_member_",i))
+    clusters_samp_size <- table(clusters)
+    clusters_samp_size <- clusters_samp_size[clusters_samp_size>=5]
+    clusters <- clusters[clusters %in% names(clusters_samp_size)]
+    ordered_species <- species_for_niche[match(names(clusters), names(species_for_niche))]
+    #Randomization for p-values
+    ordered_species <- sample(ordered_species)
+    if(sum(abs(ordered_species) >0) >=5){
+      test <- kruskal.test(ordered_species, as.vector(clusters))
+      niche_frame_kw_rand[i,j] <- test$p.value
+    }
+  }
+}
+sum(!is.na(niche_frame_kw_rand))
+
+hist_dat_pvals_rand <- data.frame(pvals = (niche_frame_kw_rand %>% as.matrix %>% as.vector))
+
+niche_hist_rand <-
+  gghistogram(hist_dat_pvals_rand, x = "pvals", fill = "#E7B800") +
+  theme_pubr() +
+  labs_pubr() +
+  xlab("P-Values") +
+  ylab("Frequency") +
+  ggtitle("P-Value Distribution of Randomized Species Niches") +
+  theme(plot.title = element_text(hjust = .5))
+```
+
+
+
+
+MTC
+```{r}
+
+#Multiple testing correction
+niche_frame_kw_adj <- niche_frame_kw %>%
+  as.matrix %>%
+  as.vector %>%
+  p.adjust(method = 'BH') %>%
+  matrix(nrow = length(village_names))
+
+#Ok don't want to put the ones in
+sum(niche_frame_kw_adj<.05, na.rm = TRUE)
+sum(!is.na(niche_frame_kw_adj))
+
+hist(niche_frame_kw_adj %>% as.matrix %>% as.vector)
+
+
+
+colnames(niche_frame_kw)[colSums(niche_frame_kw_adj<.05, na.rm = TRUE)>0]
+#Should we check whether most of them tend to be from a certain genus
+#Can add back in species names
+
+hist(colSums(niche_frame_kw_adj<.05))
+
+
+
+plot(niche_frame_kw_adj[1,],niche_frame_kw_adj[7,])
+
+
+niche_frame_kw_adj_2 <- niche_frame_kw %>%
+  as.matrix %>%
+  as.vector %>%
+  p.adjust(method = 'bonferroni') %>%
+  matrix(nrow = length(village_names))
+
+
+sum(niche_frame_kw_adj_2<.05, na.rm = TRUE)
+
+species_for_niche <- species_data[,j]
+
+
+i <- 6
+clusters <- get(paste0("sn_member_", i))
+clusters_samp_size <- table(clusters)
+clusters_samp_size <- clusters_samp_size[clusters_samp_size >= 5]
+clusters <- clusters[clusters %in% names(clusters_samp_size)]
+ordered_species <- species_for_niche[match(names(clusters), names(species_for_niche))]
+```
+
+Relative abundance graphs
+```{r}
+#Don't necessarily need to change these network graphs, would be alot of work, but need to update non-exemplar graphs
+#village_map
+
+
+vil_graph <- sn_vil_graph_6
+#Get species
+species_for_niche <- species_data[, 651]
+#Get village clusters
+clusters <- sn_member_6
+#Filter species to village members
+ordered_species <-
+  species_for_niche[match(names(clusters), names(species_for_niche))]
+
+pal <- colorRampPalette(c("red", "yellow"))
+my_pal <- pal(length(ordered_species))
+
+pal <- colorRampPalette(c("red", "yellow"))
+my_pal <- pal(2)
+
+test_cols <- my_pal[rank(ordered_species, ties.method = "min")]
+
+test_cols <- my_pal[ceiling(ordered_species)+1]
+V(vil_graph)$color <- test_cols[match(names(V(vil_graph)),
+                                      names(ordered_species))]
+
+V(vil_graph)$size <- log2(ordered_species*100000+5)+2
+
+set.seed(1)
+par(mar= c(0,0,0,0))
+plot(
+  vil_graph,
+  vertex.label = NA
+)
+title(paste0("Differentially Abundant Species: Enterococcus_faecium (SGB7967)"),
+      cex.main=1,
+      line = -1)
+legend(
+"bottomleft",
+  legend = c("Species Present",
+             "Species Absent"),
+  pt.bg  = rev(my_pal),
+  pch    = 21,
+  cex    = 1,
+  border = NA,
+  bty    = "n"
+)
+set.seed(1)
+species_da_1 <- as.ggplot(expression(plot(
+  vil_graph,
+  vertex.label = NA
+),
+title(paste0("Differentially Abundant Species:\nEnterococcus_faecium (SGB7967)"),
+      cex.main=1,
+      line = -1),
+legend(
+  'bottomleft',
+  legend = c("Species Present",
+             "Species Absent"),
+  pt.bg  = rev(my_pal),
+  pch    = 21,
+  cex    = 1,
+  border = NA,
+  bty    = "n"
+)))
+
+colnames(species_data)[651]
+```
+
+
+```{r}
+vil_graph <- sn_vil_graph_6
+#Get species
+species_for_niche <- species_data[, 112]
+#Get village clusters
+clusters <- sn_member_6
+#Filter species to village members
+ordered_species <-
+  species_for_niche[match(names(clusters), names(species_for_niche))]
+
+pal <- colorRampPalette(c("red", "yellow"))
+my_pal <- pal(length(ordered_species))
+
+test_cols <- my_pal[rank(ordered_species, ties.method = "min")]
+
+pal <- colorRampPalette(c("red", "yellow"))
+my_pal <- pal(2)
+
+test_cols <- my_pal[rank(ordered_species, ties.method = "min")]
+
+test_cols <- my_pal[ceiling(ordered_species)+1]
+V(vil_graph)$color <- test_cols[match(names(V(vil_graph)),
+                                      names(ordered_species))]
+
+V(vil_graph)$size <- log2(ordered_species*100000+5)+2
+
+set.seed(1)
+plot(vil_graph,
+     vertex.label = NA
+     )
+title(
+  paste0(
+    "Differentially Abundant Species: Coriobacteriaceae (GGB9379_SGB14372)"
+  ),
+  cex.main = 1,
+  line = -1
+)
+legend(
+  'bottomleft',
+  legend = c("Species Present",
+             "Species Absent"),
+  pt.bg  = rev(my_pal),
+  pch    = 21,
+  cex    = 1,
+  border = NA,
+  bty    = "n"
+)
+
+set.seed(1)
+species_da_2 <- as.ggplot(expression(plot(vil_graph,
+     vertex.label = NA
+     ),
+title(
+  paste0(
+    "Differentially Abundant Species:\nCoriobacteriaceae (GGB9379_SGB14372)"
+  ),
+  cex.main = 1,
+  line = -1
+),
+legend(
+  'bottomleft',
+  legend = c("Species Present",
+             "Species Absent"),
+  pt.bg  = rev(my_pal),
+  pch    = 21,
+  cex    = 1,
+  border = NA,
+  bty    = "n"
+)))
+
+```
+
+
+
+```{r}
+# fig5_2<- ggarrange(species_da_1, species_da_2,niche_hist,
+#           labels = c("F", "G", "H"), nrow = 1)
+
+svglite("../FiguresNew/SFigure12/fig_12.svg", width = 11)
+ggarrange(niche_hist, niche_hist_rand,
+          labels = c("A", "B"), nrow = 1)
+dev.off()
+```
+
+
+Make full niche figure
+
+
+
+
+
+```{r}
+#Make graphs of good species
+for(j in 1:ncol(species_data)){
+ #j <-651
+  species_for_niche <- species_data[,j]
+  for(i in 1:length(village_names)){
+   # i <- 6
+    clusters <- get(paste0("sn_member_",i))
+    clusters_samp_size <- table(clusters)
+    clusters_samp_size <- clusters_samp_size[clusters_samp_size>=5]
+    clusters <- clusters[clusters %in% names(clusters_samp_size)]
+    ordered_species <- species_for_niche[match(names(clusters), names(species_for_niche))]
+    if(sum(ordered_species >0) >=5){
+      test <- kruskal.test(ordered_species, as.vector(clusters))
+      niche_frame_kw[i,j] <- test$p.value
+    }
+  }
+}
+
+
+
+colnames(species_data)[112]
+dat <- data.frame(species_rel_abund = ordered_species,
+                  sn_clusters = as.vector(clusters))
+
+species_medians <- aggregate(species_rel_abund ~  sn_clusters,
+                             dat, median)
+
+
+ggplot(dat,
+       aes(x = as.factor(sn_clusters), y= species_rel_abund)) +
+  geom_boxplot() +
+  xlab("Social Network Cluster Number") +
+  ylab("Relative Abundance") + 
+  theme_pubr() +
+  ggtitle(paste0(colnames(species_data)[651], " in Village Six")) +
+  geom_text(data = species_medians,
+            aes(
+              label = sprintf(
+                "%0.6f", round(species_rel_abund, digits = 6)
+              ),
+              y = .02,
+              fontface = "bold"
+            ))
+
+
+vil_graph <- sn_vil_graph_6
+#Get species
+species_for_niche <- species_data[, 651]
+#Get vilalge clusters
+clusters <- sn_member_6
+#Filter species to village members
+ordered_species <-
+  species_for_niche[match(names(clusters), names(species_for_niche))]
+
+pal <- colorRampPalette(c("red", "yellow"))
+my_pal <- pal(length(ordered_species))
+
+test_cols <- my_pal[rank(ordered_species, ties.method = "min")]
+V(vil_graph)$color <- test_cols[match(names(V(vil_graph)),
+                                      names(ordered_species))]
+
+set.seed(1)
+plot(
+  vil_graph,
+  vertex.size = 5,
+  vertex.label = NA
+  #main = paste0("Village: ", "6", " Species: ", colnames(species_data)[112]),
+  #cex.main = .75
+)
+title(paste0("Village: ", "6", " Species: ", colnames(species_data)[651]),
+      cex.main=.75)
+
+table(clusters)
+```
+
+
+
+
+Wilcox approach
+
+```{r}
+niche_frame_wilcox <- data.frame(matrix(1, nrow = 9, ncol = ncol(species_data)))
+colnames(niche_frame_wilcox) <- colnames(species_data)
+
+for(j in 1:ncol(species_data)){
+  #j <- 1
+  species_for_niche <- species_data[,j]
+  for(i in 1:length(village_names)){
+    #i <- 1
+    clusters <- get(paste0("sn_member_",i))
+    ordered_species <- species_for_niche[match(names(clusters), names(species_for_niche))]
+    dat <- data.frame(ordered_species, as.vector(clusters))
+    #names(dat)
+    for(k in 1:length(unique(clusters))){
+      dat$clusters_use <- case_when(
+        dat$as.vector.clusters. == unique(clusters)[k] ~ 1,
+        TRUE ~ 0
+      )
+      w_test <- wilcox.test(ordered_species ~ clusters_use, data = dat)
+      #Want to do some MTC here
+      niche_frame_wilcox[i,j] <- min(niche_frame_wilcox[i,j], w_test$p.value)
+    }
+  }
+  print(j)
+}
+
+# I could do Kruskal Wallis
+#Pairwise wilcox
+#Or the other one
+#Report results
+#Just saw we found a lot of species differentially abundant.
+niche_frame_wilcox[is.na(niche_frame_wilcox)] <- 1
+niche_frame_wilcox
+sum(niche_frame_wilcox  ==1)
+niche_frame_wilcox[1:5,1:5]
+
+niche_frame_wilcox_adj <- niche_frame_wilcox %>%
+  as.matrix %>%
+  as.vector %>%
+  p.adjust(method = 'BH') %>%
+  matrix(nrow = 9)
+
+#Cool
+sum(niche_frame_wilcox_adj <.05)
+
+
+```
+
+
+
+```{r}
+#Let's try this with contrast sum now
+dat <- data.frame(ordered_species, as.vector(clusters))
+names(dat)
+dat$clusters <- as.factor(dat$as.vector.clusters.)
+dat$respondent_master_id <- rownames(dat)
+dat <- merge(dat, covariates)
+names(covariates)
+
+summary(lm(ordered_species ~ age_at_survey + gender + clusters,
+           data = dat,
+           contrasts = list(clusters = "contr.sum")))
+
+#LM appraoch
+niche_frame_lm <- data.frame(matrix(NA, nrow = 9, ncol = ncol(species_data)))
+colnames(niche_frame_lm) <- colnames(species_data)
+for(j in 1:ncol(species_data)){
+  species_for_niche <- species_data[,j]
+  for(i in 1:length(village_names)){
+    clusters <- get(paste0("sn_member_",i))
+    ordered_species <- species_for_niche[match(names(clusters), names(species_for_niche))]
+    dat <- data.frame(ordered_species, as.vector(clusters))
+    dat$clusters <- as.factor(dat$as.vector.clusters.)
+    dat$respondent_master_id <- rownames(dat)
+    dat <- merge(dat, covariates)
+    
+    lm_test <-
+      lm(
+        ordered_species ~ age_at_survey + gender + clusters,
+        data = dat,
+        contrasts = list(clusters = "contr.sum")
+      )
+    coefs <- summary(lm_test)$coefficients
+    
+    niche_frame_lm[i, j] <-
+      min(coefs[startsWith(rownames(coefs), "clusters") &
+                  coefs[, 4] < .05, 4])
+  }
+}
+#Deal with infinite and na
+niche_frame_lm[is.na(niche_frame_lm)] <- 1
+niche_frame_lm[niche_frame_lm>=1] <- 1
+
+niche_frame_lm_adj[6,112]
+
+niche_frame_lm_adj <- niche_frame_lm %>%
+  as.matrix %>%
+  as.vector %>%
+  p.adjust(method = 'BH') %>%
+  matrix(nrow = 9)
+
+niche_frame_lm_adj_2 <- niche_frame_lm %>%
+  as.matrix %>%
+  as.vector %>%
+  p.adjust(method = 'bonferroni') %>%
+  matrix(nrow = 9)
+
+sum(niche_frame_lm_adj_2 < .05) 
+
+for(i in 1:100){
+  if(sum(niche_frame_lm_adj[,i] <.05) >0){
+    vil_num <- max(which(niche_frame_lm_adj[,i] <.05))
+    #Get village graph
+    vil_graph <- get(paste0("sn_vil_graph_",vil_num))
+    #Get species
+    species_for_niche <- species_data[, i]
+    #Get vilalge clusters
+    clusters <- get(paste0("sn_member_",vil_num))
+    #Filter species to village members
+    ordered_species <-
+      species_for_niche[match(names(clusters), names(species_for_niche))]
+    
+    pal <- colorRampPalette(c("red", "yellow"))
+    my_pal <- pal(length(ordered_species))
+    
+    test_cols <- my_pal[rank(ordered_species, ties.method = "min")]
+    V(vil_graph)$color <- test_cols[match(names(V(vil_graph)),
+                                               names(ordered_species))]
+    
+    set.seed(1)
+    plot(vil_graph,
+         vertex.size = 5,
+         vertex.label = NA,
+         main = paste0("Village: ", vil_num, " Species: ", i))
+                     
+  }
+}
+#I think for each one, need to wilcox test its abundance against the rest. 
+wilcox.test(c(0,0,0,0,0,0,1,1,0,0,0,0), c(0,0,0,0,0,0,0,0,0,0,0))
+```
+
+
+
+
+
+
+```{r}
+p.adjust(niche_frame_kw, method = "BH")
+
+
+
+niche_frame_kw_adj_2[1:9,1:10]
+niche_frame_kw_adj_2[niche_frame_kw_adj_2 < .05]
+
+sum(niche_frame_kw_adj_2 < .05)
+
+for(i in 1:2285){
+  if(sum(niche_frame_kw_adj[,i] <.05) >0){
+    for(k in 1:sum(niche_frame_kw_adj[,i] <.05)){
+    vil_num <- which(niche_frame_kw_adj[,i] <.05)[k]
+    #Get village graph
+    vil_graph <- get(paste0("sn_vil_graph_",vil_num))
+    #Get species
+    species_for_niche <- species_data[, i]
+    #Get vilalge clusters
+    clusters <- get(paste0("sn_member_",vil_num))
+    #Filter species to village members
+    ordered_species <-
+      species_for_niche[match(names(clusters), names(species_for_niche))]
+    
+    pal <- colorRampPalette(c("red", "yellow"))
+    my_pal <- pal(length(ordered_species))
+    
+    test_cols <- my_pal[rank(ordered_species, ties.method = "min")]
+    V(vil_graph)$color <- test_cols[match(names(V(vil_graph)),
+                                               names(ordered_species))]
+    
+    set.seed(1)
+    plot(vil_graph,
+         vertex.size = 5,
+         vertex.label = NA,
+         main = paste0("Village: ", vil_num, " Species: ", i))
+    }
+                     
+  }
+}
+#Village 4 species 2035
+#Village 9 species 1679
+#Village 8 species 245
+#Village 9 species 159
+#Species 112, village 6
+#maybe 185, 4
+#Village 4 species 146
+#Village 4 species 2278
+#Village 9 species 2251
+#Village 9 species 1930
+#Village 6 species 1860
+#Village 4 species 1780
+#Village 4 species 1733
+#Village 9 species 1688
+#Village 4 species 1602
+#Village 5 species 1441
+#Village 4 and 6 species 1415
+#Village 8 species 1335
+#Village 9 species 1209
+#Village 6 species 1096
+#Village 5 species 732
+#Village 6 species 651 Good contrast with 112
+#Village 6 species 614
+#Village 4 species 185
+#Village 4 species 158
+
+colnames(species_data)[112]
+
+#Should I combine SGBs?
+
+#Want at least 5 people to have species
+
+sum(niche_frame_kw_adj < .05)
+#ok I'm convinced that it happens
+#Want to avoid the low sample size,
+#Make sure all clusters have more then 5?
+for(i in 300:400){
+  if(sum(niche_frame_kw_adj[,i] <.005) >0){
+
+    print("found")
+    print(i)
+    print(which(niche_frame_kw_adj[,i] <.005))
+  }
+}
+niche_frame_kw_adj[6,112]
+#Species 112, village 6
+#maybe 185, 4
+#need a condition probably that a certain number of people have to have it
+species_for_niche <- species_data[,112]
+clusters <- sn_member_6
+ordered_species <- species_for_niche[match(names(clusters), names(species_for_niche))]
+ggplot(data.frame(ordered_species, as.vector(clusters)),
+       aes(x = as.factor(as.vector.clusters.), y= ordered_species)) +
+  geom_boxplot()
+
+ordered_species[as.vector(clusters) == 811]
+sum(as.vector(clusters) == 811)
+#This is too sensitive, I need something that has at least five people in a cluster
+
+plot(sn_vil_graph_8,
+     vertex.size = 5,
+     vertex.label = NA)
+
+#I bet doing this same thing with linear model and contrast sum wouldn't hold up
+pal <- colorRampPalette(c("red", "yellow"))
+my_pal <- pal(length(ordered_species))
+
+test_cols <- my_pal[rank(ordered_species, ties.method = "min")]
+V(sn_vil_graph_8)$color <- test_cols[match(names(V(sn_vil_graph_8)),
+                                           names(ordered_species))]
+
+set.seed(1)
+plot(sn_vil_graph_8,
+     vertex.size = 5,
+     vertex.label = NA)
+plot(sn_cluster_8,sn_vil_graph_8,
+     vertex.size = 5,
+     vertex.label = NA)
+
+
+
+sum(ordered_species>0)
+
+niche_frame_kw[niche_frame_kw < .05]
+
+round(niche_frame_kw[1:9,1:10],3)
+
+
+test$p.value
+str(test)
+as.vector(clusters)
+library(ggplot2)
+
+
+?kruskal.test()
+
+length(unique(sn_member_9))
+
+species_data[1:5,1:5]
+
+
+```
+

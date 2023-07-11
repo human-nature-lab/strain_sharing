@@ -1,0 +1,1359 @@
+---
+title: "Clustering"
+author: "Jackson Pullman"
+date: "2022-12-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Clustering
+library(ggplotify)
+#Imports Rand Index
+library(mclust)
+#citation("mclust")
+#Get observed metric
+
+set.seed(1)
+#Could find better
+#Louvain clustering does not work with NA edge weights, set to zero
+E(strain_rate_vil_graph_1)$weight[is.na(E(strain_rate_vil_graph_1)$weight)] <- 0
+E(strain_rate_vil_graph_2)$weight[is.na(E(strain_rate_vil_graph_2)$weight)] <- 0
+E(strain_rate_vil_graph_3)$weight[is.na(E(strain_rate_vil_graph_3)$weight)] <- 0
+E(strain_rate_vil_graph_4)$weight[is.na(E(strain_rate_vil_graph_4)$weight)] <- 0
+E(strain_rate_vil_graph_5)$weight[is.na(E(strain_rate_vil_graph_5)$weight)] <- 0
+E(strain_rate_vil_graph_6)$weight[is.na(E(strain_rate_vil_graph_6)$weight)] <- 0
+E(strain_rate_vil_graph_7)$weight[is.na(E(strain_rate_vil_graph_7)$weight)] <- 0
+E(strain_rate_vil_graph_8)$weight[is.na(E(strain_rate_vil_graph_8)$weight)] <- 0
+E(strain_rate_vil_graph_9)$weight[is.na(E(strain_rate_vil_graph_9)$weight)] <- 0
+E(strain_rate_vil_graph_10)$weight[is.na(E(strain_rate_vil_graph_10)$weight)] <- 0
+E(strain_rate_vil_graph_11)$weight[is.na(E(strain_rate_vil_graph_11)$weight)] <- 0
+E(strain_rate_vil_graph_12)$weight[is.na(E(strain_rate_vil_graph_12)$weight)] <- 0
+E(strain_rate_vil_graph_13)$weight[is.na(E(strain_rate_vil_graph_13)$weight)] <- 0
+E(strain_rate_vil_graph_14)$weight[is.na(E(strain_rate_vil_graph_14)$weight)] <- 0
+E(strain_rate_vil_graph_15)$weight[is.na(E(strain_rate_vil_graph_15)$weight)] <- 0
+E(strain_rate_vil_graph_16)$weight[is.na(E(strain_rate_vil_graph_16)$weight)] <- 0
+E(strain_rate_vil_graph_17)$weight[is.na(E(strain_rate_vil_graph_17)$weight)] <- 0
+E(strain_rate_vil_graph_18)$weight[is.na(E(strain_rate_vil_graph_18)$weight)] <- 0
+
+for(i in 1:length(village_names)){
+  assign(paste0("strain_rate_vil_graph_scram_", i), get(paste0("strain_rate_vil_graph_", i)))
+}
+
+
+strain_rate_cluster_1 <- cluster_louvain(strain_rate_vil_graph_1, weights = E(strain_rate_vil_graph_1)$weight)
+strain_rate_cluster_2 <- cluster_louvain(strain_rate_vil_graph_2, weights = E(strain_rate_vil_graph_2)$weight)
+strain_rate_cluster_3 <- cluster_louvain(strain_rate_vil_graph_3, weights = E(strain_rate_vil_graph_3)$weight)
+strain_rate_cluster_4 <- cluster_louvain(strain_rate_vil_graph_4, weights = E(strain_rate_vil_graph_4)$weight)
+strain_rate_cluster_5 <- cluster_louvain(strain_rate_vil_graph_5, weights = E(strain_rate_vil_graph_5)$weight)
+strain_rate_cluster_6 <- cluster_louvain(strain_rate_vil_graph_6, weights = E(strain_rate_vil_graph_6)$weight)
+strain_rate_cluster_7 <- cluster_louvain(strain_rate_vil_graph_7, weights = E(strain_rate_vil_graph_7)$weight)
+strain_rate_cluster_8 <- cluster_louvain(strain_rate_vil_graph_8, weights = E(strain_rate_vil_graph_8)$weight)
+strain_rate_cluster_9 <- cluster_louvain(strain_rate_vil_graph_9, weights = E(strain_rate_vil_graph_9)$weight)
+strain_rate_cluster_10 <- cluster_louvain(strain_rate_vil_graph_10, weights = E(strain_rate_vil_graph_10)$weight)
+strain_rate_cluster_11 <- cluster_louvain(strain_rate_vil_graph_11, weights = E(strain_rate_vil_graph_11)$weight)
+strain_rate_cluster_12 <- cluster_louvain(strain_rate_vil_graph_12, weights = E(strain_rate_vil_graph_12)$weight)
+strain_rate_cluster_13 <- cluster_louvain(strain_rate_vil_graph_13, weights = E(strain_rate_vil_graph_13)$weight)
+strain_rate_cluster_14 <- cluster_louvain(strain_rate_vil_graph_14, weights = E(strain_rate_vil_graph_14)$weight)
+strain_rate_cluster_15 <- cluster_louvain(strain_rate_vil_graph_15, weights = E(strain_rate_vil_graph_15)$weight)
+strain_rate_cluster_16 <- cluster_louvain(strain_rate_vil_graph_16, weights = E(strain_rate_vil_graph_16)$weight)
+strain_rate_cluster_17 <- cluster_louvain(strain_rate_vil_graph_17, weights = E(strain_rate_vil_graph_17)$weight)
+strain_rate_cluster_18 <- cluster_louvain(strain_rate_vil_graph_18, weights = E(strain_rate_vil_graph_18)$weight)
+
+#Get microbiome clustering for each village based on count of shared strains
+# strain_cluster_1 <- cluster_louvain(strain_vil_graph_1, weights = E(strain_vil_graph_1)$weight)
+# strain_cluster_2 <- cluster_louvain(strain_vil_graph_2, weights = E(strain_vil_graph_2)$weight)
+# strain_cluster_3 <- cluster_louvain(strain_vil_graph_3, weights = E(strain_vil_graph_3)$weight)
+# strain_cluster_4 <- cluster_louvain(strain_vil_graph_4, weights = E(strain_vil_graph_4)$weight)
+# strain_cluster_5 <- cluster_louvain(strain_vil_graph_5, weights = E(strain_vil_graph_5)$weight)
+# strain_cluster_6 <- cluster_louvain(strain_vil_graph_6, weights = E(strain_vil_graph_6)$weight)
+# strain_cluster_7 <- cluster_louvain(strain_vil_graph_7, weights = E(strain_vil_graph_7)$weight)
+# strain_cluster_8 <- cluster_louvain(strain_vil_graph_8, weights = E(strain_vil_graph_8)$weight)
+# strain_cluster_9 <- cluster_louvain(strain_vil_graph_9, weights = E(strain_vil_graph_9)$weight)
+
+set.seed(1)
+#Make sure to change this back to non overall graph
+#Get social network clustering for each village
+sn_cluster_1 <- cluster_louvain(sn_vil_graph_1)
+sn_cluster_2 <- cluster_louvain(sn_vil_graph_2)
+sn_cluster_3 <- cluster_louvain(sn_vil_graph_3)
+sn_cluster_4 <- cluster_louvain(sn_vil_graph_4)
+sn_cluster_5 <- cluster_louvain(sn_vil_graph_5)
+sn_cluster_6 <- cluster_louvain(sn_vil_graph_6)
+sn_cluster_7 <- cluster_louvain(sn_vil_graph_7)
+sn_cluster_8 <- cluster_louvain(sn_vil_graph_8)
+sn_cluster_9 <- cluster_louvain(sn_vil_graph_9)
+sn_cluster_10 <- cluster_louvain(sn_vil_graph_10)
+sn_cluster_11 <- cluster_louvain(sn_vil_graph_11)
+sn_cluster_12 <- cluster_louvain(sn_vil_graph_12)
+sn_cluster_13 <- cluster_louvain(sn_vil_graph_13)
+sn_cluster_14 <- cluster_louvain(sn_vil_graph_14)
+sn_cluster_15 <- cluster_louvain(sn_vil_graph_15)
+sn_cluster_16 <- cluster_louvain(sn_vil_graph_16)
+sn_cluster_17 <- cluster_louvain(sn_vil_graph_17)
+sn_cluster_18 <- cluster_louvain(sn_vil_graph_18)
+
+
+#Order names for both clusters
+mbiome_member_1 <- membership(strain_rate_cluster_1)[match(names(membership(sn_cluster_1)),
+                                                           names(membership(strain_rate_cluster_1)))]
+mbiome_member_2 <- membership(strain_rate_cluster_2)[match(names(membership(sn_cluster_2)),
+                                                           names(membership(strain_rate_cluster_2)))]
+mbiome_member_3 <- membership(strain_rate_cluster_3)[match(names(membership(sn_cluster_3)),
+                                                           names(membership(strain_rate_cluster_3)))]
+mbiome_member_4 <- membership(strain_rate_cluster_4)[match(names(membership(sn_cluster_4)),
+                                                           names(membership(strain_rate_cluster_4)))]
+mbiome_member_5 <- membership(strain_rate_cluster_5)[match(names(membership(sn_cluster_5)),
+                                                           names(membership(strain_rate_cluster_5)))]
+mbiome_member_6 <- membership(strain_rate_cluster_6)[match(names(membership(sn_cluster_6)),
+                                                           names(membership(strain_rate_cluster_6)))]
+mbiome_member_7 <- membership(strain_rate_cluster_7)[match(names(membership(sn_cluster_7)),
+                                                           names(membership(strain_rate_cluster_7)))]
+mbiome_member_8 <- membership(strain_rate_cluster_8)[match(names(membership(sn_cluster_8)),
+                                                           names(membership(strain_rate_cluster_8)))]
+mbiome_member_9 <- membership(strain_rate_cluster_9)[match(names(membership(sn_cluster_9)),
+                                                           names(membership(strain_rate_cluster_9)))]
+mbiome_member_10 <- membership(strain_rate_cluster_10)[match(names(membership(sn_cluster_10)),
+                                                           names(membership(strain_rate_cluster_10)))]
+mbiome_member_11 <- membership(strain_rate_cluster_11)[match(names(membership(sn_cluster_11)),
+                                                           names(membership(strain_rate_cluster_11)))]
+mbiome_member_12 <- membership(strain_rate_cluster_12)[match(names(membership(sn_cluster_12)),
+                                                           names(membership(strain_rate_cluster_12)))]
+mbiome_member_13 <- membership(strain_rate_cluster_13)[match(names(membership(sn_cluster_13)),
+                                                           names(membership(strain_rate_cluster_13)))]
+mbiome_member_14 <- membership(strain_rate_cluster_14)[match(names(membership(sn_cluster_14)),
+                                                           names(membership(strain_rate_cluster_14)))]
+mbiome_member_15 <- membership(strain_rate_cluster_15)[match(names(membership(sn_cluster_15)),
+                                                           names(membership(strain_rate_cluster_15)))]
+mbiome_member_16 <- membership(strain_rate_cluster_16)[match(names(membership(sn_cluster_16)),
+                                                           names(membership(strain_rate_cluster_16)))]
+mbiome_member_17 <- membership(strain_rate_cluster_17)[match(names(membership(sn_cluster_17)),
+                                                           names(membership(strain_rate_cluster_17)))]
+mbiome_member_18 <- membership(strain_rate_cluster_18)[match(names(membership(sn_cluster_18)),
+                                                           names(membership(strain_rate_cluster_18)))]
+
+
+# #Order names for both clusters
+# mbiome_member_1_strain <- membership(strain_cluster_1)[match(names(membership(sn_cluster_1)),
+#                                                            names(membership(strain_cluster_1)))]
+# mbiome_member_2_strain <- membership(strain_cluster_2)[match(names(membership(sn_cluster_2)),
+#                                                            names(membership(strain_cluster_2)))]
+# mbiome_member_3_strain <- membership(strain_cluster_3)[match(names(membership(sn_cluster_3)),
+#                                                            names(membership(strain_cluster_3)))]
+# mbiome_member_4_strain <- membership(strain_cluster_4)[match(names(membership(sn_cluster_4)),
+#                                                            names(membership(strain_cluster_4)))]
+# mbiome_member_5_strain <- membership(strain_cluster_5)[match(names(membership(sn_cluster_5)),
+#                                                            names(membership(strain_cluster_5)))]
+# mbiome_member_6_strain <- membership(strain_cluster_6)[match(names(membership(sn_cluster_6)),
+#                                                            names(membership(strain_cluster_6)))]
+# mbiome_member_7_strain <- membership(strain_cluster_7)[match(names(membership(sn_cluster_7)),
+#                                                            names(membership(strain_cluster_7)))]
+# mbiome_member_8_strain <- membership(strain_cluster_8)[match(names(membership(sn_cluster_8)),
+#                                                            names(membership(strain_cluster_8)))]
+# mbiome_member_9_strain <- membership(strain_cluster_9)[match(names(membership(sn_cluster_9)),
+#                                                            names(membership(strain_cluster_9)))]
+
+
+
+
+#adjust village cluster numbers so the are different across villages
+#never more than 100 clusters so this works
+mbiome_member_1 <- mbiome_member_1 + 100
+mbiome_member_2 <- mbiome_member_2 + 200
+mbiome_member_3 <- mbiome_member_3 + 300
+mbiome_member_4 <- mbiome_member_4 + 400
+mbiome_member_5 <- mbiome_member_5 + 500
+mbiome_member_6 <- mbiome_member_6 + 600
+mbiome_member_7 <- mbiome_member_7 + 700
+mbiome_member_8 <- mbiome_member_8 + 800
+mbiome_member_9 <- mbiome_member_9 + 900
+mbiome_member_10 <- mbiome_member_10 + 1000
+mbiome_member_11 <- mbiome_member_11 + 1100
+mbiome_member_12 <- mbiome_member_12 + 1200
+mbiome_member_13 <- mbiome_member_13 + 1300
+mbiome_member_14 <- mbiome_member_14 + 1400
+mbiome_member_15 <- mbiome_member_15 + 1500
+mbiome_member_16 <- mbiome_member_16 + 1600
+mbiome_member_17 <- mbiome_member_17 + 1700
+mbiome_member_18 <- mbiome_member_18 + 1800
+
+# mbiome_member_1_strain <- mbiome_member_1_strain + 100
+# mbiome_member_2_strain <- mbiome_member_2_strain + 200
+# mbiome_member_3_strain <- mbiome_member_3_strain + 300
+# mbiome_member_4_strain <- mbiome_member_4_strain + 400
+# mbiome_member_5_strain <- mbiome_member_5_strain + 500
+# mbiome_member_6_strain <- mbiome_member_6_strain + 600
+# mbiome_member_7_strain <- mbiome_member_7_strain + 700
+# mbiome_member_8_strain <- mbiome_member_8_strain + 800
+# mbiome_member_9_strain <- mbiome_member_9_strain + 900
+
+
+#Create social network membership vectors, shifted by village
+sn_member_1 <- membership(sn_cluster_1) + 100
+sn_member_2 <- membership(sn_cluster_2) + 200
+sn_member_3 <- membership(sn_cluster_3) + 300
+sn_member_4 <- membership(sn_cluster_4) + 400
+sn_member_5 <- membership(sn_cluster_5) + 500
+sn_member_6 <- membership(sn_cluster_6) + 600
+sn_member_7 <- membership(sn_cluster_7) + 700
+sn_member_8 <- membership(sn_cluster_8) + 800
+sn_member_9 <- membership(sn_cluster_9) + 900
+sn_member_10 <- membership(sn_cluster_10) + 1000
+sn_member_11 <- membership(sn_cluster_11) + 1100
+sn_member_12 <- membership(sn_cluster_12) + 1200
+sn_member_13 <- membership(sn_cluster_13) + 1300
+sn_member_14 <- membership(sn_cluster_14) + 1400
+sn_member_15 <- membership(sn_cluster_15) + 1500
+sn_member_16 <- membership(sn_cluster_16) + 1600
+sn_member_17 <- membership(sn_cluster_17) + 1700
+sn_member_18 <- membership(sn_cluster_18) + 1800
+
+
+#Get rand index across all villages
+all_mbiome_membership <-c(mbiome_member_1,
+                          mbiome_member_2,
+                          mbiome_member_3,
+                          mbiome_member_4,
+                          mbiome_member_5,
+                          mbiome_member_6,
+                          mbiome_member_7,
+                          mbiome_member_8,
+                          mbiome_member_9,
+                          mbiome_member_10,
+                          mbiome_member_11,
+                          mbiome_member_12,
+                          mbiome_member_13,
+                          mbiome_member_14,
+                          mbiome_member_15,
+                          mbiome_member_16,
+                          mbiome_member_17,
+                          mbiome_member_18)
+
+# all_mbiome_membership_strain <-c(mbiome_member_1_strain,
+#                           mbiome_member_2_strain,
+#                           mbiome_member_3_strain,
+#                           mbiome_member_4_strain,
+#                           mbiome_member_5_strain,
+#                           mbiome_member_6_strain,
+#                           mbiome_member_7_strain,
+#                           mbiome_member_8_strain,
+#                           mbiome_member_9_strain)
+
+all_sn_membership <- c(sn_member_1,
+                       sn_member_2,
+                       sn_member_3,
+                       sn_member_4,
+                       sn_member_5,
+                       sn_member_6,
+                       sn_member_7,
+                       sn_member_8,
+                       sn_member_9,
+                       sn_member_10,
+                       sn_member_11,
+                       sn_member_12,
+                       sn_member_13,
+                       sn_member_14,
+                       sn_member_15,
+                       sn_member_16,
+                       sn_member_17,
+                       sn_member_18)
+
+#Get Statistics on clustering
+all_sn_membership_df <- data.frame(name = names(all_sn_membership),
+                                   cluster = unname(all_sn_membership))
+
+all_mbiome_membership_df <- data.frame(name = names(all_mbiome_membership),
+                                   cluster = unname(all_mbiome_membership))
+
+#Average number of people
+all_sn_membership_df %>%
+  group_by(cluster) %>%
+  summarize(n = n()) %>%
+  ungroup() %>%
+  distinct(cluster, .keep_all = TRUE) %>%
+  pull(n) %>%
+  median()
+
+all_mbiome_membership_df %>%
+  group_by(cluster) %>%
+  summarize(n = n()) %>%
+  ungroup() %>%
+  distinct(cluster, .keep_all = TRUE) %>%
+  pull(n) %>%
+  median()
+
+all_mbiome_membership_df %>%
+  group_by(cluster) %>%
+  summarize(n = n()) %>%
+  arrange(n)
+
+#Average strain-sharing rate within cluster
+#Some of these probably only have one
+
+uniq_clusters <- unique(all_mbiome_membership_df$cluster)
+cluster_sharing_all <- c()
+for(i in 1:length(uniq_clusters)){
+  cluster_names <- all_mbiome_membership_df %>% filter(cluster == uniq_clusters[i]) %>% pull(name)
+  cluster_sharing <- strain_rate[rownames(strain_rate) %in% cluster_names,
+                                 colnames(strain_rate) %in% cluster_names]
+  cluster_sharing[lower.tri(cluster_sharing, diag = TRUE)] <- NA
+  #cluster_sharing_all <- c(cluster_sharing_all,
+   #                        na.omit(unlist(as.list(cluster_sharing))))
+  cluster_sharing_all <- c(cluster_sharing_all,
+                           mean(unlist(as.list(cluster_sharing)), na.rm = TRUE))
+  
+}
+median(cluster_sharing_all, na.rm = TRUE)
+
+#Average number of ties
+uniq_clusters <- unique(all_sn_membership_df$cluster)
+cluster_ties_all <- c()
+
+SN_Graph_all <- as_adjacency_matrix(simplify(graph_from_data_frame(SN, directed = FALSE)))
+
+for(i in 1:length(uniq_clusters)){
+  cluster_names <- all_sn_membership_df %>% filter(cluster == uniq_clusters[i]) %>% pull(name)
+  cluster_count <- SN_Graph_all[rownames(SN_Graph_all) %in% cluster_names,
+                                 colnames(SN_Graph_all) %in% cluster_names]
+  cluster_count[lower.tri(cluster_count, diag = TRUE)] <- NA
+  #cluster_sharing_all <- c(cluster_sharing_all,
+   #                        na.omit(unlist(as.list(cluster_sharing))))
+  cluster_ties_all <- c(cluster_ties_all,
+                           sum(unlist(as.list(cluster_count)), na.rm = TRUE))
+  
+}
+mean(cluster_ties_all)
+
+#names align
+sum(names(all_sn_membership) != names(all_mbiome_membership))
+#names(all_sn_membership) == names(all_mbiome_membership_strain)
+
+rand_stat_strain_rate <- mclust::adjustedRandIndex(all_mbiome_membership, all_sn_membership)
+#rand_stat_strain <- adjustedRandIndex(all_mbiome_membership_strain, all_sn_membership)
+
+null_rands_strain_rate <- numeric(10000)
+#null_rands_strain <- numeric(1000)
+
+#Create null distribution metrics
+for(i in 1:10000){
+  #Scramble microbiome
+  strain_rate_vil_graph_scram_1 <- set.vertex.attribute(strain_rate_vil_graph_scram_1, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_1, "name")))
+  strain_rate_vil_graph_scram_2 <- set.vertex.attribute(strain_rate_vil_graph_scram_2, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_2, "name")))
+  strain_rate_vil_graph_scram_3 <- set.vertex.attribute(strain_rate_vil_graph_scram_3, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_3, "name")))
+  strain_rate_vil_graph_scram_4 <- set.vertex.attribute(strain_rate_vil_graph_scram_4, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_4, "name")))
+  strain_rate_vil_graph_scram_5 <- set.vertex.attribute(strain_rate_vil_graph_scram_5, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_5, "name")))
+  strain_rate_vil_graph_scram_6 <- set.vertex.attribute(strain_rate_vil_graph_scram_6, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_6, "name")))
+  strain_rate_vil_graph_scram_7 <- set.vertex.attribute(strain_rate_vil_graph_scram_7, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_7, "name")))
+  strain_rate_vil_graph_scram_8 <- set.vertex.attribute(strain_rate_vil_graph_scram_8, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_8, "name")))
+  strain_rate_vil_graph_scram_9 <- set.vertex.attribute(strain_rate_vil_graph_scram_9, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_9, "name")))
+  strain_rate_vil_graph_scram_10 <- set.vertex.attribute(strain_rate_vil_graph_scram_10, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_10, "name")))
+  strain_rate_vil_graph_scram_11 <- set.vertex.attribute(strain_rate_vil_graph_scram_11, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_11, "name")))
+  strain_rate_vil_graph_scram_12 <- set.vertex.attribute(strain_rate_vil_graph_scram_12, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_12, "name")))
+  strain_rate_vil_graph_scram_13 <- set.vertex.attribute(strain_rate_vil_graph_scram_13, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_13, "name")))
+  strain_rate_vil_graph_scram_14 <- set.vertex.attribute(strain_rate_vil_graph_scram_14, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_14, "name")))
+  strain_rate_vil_graph_scram_15 <- set.vertex.attribute(strain_rate_vil_graph_scram_15, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_15, "name")))
+  strain_rate_vil_graph_scram_16 <- set.vertex.attribute(strain_rate_vil_graph_scram_16, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_16, "name")))
+  strain_rate_vil_graph_scram_17 <- set.vertex.attribute(strain_rate_vil_graph_scram_17, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_17, "name")))
+  strain_rate_vil_graph_scram_18 <- set.vertex.attribute(strain_rate_vil_graph_scram_18, "name",
+                                                        value = sample(vertex_attr(strain_rate_vil_graph_scram_18, "name")))
+  
+  # strain_vil_graph_scram_1 <- set.vertex.attribute(strain_vil_graph_scram_1, "name",
+  #                                                       value = sample(vertex_attr(strain_vil_graph_scram_1, "name")))
+  # strain_vil_graph_scram_2 <- set.vertex.attribute(strain_vil_graph_scram_2, "name",
+  #                                                       value = sample(vertex_attr(strain_vil_graph_scram_2, "name")))
+  # strain_vil_graph_scram_3 <- set.vertex.attribute(strain_vil_graph_scram_3, "name",
+  #                                                       value = sample(vertex_attr(strain_vil_graph_scram_3, "name")))
+  # strain_vil_graph_scram_4 <- set.vertex.attribute(strain_vil_graph_scram_4, "name",
+  #                                                       value = sample(vertex_attr(strain_vil_graph_scram_4, "name")))
+  # strain_vil_graph_scram_5 <- set.vertex.attribute(strain_vil_graph_scram_5, "name",
+  #                                                       value = sample(vertex_attr(strain_vil_graph_scram_5, "name")))
+  # strain_vil_graph_scram_6 <- set.vertex.attribute(strain_vil_graph_scram_6, "name",
+  #                                                       value = sample(vertex_attr(strain_vil_graph_scram_6, "name")))
+  # strain_vil_graph_scram_7 <- set.vertex.attribute(strain_vil_graph_scram_7, "name",
+  #                                                       value = sample(vertex_attr(strain_vil_graph_scram_7, "name")))
+  # strain_vil_graph_scram_8 <- set.vertex.attribute(strain_vil_graph_scram_8, "name",
+  #                                                       value = sample(vertex_attr(strain_vil_graph_scram_8, "name")))
+  # strain_vil_graph_scram_9 <- set.vertex.attribute(strain_vil_graph_scram_9, "name",
+  #                                                       value = sample(vertex_attr(strain_vil_graph_scram_9, "name")))
+  # 
+  #Get scrambled microbiome membership
+  
+  strain_rate_cluster_1_scram <- cluster_louvain(strain_rate_vil_graph_scram_1, weights = E(strain_rate_vil_graph_scram_1)$weight)
+  strain_rate_cluster_2_scram <- cluster_louvain(strain_rate_vil_graph_scram_2, weights = E(strain_rate_vil_graph_scram_2)$weight)
+  strain_rate_cluster_3_scram <- cluster_louvain(strain_rate_vil_graph_scram_3, weights = E(strain_rate_vil_graph_scram_3)$weight)
+  strain_rate_cluster_4_scram <- cluster_louvain(strain_rate_vil_graph_scram_4, weights = E(strain_rate_vil_graph_scram_4)$weight)
+  strain_rate_cluster_5_scram <- cluster_louvain(strain_rate_vil_graph_scram_5, weights = E(strain_rate_vil_graph_scram_5)$weight)
+  strain_rate_cluster_6_scram <- cluster_louvain(strain_rate_vil_graph_scram_6, weights = E(strain_rate_vil_graph_scram_6)$weight)
+  strain_rate_cluster_7_scram <- cluster_louvain(strain_rate_vil_graph_scram_7, weights = E(strain_rate_vil_graph_scram_7)$weight)
+  strain_rate_cluster_8_scram <- cluster_louvain(strain_rate_vil_graph_scram_8, weights = E(strain_rate_vil_graph_scram_8)$weight)
+  strain_rate_cluster_9_scram <- cluster_louvain(strain_rate_vil_graph_scram_9, weights = E(strain_rate_vil_graph_scram_9)$weight)
+  strain_rate_cluster_10_scram <- cluster_louvain(strain_rate_vil_graph_scram_10, weights = E(strain_rate_vil_graph_scram_10)$weight)
+  strain_rate_cluster_11_scram <- cluster_louvain(strain_rate_vil_graph_scram_11, weights = E(strain_rate_vil_graph_scram_11)$weight)
+  strain_rate_cluster_12_scram <- cluster_louvain(strain_rate_vil_graph_scram_12, weights = E(strain_rate_vil_graph_scram_12)$weight)
+  strain_rate_cluster_13_scram <- cluster_louvain(strain_rate_vil_graph_scram_13, weights = E(strain_rate_vil_graph_scram_13)$weight)
+  strain_rate_cluster_14_scram <- cluster_louvain(strain_rate_vil_graph_scram_14, weights = E(strain_rate_vil_graph_scram_14)$weight)
+  strain_rate_cluster_15_scram <- cluster_louvain(strain_rate_vil_graph_scram_15, weights = E(strain_rate_vil_graph_scram_15)$weight)
+  strain_rate_cluster_16_scram <- cluster_louvain(strain_rate_vil_graph_scram_16, weights = E(strain_rate_vil_graph_scram_16)$weight)
+  strain_rate_cluster_17_scram <- cluster_louvain(strain_rate_vil_graph_scram_17, weights = E(strain_rate_vil_graph_scram_17)$weight)
+  strain_rate_cluster_18_scram <- cluster_louvain(strain_rate_vil_graph_scram_18, weights = E(strain_rate_vil_graph_scram_18)$weight)
+  
+  # strain_cluster_1_scram <- cluster_louvain(strain_vil_graph_scram_1, weights = E(strain_vil_graph_scram_1)$weight)
+  # strain_cluster_2_scram <- cluster_louvain(strain_vil_graph_scram_2, weights = E(strain_vil_graph_scram_2)$weight)
+  # strain_cluster_3_scram <- cluster_louvain(strain_vil_graph_scram_3, weights = E(strain_vil_graph_scram_3)$weight)
+  # strain_cluster_4_scram <- cluster_louvain(strain_vil_graph_scram_4, weights = E(strain_vil_graph_scram_4)$weight)
+  # strain_cluster_5_scram <- cluster_louvain(strain_vil_graph_scram_5, weights = E(strain_vil_graph_scram_5)$weight)
+  # strain_cluster_6_scram <- cluster_louvain(strain_vil_graph_scram_6, weights = E(strain_vil_graph_scram_6)$weight)
+  # strain_cluster_7_scram <- cluster_louvain(strain_vil_graph_scram_7, weights = E(strain_vil_graph_scram_7)$weight)
+  # strain_cluster_8_scram <- cluster_louvain(strain_vil_graph_scram_8, weights = E(strain_vil_graph_scram_8)$weight)
+  # strain_cluster_9_scram <- cluster_louvain(strain_vil_graph_scram_9, weights = E(strain_vil_graph_scram_9)$weight)
+  
+  #Order scrambled microbiome membership and make separate by villages
+  mbiome_member_1_scram <- membership(strain_rate_cluster_1_scram)[match(names(membership(sn_cluster_1)),
+                                                             names(membership(strain_rate_cluster_1_scram)))] + 100
+  mbiome_member_2_scram <- membership(strain_rate_cluster_2_scram)[match(names(membership(sn_cluster_2)),
+                                                             names(membership(strain_rate_cluster_2_scram)))] + 200
+  mbiome_member_3_scram <- membership(strain_rate_cluster_3_scram)[match(names(membership(sn_cluster_3)),
+                                                             names(membership(strain_rate_cluster_3_scram)))] + 300
+  mbiome_member_4_scram <- membership(strain_rate_cluster_4_scram)[match(names(membership(sn_cluster_4)),
+                                                             names(membership(strain_rate_cluster_4_scram)))] + 400
+  mbiome_member_5_scram <- membership(strain_rate_cluster_5_scram)[match(names(membership(sn_cluster_5)),
+                                                             names(membership(strain_rate_cluster_5_scram)))] + 500
+  mbiome_member_6_scram <- membership(strain_rate_cluster_6_scram)[match(names(membership(sn_cluster_6)),
+                                                             names(membership(strain_rate_cluster_6_scram)))] + 600
+  mbiome_member_7_scram <- membership(strain_rate_cluster_7_scram)[match(names(membership(sn_cluster_7)),
+                                                             names(membership(strain_rate_cluster_7_scram)))] + 700
+  mbiome_member_8_scram <- membership(strain_rate_cluster_8_scram)[match(names(membership(sn_cluster_8)),
+                                                             names(membership(strain_rate_cluster_8_scram)))] + 800
+  mbiome_member_9_scram <- membership(strain_rate_cluster_9_scram)[match(names(membership(sn_cluster_9)),
+                                                             names(membership(strain_rate_cluster_9_scram)))] + 900
+  mbiome_member_10_scram <- membership(strain_rate_cluster_10_scram)[match(names(membership(sn_cluster_10)),
+                                                             names(membership(strain_rate_cluster_10_scram)))] + 1000
+  mbiome_member_11_scram <- membership(strain_rate_cluster_11_scram)[match(names(membership(sn_cluster_11)),
+                                                             names(membership(strain_rate_cluster_11_scram)))] + 1100
+  mbiome_member_12_scram <- membership(strain_rate_cluster_12_scram)[match(names(membership(sn_cluster_12)),
+                                                             names(membership(strain_rate_cluster_12_scram)))] + 1200
+  mbiome_member_13_scram <- membership(strain_rate_cluster_13_scram)[match(names(membership(sn_cluster_13)),
+                                                             names(membership(strain_rate_cluster_13_scram)))] + 1300
+  mbiome_member_14_scram <- membership(strain_rate_cluster_14_scram)[match(names(membership(sn_cluster_14)),
+                                                             names(membership(strain_rate_cluster_14_scram)))] + 1400
+  mbiome_member_15_scram <- membership(strain_rate_cluster_15_scram)[match(names(membership(sn_cluster_15)),
+                                                             names(membership(strain_rate_cluster_15_scram)))] + 1500
+  mbiome_member_16_scram <- membership(strain_rate_cluster_16_scram)[match(names(membership(sn_cluster_16)),
+                                                             names(membership(strain_rate_cluster_16_scram)))] + 1600
+  mbiome_member_17_scram <- membership(strain_rate_cluster_17_scram)[match(names(membership(sn_cluster_17)),
+                                                             names(membership(strain_rate_cluster_17_scram)))] + 1700
+  mbiome_member_18_scram <- membership(strain_rate_cluster_18_scram)[match(names(membership(sn_cluster_18)),
+                                                             names(membership(strain_rate_cluster_18_scram)))] + 1800
+  # mbiome_member_1_scram_strain <- membership(strain_cluster_1_scram)[match(names(membership(sn_cluster_1)),
+  #                                                                        names(membership(strain_cluster_1_scram)))] + 100
+  # mbiome_member_2_scram_strain <- membership(strain_cluster_2_scram)[match(names(membership(sn_cluster_2)),
+  #                                                                        names(membership(strain_cluster_2_scram)))] + 200
+  # mbiome_member_3_scram_strain <- membership(strain_cluster_3_scram)[match(names(membership(sn_cluster_3)),
+  #                                                                        names(membership(strain_cluster_3_scram)))] + 300
+  # mbiome_member_4_scram_strain <- membership(strain_cluster_4_scram)[match(names(membership(sn_cluster_4)),
+  #                                                                        names(membership(strain_cluster_4_scram)))] + 400
+  # mbiome_member_5_scram_strain <- membership(strain_cluster_5_scram)[match(names(membership(sn_cluster_5)),
+  #                                                                        names(membership(strain_cluster_5_scram)))] + 500
+  # mbiome_member_6_scram_strain <- membership(strain_cluster_6_scram)[match(names(membership(sn_cluster_6)),
+  #                                                                        names(membership(strain_cluster_6_scram)))] + 600
+  # mbiome_member_7_scram_strain <- membership(strain_cluster_7_scram)[match(names(membership(sn_cluster_7)),
+  #                                                                        names(membership(strain_cluster_7_scram)))] + 700
+  # mbiome_member_8_scram_strain <- membership(strain_cluster_8_scram)[match(names(membership(sn_cluster_8)),
+  #                                                                        names(membership(strain_cluster_8_scram)))] + 800
+  # mbiome_member_9_scram_strain <- membership(strain_cluster_9_scram)[match(names(membership(sn_cluster_9)),
+  #                                                                        names(membership(strain_cluster_9_scram)))] + 900
+  
+  #combine membership
+  all_mbiome_membership_scram <-c(mbiome_member_1_scram,
+                            mbiome_member_2_scram,
+                            mbiome_member_3_scram,
+                            mbiome_member_4_scram,
+                            mbiome_member_5_scram,
+                            mbiome_member_6_scram,
+                            mbiome_member_7_scram,
+                            mbiome_member_8_scram,
+                            mbiome_member_9_scram,
+                            mbiome_member_10_scram,
+                            mbiome_member_11_scram,
+                            mbiome_member_12_scram,
+                            mbiome_member_13_scram,
+                            mbiome_member_14_scram,
+                            mbiome_member_15_scram,
+                            mbiome_member_16_scram,
+                            mbiome_member_17_scram,
+                            mbiome_member_18_scram)
+  
+  # all_mbiome_membership_scram_strain <-c(mbiome_member_1_scram_strain,
+  #                                 mbiome_member_2_scram_strain,
+  #                                 mbiome_member_3_scram_strain,
+  #                                 mbiome_member_4_scram_strain,
+  #                                 mbiome_member_5_scram_strain,
+  #                                 mbiome_member_6_scram_strain,
+  #                                 mbiome_member_7_scram_strain,
+  #                                 mbiome_member_8_scram_strain,
+  #                                 mbiome_member_9_scram_strain)
+  
+  #Get null statistic
+  null_rands_strain_rate[i] <- mclust::adjustedRandIndex(all_mbiome_membership_scram, all_sn_membership)
+  #null_rands_strain[i] <- adjustedRandIndex(all_mbiome_membership_scram_strain, all_sn_membership)
+  #Check status
+  #all_mbiome_membership_scram == all_mbiome_membership
+  if(i %%100  == 0){
+    print(i)
+  }
+  #Get not combined statistics
+  
+  #Louvain clustering does not work on bray curtids for this data
+  #Is there a better way to cluster the strain data? Probably, I'm not exactly sure what
+  
+  if(i == 1){
+    null_clusters <- data.frame(rand_inds = c(mclust::adjustedRandIndex(mbiome_member_1_scram, sn_member_1),
+                                              mclust::adjustedRandIndex(mbiome_member_2_scram, sn_member_2),
+                                              mclust::adjustedRandIndex(mbiome_member_3_scram, sn_member_3),
+                                              mclust::adjustedRandIndex(mbiome_member_4_scram, sn_member_4),
+                                              mclust::adjustedRandIndex(mbiome_member_5_scram, sn_member_5),
+                                              mclust::adjustedRandIndex(mbiome_member_6_scram, sn_member_6),
+                                              mclust::adjustedRandIndex(mbiome_member_7_scram, sn_member_7),
+                                              mclust::adjustedRandIndex(mbiome_member_8_scram, sn_member_8),
+                                              mclust::adjustedRandIndex(mbiome_member_9_scram, sn_member_9),
+                                              mclust::adjustedRandIndex(mbiome_member_10_scram, sn_member_10),
+                                              mclust::adjustedRandIndex(mbiome_member_11_scram, sn_member_11),
+                                              mclust::adjustedRandIndex(mbiome_member_12_scram, sn_member_12),
+                                              mclust::adjustedRandIndex(mbiome_member_13_scram, sn_member_13),
+                                              mclust::adjustedRandIndex(mbiome_member_14_scram, sn_member_14),
+                                              mclust::adjustedRandIndex(mbiome_member_15_scram, sn_member_15),
+                                              mclust::adjustedRandIndex(mbiome_member_16_scram, sn_member_16),
+                                              mclust::adjustedRandIndex(mbiome_member_17_scram, sn_member_17),
+                                              mclust::adjustedRandIndex(mbiome_member_18_scram, sn_member_18)),
+                                vils = village_names)
+  }
+  else{
+    null_clusters <- rbind(null_clusters,
+                           data.frame(rand_inds = c(mclust::adjustedRandIndex(mbiome_member_1_scram,sn_member_1),
+                                              mclust::adjustedRandIndex(mbiome_member_2_scram, sn_member_2),
+                                              mclust::adjustedRandIndex(mbiome_member_3_scram, sn_member_3),
+                                              mclust::adjustedRandIndex(mbiome_member_4_scram, sn_member_4),
+                                              mclust::adjustedRandIndex(mbiome_member_5_scram, sn_member_5),
+                                              mclust::adjustedRandIndex(mbiome_member_6_scram, sn_member_6),
+                                              mclust::adjustedRandIndex(mbiome_member_7_scram, sn_member_7),
+                                              mclust::adjustedRandIndex(mbiome_member_8_scram, sn_member_8),
+                                              mclust::adjustedRandIndex(mbiome_member_9_scram, sn_member_9),
+                                              mclust::adjustedRandIndex(mbiome_member_10_scram,sn_member_10),
+                                              mclust::adjustedRandIndex(mbiome_member_11_scram,sn_member_11),
+                                              mclust::adjustedRandIndex(mbiome_member_12_scram, sn_member_12),
+                                              mclust::adjustedRandIndex(mbiome_member_13_scram, sn_member_13),
+                                              mclust::adjustedRandIndex(mbiome_member_14_scram, sn_member_14),
+                                              mclust::adjustedRandIndex(mbiome_member_15_scram, sn_member_15),
+                                              mclust::adjustedRandIndex(mbiome_member_16_scram, sn_member_16),
+                                              mclust::adjustedRandIndex(mbiome_member_17_scram, sn_member_17),
+                                              mclust::adjustedRandIndex(mbiome_member_18_scram, sn_member_18)),
+                                vils = village_names))
+  }
+}
+```
+
+
+```{r}
+
+village_map
+village_names_temp <- unname(village_map[village_names])
+observed <- data.frame(
+  vils = village_names_temp,
+  obs = c(
+    mclust::adjustedRandIndex(mbiome_member_1, sn_member_1),
+    mclust::adjustedRandIndex(mbiome_member_2, sn_member_2),
+    mclust::adjustedRandIndex(mbiome_member_3, sn_member_3),
+    mclust::adjustedRandIndex(mbiome_member_4, sn_member_4),
+    mclust::adjustedRandIndex(mbiome_member_5, sn_member_5),
+    mclust::adjustedRandIndex(mbiome_member_6, sn_member_6),
+    mclust::adjustedRandIndex(mbiome_member_7, sn_member_7),
+    mclust::adjustedRandIndex(mbiome_member_8, sn_member_8),
+    mclust::adjustedRandIndex(mbiome_member_9, sn_member_9),
+    mclust::adjustedRandIndex(mbiome_member_10, sn_member_10),
+    mclust::adjustedRandIndex(mbiome_member_11, sn_member_11),
+    mclust::adjustedRandIndex(mbiome_member_12, sn_member_12),
+    mclust::adjustedRandIndex(mbiome_member_13, sn_member_13),
+    mclust::adjustedRandIndex(mbiome_member_14, sn_member_14),
+    mclust::adjustedRandIndex(mbiome_member_15, sn_member_15),
+    mclust::adjustedRandIndex(mbiome_member_16, sn_member_16),
+    mclust::adjustedRandIndex(mbiome_member_17, sn_member_17),
+    mclust::adjustedRandIndex(mbiome_member_18, sn_member_18)
+  )
+)
+
+null_clusters$vils <- unname(village_map[null_clusters$vils])
+
+p_vals <- data.frame(
+  vils = observed$vils,
+  p_val = c(
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[1]] >= observed$obs[1]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[2]] >= observed$obs[2]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[3]] >= observed$obs[3]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[4]] >= observed$obs[4]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[5]] >= observed$obs[5]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[6]] >= observed$obs[6]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[7]] >= observed$obs[7]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[8]] >= observed$obs[8]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[9]] >= observed$obs[9]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[10]] >= observed$obs[10]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[11]] >= observed$obs[11]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[12]] >= observed$obs[12]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[13]] >= observed$obs[13]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[14]] >= observed$obs[14]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[15]] >= observed$obs[15]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[16]] >= observed$obs[16]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[17]] >= observed$obs[17]) /
+      10000,
+    sum(null_clusters$rand_inds[null_clusters$vils ==
+                                  observed$vils[18]] >= observed$obs[18]) /
+      10000
+  )
+)
+village_map
+for(i in 1:nrow(p_vals)){
+  if(p_vals$p_val[i] == 0){
+    p_vals$p_val[i] <- paste0("p <= .0001")
+  }
+  else{
+    p_vals$p_val[i] <- paste0("p = ", p_vals$p_val[i])
+  }
+}
+
+
+
+null_clusters$dummy = null_clusters$rand_inds
+
+cluster_pvals_fig <- ggplot(null_clusters, aes(x=rand_inds ))+
+  geom_histogram(color="black",fill="grey", bins = 100, show.legend = FALSE)+
+  #facet_grid(as.factor(vils) ~ .) +
+  facet_wrap(~ as.factor(vils), ncol=2) +
+  geom_vline(data=observed,
+             aes(xintercept=obs, color="red"),
+             linetype="solid", show.legend = FALSE) +
+  theme_pubr() +
+  ylab("Frequency") +
+  xlab("Adjusted Rand Index") +
+  ggtitle("Permutation Null Distributions")+
+  #scale_x_break(breaks = c(.3,.4), ticklabels=c(-.1,0,.05,.1,.15,.2,.25,.3,.4,.45)) +
+  geom_text(data = p_vals, aes(label = p_val,
+                               y = 2000,
+                               x = .52)) +
+  theme_pubr()+
+  theme(
+    axis.text.x.top = element_blank(),
+    axis.ticks.x.top = element_blank(),
+    strip.background = element_blank(),
+    strip.text.x = element_text(size = 10),
+    plot.title = element_text(hjust = .5, face = "bold"),
+    axis.title  = element_text(face = "bold"),
+    axis.text  = element_text(face = "bold")
+  ) +
+  coord_cartesian(ylim = c(0,4000)) +
+  scale_y_continuous(limits = c(0, 4000), breaks = c(0, 2000, 4000))
+#Plan el peroicso and mirasol and sesimel
+```
+
+Combine with clustering coef bucket fig from centralitysharing
+```{r}
+ggarrange(cluster_pvals_fig, cluster_bucket_fig, nrow = 1, labels = c("", "h"))
+```
+
+
+
+
+Statistics on which relationships are typically grouped together
+Probably just following the strain-sharing rate
+
+
+```{r}
+# #Get probability each relationship is grouped together
+# #Probably total accuracy
+# #Probability of looping in degree two
+# #Split up by relationship type
+# #Don't really need the SN Clusters
+# for(i in 1:length(village_names)) {
+#   mbiome_membership <- get(paste0("mbiome_member_", i))
+#   #Probability first-degree connections included
+#   sn_edges <- get(paste0("sn_vil_", i))
+#   for (j in 1:nrow(sn_edges)) {
+#     sn_edges$clustered[j] <-
+#       mbiome_membership[names(mbiome_membership) == sn_edges$ego[j]] ==
+#       mbiome_membership[names(mbiome_membership) == sn_edges$alter[j]]
+#   }
+#   assign(paste0("sn_vil_", i), sn_edges)
+# }
+# 
+# for(i in 1:length(village_names)) {
+#   sn_membership <- get(paste0("sn_member_", i))
+#   #Probability first-degree connections included
+#   sn_edges <- get(paste0("sn_vil_", i))
+#   for (j in 1:nrow(sn_edges)) {
+#     sn_edges$clustered_social[j] <-
+#       sn_membership[names(sn_membership) == sn_edges$ego[j]] ==
+#       sn_membership[names(sn_membership) == sn_edges$alter[j]]
+#   }
+#   assign(paste0("sn_vil_", i), sn_edges)
+# }
+# 
+# 
+# 
+# 
+# sn_cluster_stack <- rbind(sn_vil_1,
+#                           sn_vil_2,
+#                           sn_vil_3,
+#                           sn_vil_4,
+#                           sn_vil_5,
+#                           sn_vil_6,
+#                           sn_vil_7,
+#                           sn_vil_8,
+#                           sn_vil_9)
+# 
+# #Baseline it
+# 
+# sn_cluster_stack %>%
+#   distinct(pair_key,.keep_all = TRUE) %>% 
+#   summarize(prob_clustered = mean(clustered))
+# 
+# sn_cluster_stack %>%
+#   distinct(pair_key,.keep_all = TRUE) %>% 
+#   summarize(prob_mbiome_clustered = mean(clustered),
+#             prob_sn_clustered = mean(clustered_social),
+#             prob_overlap = mean(clustered == clustered_social) )
+# 
+# sn_cluster_stack %>%
+#   distinct(relationship, pair_key,.keep_all = TRUE) %>%
+#   group_by(relationship) %>% 
+#   summarize(prob_clustered = mean(clustered)) %>%
+#   arrange(desc(prob_clustered))
+
+```
+
+
+
+
+
+Village Plots
+```{r}
+
+add.alpha <- function(col, alpha = 1) {
+  if (missing(col))
+    stop("Please provide a vector of colours.")
+  apply(sapply(col, col2rgb) / 255, 2,
+        function(x)
+          rgb(x[1], x[2], x[3], alpha = alpha))
+}
+
+
+par(mar=c(0,0,0,0))
+for(i in 1:length(village_names)){
+  #i<- 1
+  #SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  set.seed(1)
+  #min(E(mbiome_all)$weight)
+  #mbiome_all <- mbiome_all - E(mbiome_all)[E(mbiome_all)$weight ==0]
+  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  #Filter to relationships of interest
+  #Get ids for that village
+  village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
+  #mbiome_all <- get(paste0("strain_rate_vil_graph_",i))
+  strain_vil <- strain_rate[rownames(strain_rate) %in% village_ids ,
+                            colnames(strain_rate) %in% village_ids]
+  #Create social network and microbiome networks
+  sn_vil <- igraph::simplify(graph_from_data_frame(SN_Village, directed = FALSE))
+  
+  mbiome_all <- simplify(graph_from_adjacency_matrix(strain_vil,
+                                                     mode = "undirected", weighted = TRUE))
+  
+  #Cluster
+  #sum(is.na(E(mbiome_all)$weight))
+  mbiome_all <- mbiome_all - E(mbiome_all)[is.na(E(mbiome_all)$weight)]
+  mbiome_cluster <- cluster_louvain(mbiome_all, weights = E(mbiome_all)$weight)
+  sn_cluster <- cluster_louvain(sn_vil)
+  
+  max_cluster <- max(max(membership(mbiome_cluster)), max(membership(sn_cluster)))
+  
+  colors <- pals::cols25(max_cluster)
+  colors <- add.alpha(colors, alpha = .5)
+
+  mbiome_cols <- colors[membership(mbiome_cluster)]
+  #Want colors here to best visually map to social network
+
+  plot(mbiome_cluster,
+       mbiome_all,
+       col = mbiome_cols,
+       #mark.groups = mbiome_cols,
+       mark.col = colors,
+       mark.border=colors,
+       vertex.label = NA,
+       vertex.size =5,
+       edge.width=E(mbiome_all)$weight/50,
+       edge.color = "black",
+       layout = layout_with_fr#,
+      # main = paste(village_names[i], "Strain Clusters"))
+  )
+  # table(membership(sn_cluster))
+  # table(membership(mbiome_cluster))
+  # temp <- membership(mbiome_cluster)
+  # swap <- c(temp)
+  # swap <- case_when(
+  #   swap == 1 ~ 5,
+  #   swap == 5 ~ 2,
+  #   swap == 3 ~ 6,
+  #   swap == 2 ~ 1,
+  #   swap == 4 ~ 3,
+  #   TRUE ~ swap
+  # )
+  # names(swap) <- names(temp)
+
+
+  
+  V(sn_vil)$color <- colors[membership(sn_cluster)]
+  set.seed(1)
+  sn_colors <- colors[membership(sn_cluster)]
+  plot(sn_vil,
+       vertex.label = NA,
+       vertex.size =5,
+       mark.col = colors,
+       mark.border=colors,
+       col = sn_colors,
+       edge.color = "black",
+       layout = layout_with_fr#,
+      # main = paste(village_names[i], "Social Network Clusters")
+  )
+
+  #Could Change these to match colors, hard would have to do manually
+  #V(sn_vil)$color <- swap[match(V(sn_vil)$name, names(swap))]
+  V(sn_vil)$color <- membership(mbiome_cluster)[match(V(sn_vil)$name, names(membership(mbiome_cluster)))]
+  V(sn_vil)$color <- colors[as.numeric(V(sn_vil)$color)]
+  set.seed(1)
+  plot(sn_vil,
+       vertex.label = NA,
+       vertex.size =5,
+       edge.color = "black",
+       #vertex.color = new_cols,
+       layout = layout_with_fr#,
+      # main = paste(village_names[i], "Microbiome Clusters Overlay")
+  )
+
+  
+  
+}
+#there's a couple good ones I say bring in the old strains for Mariposal
+```
+
+
+Mariposal Visualization
+```{r}
+
+add.alpha <- function(col, alpha = 1) {
+  if (missing(col))
+    stop("Please provide a vector of colours.")
+  apply(sapply(col, col2rgb) / 255, 2,
+        function(x)
+          rgb(x[1], x[2], x[3], alpha = alpha))
+}
+
+
+village_map
+SN_Village <- SN %>% filter(village_name_w3 == "mariposal")
+#Filter to relationships of interest
+#Get ids for that village
+village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
+
+strain_vil <-
+  strain_rate[rownames(strain_rate) %in% village_ids ,
+                  colnames(strain_rate) %in% village_ids]
+#Create social network and microbiome networks
+sn_vil <-
+  igraph::simplify(graph_from_data_frame(SN_Village, directed = FALSE))
+
+mbiome_all <-
+  simplify(graph_from_adjacency_matrix(strain_vil, mode = "undirected", weighted = TRUE))
+
+#Cluster
+mbiome_cluster <-
+  cluster_louvain(mbiome_all, weights = E(mbiome_all)$weight)
+sn_cluster <- cluster_louvain(sn_vil)
+
+max_cluster <-
+  max(max(membership(mbiome_cluster)), max(membership(sn_cluster)))
+
+colors <- pals::cols25(max_cluster)
+
+
+temp <- membership(mbiome_cluster)
+swap <- c(temp)
+swap <- case_when(swap == 4 ~ 5,
+                  swap == 3 ~ 2,
+                  swap == 2 ~ 4,
+                  swap == 1 ~ 3,
+                  TRUE ~ swap)
+names(swap) <- names(temp)
+
+
+
+V(sn_vil)$color <- colors[membership(sn_cluster)]
+sn_colors <- colors[membership(sn_cluster)]
+set.seed(1)
+plot(
+  #sn_cluster,
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  mark.col = colors,
+  mark.border = colors,
+  col = sn_colors,
+  edge.color = "black",
+  layout = layout_with_fr,
+  main = "Social Network Clusters for Mariposal"
+)
+set.seed(1)
+mariposal_sn <- as.ggplot(expression(plot(#sn_cluster,
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  mark.col = colors,
+  mark.border = colors,
+  col = sn_colors,
+  edge.color = "black",
+  layout = layout_with_fr,
+  #main = "Social Network Clusters"
+),
+title("Social Network Clusters",line = 0)))
+
+#Could Change these to match colors, hard would have to do manually
+V(sn_vil)$color <- swap[match(V(sn_vil)$name, names(swap))]
+V(sn_vil)$color <- colors[as.numeric(V(sn_vil)$color)]
+set.seed(1)
+
+plot(
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.color = "black",
+  layout = layout_with_fr,
+  main = "Microbiome Similarity Clusters\non Social Network"
+)
+set.seed(1)
+mariposal_overlay <- as.ggplot(expression(plot(
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.color = "black",
+  layout = layout_with_fr#,
+  #main = "Microbiome Similarity Clusters\non Social Network"
+),
+title("Microbiome Similarity Clusters\non Social Network", line = -.75)))
+
+colors <- add.alpha(colors, alpha = .5)
+mbiome_cols <- colors[swap]
+mbiome_cols_rect <- colors
+mbiome_cols_rect <- mbiome_cols_rect[c(3,4,2,5)]
+V(mbiome_all)$color <- mbiome_cols
+
+plot(
+  mbiome_cluster,
+  mbiome_all,
+  col = mbiome_cols,
+  mark.col = mbiome_cols_rect,
+  mark.border = mbiome_cols_rect,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.width = E(mbiome_all)$weight / 25,
+  edge.color = "black",
+  layout = layout_with_fr,
+  main = "Microbiome Similarity Clusters"
+)
+
+
+mariposal_mbiome <- as.ggplot(expression(plot(
+  mbiome_cluster,
+  mbiome_all,
+  col = mbiome_cols,
+  mark.col = mbiome_cols_rect,
+  mark.border = mbiome_cols_rect,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.width = E(mbiome_all)$weight / 25,
+  edge.color = "black",
+  layout = layout_with_fr#,
+  #main = "Microbiome Similarity Clusters"
+),
+title("Microbiome Similarity Clusters",line = 0)))
+```
+
+Quesaras Visualization
+```{r}
+village_map
+SN_Village <- SN %>% filter(village_name_w3 == "Hernani")
+
+
+village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
+
+strain_vil <-
+  strain_rate[rownames(strain_rate) %in% village_ids ,
+                  colnames(strain_rate) %in% village_ids]
+
+sn_vil <-
+  igraph::simplify(graph_from_data_frame(SN_Village, directed = FALSE))
+
+mbiome_all <-
+  simplify(graph_from_adjacency_matrix(strain_vil, mode = "undirected", weighted = TRUE))
+
+#Cluster
+mbiome_cluster <-
+  cluster_louvain(mbiome_all, weights = E(mbiome_all)$weight)
+sn_cluster <- cluster_louvain(sn_vil)
+
+max_cluster <-
+  max(max(membership(mbiome_cluster)), max(membership(sn_cluster)))
+
+colors <- pals::cols25(max_cluster)
+
+
+#need to line up the cluster plot now
+temp <- membership(mbiome_cluster)
+swap <- c(temp)
+swap <- case_when(swap == 1 ~ 5,
+                  swap == 5 ~ 2,
+                  swap == 3 ~ 6,
+                  swap == 2 ~ 1,
+                  swap == 4 ~ 3,
+                  TRUE ~ swap)
+names(swap) <- names(temp)
+
+
+
+V(sn_vil)$color <- colors[membership(sn_cluster)]
+sn_colors <- colors[membership(sn_cluster)]
+set.seed(1)
+plot(#sn_cluster,
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  mark.col = colors,
+  mark.border = colors,
+  col = sn_colors,
+  edge.color = "black",
+  layout = layout_with_fr
+)
+set.seed(1)
+quesaras_sn <- as.ggplot(expression(plot(#sn_cluster,
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  mark.col = colors,
+  mark.border = colors,
+  col = sn_colors,
+  edge.color = "black",
+  layout = layout_with_fr,
+  #main = "Social Network Clusters"
+),
+title("Social Network Clusters")))
+
+#Could Change these to match colors, hard would have to do manually
+V(sn_vil)$color <- swap[match(V(sn_vil)$name, names(swap))]
+#V(sn_vil)$color <- membership(mbiome_cluster)[match(V(sn_vil)$name, names(membership(mbiome_cluster)))]
+V(sn_vil)$color <- colors[as.numeric(V(sn_vil)$color)]
+set.seed(1)
+plot(
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.color = "black",
+  layout = layout_with_fr,
+  main = "Microbiome Similarity Clusters\non Social Network"
+)
+set.seed(1)
+quesaras_overlay <- as.ggplot(expression(plot(
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.color = "black",
+  layout = layout_with_fr,
+  #main = "Microbiome Similarity Clusters\non Social Network"
+),
+title("Microbiome Similarity Clusters\non Social Network")))
+colors <- add.alpha(colors, alpha = .5)
+mbiome_cols <- colors[swap]
+mbiome_cols_rect <- colors
+mbiome_cols_rect <- mbiome_cols_rect[c(5,1,6,3,2)]
+
+V(mbiome_all)$color <- mbiome_cols
+
+plot(
+  mbiome_cluster,
+  mbiome_all,
+  col = mbiome_cols,
+  mark.col = mbiome_cols_rect,
+  mark.border = mbiome_cols_rect,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.width = E(mbiome_all)$weight / 25,
+  edge.color = "black",
+  layout = layout_with_fr
+)
+
+quesaras_mbiome <- as.ggplot(expression(plot(
+  mbiome_cluster,
+  mbiome_all,
+  col = mbiome_cols,
+  mark.col = mbiome_cols_rect,
+  mark.border = mbiome_cols_rect,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.width = E(mbiome_all)$weight / 25,
+  edge.color = "black",
+  layout = layout_with_fr,
+  #main = "Microbiome Similarity Clusters"
+),
+title("Microbiome Similarity Clusters")))
+
+```
+
+create_figure
+```{r}
+library(ggpubr)
+ggarrange(cluster_pvals_fig, cluster_bucket_fig, nrow = 1, labels = c("g", "h"))
+
+
+
+fig5_1 <- ggarrange(cluster_bucket_fig,
+          mariposal_mbiome,
+          labels = c("A", "B"),
+          nrow = 1)
+
+fig5_2 <- ggarrange(mariposal_sn,
+          mariposal_overlay,
+          labels = c("C", "D"),
+          nrow = 1)
+
+#Need to get this from the species_niches script
+fig5_3<- ggarrange(species_da_1, species_da_2,
+          labels = c("F", "G"), nrow = 1)
+
+fig5_4 <- ggarrange(fig5_1,
+                    fig5_2,
+                    fig5_3,
+                    nrow = 3)
+
+fig5 <- ggarrange(fig5_4,
+                  ggarrange(cluster_pvals_fig, labels = "E"),
+                  widths = c(2,1),
+                  nrow = 1)
+
+
+
+
+
+svglite("../FiguresNew/Figure5/fig5_full_new_2.svg",
+        width = 12,
+        height = 12)
+fig5
+dev.off()
+
+```
+
+
+```{r}
+ggarrange(cluster_bucket_fig,
+          mariposal_mbiome,
+          mariposal_sn,
+          mariposal_overlay,
+          labels = c("A", "B",
+                     "C", "D"), nrow = 2)
+
+mariposal_cluster_fig <-ggarrange(mariposal_mbiome, mariposal_sn, mariposal_overlay,
+                                  nrow = 1, labels = c("A", "C", "E"))
+
+quesaras_cluster_fig <-ggarrange(quesaras_mbiome, quesaras_sn, quesaras_overlay,
+                                  nrow = 1, labels = c("B", "D", "F"))
+
+ggarrange(mariposal_cluster_fig, quesaras_cluster_fig, nrow = 2)
+
+cluster_overlap_fig <- ggarrange(mariposal_mbiome, mariposal_overlay, mariposal_sn,
+                                 quesaras_mbiome, quesaras_overlay, quesaras_sn,
+                                 nrow = 2, labels = c("a", "b", "c", "d", "e", "f"))
+```
+
+
+
+Test Visualization
+```{r}
+village_map
+village_names
+plot(sn_vil_graph_8,vertex.label = NA,
+  vertex.size = 5)
+
+sn_vil <- sn_vil_graph_8
+
+mbiome_all <- strain_rate_vil_graph_8
+
+# plot(sn_cluster_8,
+#   sn_vil_graph_8,
+#   vertex.label = NA,
+#   vertex.size = 5,
+#   mark.col = colors,
+#   mark.border = colors,
+#   col = sn_colors,
+#   edge.color = "black",
+#   layout = layout_with_fr
+# )
+# 
+# SN_Village <- SN %>% filter(village_name_w3 == "Plan El Perico")
+# 
+# village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
+# 
+# strain_vil <-
+#   strain_rate[rownames(strain_rate) %in% village_ids ,
+#                   colnames(strain_rate) %in% village_ids]
+# 
+# sn_vil <-
+#   igraph::simplify(graph_from_data_frame(SN_Village, directed = FALSE))
+# 
+# mbiome_all <-
+#   simplify(graph_from_adjacency_matrix(strain_vil, mode = "undirected", weighted = TRUE))
+
+#Cluster
+mbiome_cluster <-
+  cluster_louvain(mbiome_all, weights = E(mbiome_all)$weight)
+sn_cluster <- cluster_louvain(sn_vil)
+
+max_cluster <-
+  max(max(membership(mbiome_cluster)), max(membership(sn_cluster)))
+
+colors <- pals::cols25(max_cluster)
+
+
+
+
+V(sn_vil)$color <- colors[membership(sn_cluster)]
+sn_colors <- colors[membership(sn_cluster)]
+set.seed(1)
+plot(#sn_cluster,
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  mark.col = colors,
+  mark.border = colors,
+  col = sn_colors,
+  edge.color = "black",
+  layout = layout_with_fr
+)
+
+
+#Could Change these to match colors, hard would have to do manually
+#V(sn_vil)$color <- swap[match(V(sn_vil)$name, names(swap))]
+V(sn_vil)$color <- membership(mbiome_cluster)[match(V(sn_vil)$name, names(membership(mbiome_cluster)))]
+V(sn_vil)$color <- colors[as.numeric(V(sn_vil)$color)]
+set.seed(1)
+plot(
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.color = "black",
+  layout = layout_with_fr,
+  main = "Microbiome Similarity Clusters\non Social Network"
+)
+set.seed(1)
+quesaras_overlay <- as.ggplot(expression(plot(
+  sn_vil,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.color = "black",
+  layout = layout_with_fr,
+  #main = "Microbiome Similarity Clusters\non Social Network"
+),
+title("Microbiome Similarity Clusters\non Social Network")))
+colors <- add.alpha(colors, alpha = .5)
+mbiome_cols <- colors[swap]
+mbiome_cols_rect <- colors
+mbiome_cols_rect <- mbiome_cols_rect[c(5,1,6,3,2)]
+
+V(mbiome_all)$color <- mbiome_cols
+
+plot(
+  mbiome_cluster,
+  mbiome_all,
+  col = mbiome_cols,
+  mark.col = mbiome_cols_rect,
+  mark.border = mbiome_cols_rect,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.width = E(mbiome_all)$weight / 25,
+  edge.color = "black",
+  layout = layout_with_fr
+)
+
+quesaras_mbiome <- as.ggplot(expression(plot(
+  mbiome_cluster,
+  mbiome_all,
+  col = mbiome_cols,
+  mark.col = mbiome_cols_rect,
+  mark.border = mbiome_cols_rect,
+  vertex.label = NA,
+  vertex.size = 5,
+  edge.width = E(mbiome_all)$weight / 25,
+  edge.color = "black",
+  layout = layout_with_fr,
+  #main = "Microbiome Similarity Clusters"
+),
+title("Microbiome Similarity Clusters")))
+
+```
+
+
+

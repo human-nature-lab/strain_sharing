@@ -1,0 +1,1228 @@
+---
+title: "Sharing_by_Degree"
+author: "Jackson Pullman"
+date: "2023-02-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Strain-Sharing by Degree All
+
+```{r}
+#Get connected graphs for each village
+
+for(i in 1:length(village_names)){
+  #Create second degree
+  assign(paste0("sn_vil_graph_all_", i,"_dg_2"),
+         difference(simplify(connect(get(paste0("sn_vil_graph_all_",i)),2)), get(paste0("sn_vil_graph_all_",i))))
+  
+  #assign(paste0("sn_vil_graph_scram_all_", i,"_dg_2"), get(paste0("sn_vil_graph_all_", i,"_dg_2")))
+  
+  #Create third degree
+  assign(paste0("sn_vil_graph_all_", i,"_dg_3"),
+         difference(simplify(connect(get(paste0("sn_vil_graph_all_",i)),3)),
+                    simplify(connect(get(paste0("sn_vil_graph_all_",i)),2))))
+  
+  #assign(paste0("sn_vil_graph_scram_all_", i,"_dg_3"), get(paste0("sn_vil_graph_all_", i,"_dg_3")))
+  
+  #Create fourth degree
+  assign(paste0("sn_vil_graph_all_", i,"_dg_4"),
+         difference(simplify(connect(get(paste0("sn_vil_graph_all_",i)),4)),
+                    simplify(connect(get(paste0("sn_vil_graph_all_",i)),3))))
+  
+  #assign(paste0("sn_vil_graph_scram_all_", i,"_dg_4"), get(paste0("sn_vil_graph_all_", i,"_dg_4")))
+  
+  #Filter just to nodes in our strain sharing set
+  assign(paste0("sn_vil_graph_all_",i),
+         delete_vertices(get(paste0("sn_vil_graph_all_",i)),
+                        V(get(paste0("sn_vil_graph_all_",i)))$name[!(V(get(paste0("sn_vil_graph_all_",i)))$name %in%
+                                                                       V(get(paste0("sn_vil_graph_",i)))$name)]))
+  #Degree 2
+  assign(paste0("sn_vil_graph_all_",i,"_dg_2"),
+         delete_vertices(get(paste0("sn_vil_graph_all_",i,"_dg_2")),
+                        V(get(paste0("sn_vil_graph_all_",i,"_dg_2")))$name[!(V(get(paste0("sn_vil_graph_all_",i,"_dg_2")))$name %in%
+                                                                       V(get(paste0("sn_vil_graph_",i)))$name)]))
+  #Degree 3
+  assign(paste0("sn_vil_graph_all_",i,"_dg_3"),
+         delete_vertices(get(paste0("sn_vil_graph_all_",i,"_dg_3")),
+                        V(get(paste0("sn_vil_graph_all_",i,"_dg_3")))$name[!(V(get(paste0("sn_vil_graph_all_",i,"_dg_3")))$name %in%
+                                                                       V(get(paste0("sn_vil_graph_",i)))$name)]))
+  #Degree 4
+  assign(paste0("sn_vil_graph_all_",i,"_dg_4"),
+         delete_vertices(get(paste0("sn_vil_graph_all_",i,"_dg_4")),
+                        V(get(paste0("sn_vil_graph_all_",i,"_dg_4")))$name[!(V(get(paste0("sn_vil_graph_all_",i,"_dg_4")))$name %in%
+                                                                       V(get(paste0("sn_vil_graph_",i)))$name)]))
+  
+  #Rename graphs for convenience
+  assign(paste0("sn_vil_graph_", i,"_dg_2"),
+          get(paste0("sn_vil_graph_all_", i,"_dg_2")))
+  
+  assign(paste0("sn_vil_graph_", i,"_dg_3"),
+          get(paste0("sn_vil_graph_all_", i,"_dg_3")))
+  
+  assign(paste0("sn_vil_graph_", i,"_dg_4"),
+          get(paste0("sn_vil_graph_all_", i,"_dg_4")))
+  
+  assign(paste0("sn_vil_graph_", i),
+          get(paste0("sn_vil_graph_all_", i)))
+  
+  
+}
+
+for(i in 1:length(village_names)){
+  graph <- get(paste0("strain_rate_vil_graph_", i))
+  test_g <- make_full_graph(length(V(graph)))
+  test_g <- set.vertex.attribute(test_g,
+                                 "name",
+                                 value = names(V(graph)))
+  E(test_g)$weight <- 0
+  test_g <- set.edge.attribute(test_g,
+                               "weight",
+                               index = as_ids(E(test_g)[na.omit(match(as_ids(E(graph)), as_ids(E(test_g))))]),
+                               value = E(graph)$weight)
+  assign(paste0("strain_rate_vil_graph_", i), test_g)
+}
+
+
+
+observed_weights_1 <-
+  median(
+    c(
+      E(intersection(strain_rate_vil_graph_1, sn_vil_graph_1))$weight,
+      E(intersection(strain_rate_vil_graph_2, sn_vil_graph_2))$weight,
+      E(intersection(strain_rate_vil_graph_3, sn_vil_graph_3))$weight,
+      E(intersection(strain_rate_vil_graph_4, sn_vil_graph_4))$weight,
+      E(intersection(strain_rate_vil_graph_5, sn_vil_graph_5))$weight,
+      E(intersection(strain_rate_vil_graph_6, sn_vil_graph_6))$weight,
+      E(intersection(strain_rate_vil_graph_7, sn_vil_graph_7))$weight,
+      E(intersection(strain_rate_vil_graph_8, sn_vil_graph_8))$weight,
+      E(intersection(strain_rate_vil_graph_9, sn_vil_graph_9))$weight,
+      E(intersection(strain_rate_vil_graph_10, sn_vil_graph_10))$weight,
+      E(intersection(strain_rate_vil_graph_11, sn_vil_graph_11))$weight,
+      E(intersection(strain_rate_vil_graph_12, sn_vil_graph_12))$weight,
+      E(intersection(strain_rate_vil_graph_13, sn_vil_graph_13))$weight,
+      E(intersection(strain_rate_vil_graph_14, sn_vil_graph_14))$weight,
+      E(intersection(strain_rate_vil_graph_15, sn_vil_graph_15))$weight,
+      E(intersection(strain_rate_vil_graph_16, sn_vil_graph_16))$weight,
+      E(intersection(strain_rate_vil_graph_17, sn_vil_graph_17))$weight,
+      E(intersection(strain_rate_vil_graph_18, sn_vil_graph_18))$weight
+    ), na.rm = TRUE
+  )
+
+
+observed_weights_2 <- median(
+  c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_2))$weight,
+    E(intersection(strain_rate_vil_graph_10,sn_vil_graph_10_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_11,sn_vil_graph_11_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_12,sn_vil_graph_12_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_13,sn_vil_graph_13_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_14,sn_vil_graph_14_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_15,sn_vil_graph_15_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_16,sn_vil_graph_16_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_17,sn_vil_graph_17_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_18,sn_vil_graph_18_dg_2))$weight),
+                             na.rm = TRUE
+  )
+
+
+observed_weights_3 <- median(c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_10,sn_vil_graph_10_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_11,sn_vil_graph_11_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_12,sn_vil_graph_12_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_13,sn_vil_graph_13_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_14,sn_vil_graph_14_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_15,sn_vil_graph_15_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_16,sn_vil_graph_16_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_17,sn_vil_graph_17_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_18,sn_vil_graph_18_dg_3))$weight),
+                             na.rm = TRUE)
+
+
+observed_weights_4 <- median(c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_10,sn_vil_graph_10_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_11,sn_vil_graph_11_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_12,sn_vil_graph_12_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_13,sn_vil_graph_13_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_14,sn_vil_graph_14_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_15,sn_vil_graph_15_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_16,sn_vil_graph_16_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_17,sn_vil_graph_17_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_18,sn_vil_graph_18_dg_4))$weight),
+                             na.rm = TRUE)
+
+
+for(i in 1:length(village_names)){
+  assign(paste0("strain_rate_vil_graph_scram_", i), get(paste0("strain_rate_vil_graph_", i)))
+}
+```
+
+
+```{r}
+#Strain Sharing Rate Test
+perm_null_weights_1 <- rep(NA, 1000)
+perm_null_weights_2 <- rep(NA, 1000)
+perm_null_weights_3 <- rep(NA, 1000)
+perm_null_weights_4 <- rep(NA, 1000)
+
+for(i in 1:1000){
+  strain_rate_vil_graph_scram_1 <- set.vertex.attribute(strain_rate_vil_graph_scram_1, "name",
+                                       value = sample(vertex_attr(strain_rate_vil_graph_scram_1, "name")))
+  strain_rate_vil_graph_scram_2 <- set.vertex.attribute(strain_rate_vil_graph_scram_2, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_2, "name")))
+  strain_rate_vil_graph_scram_3 <- set.vertex.attribute(strain_rate_vil_graph_scram_3, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_3, "name")))
+  strain_rate_vil_graph_scram_4 <- set.vertex.attribute(strain_rate_vil_graph_scram_4, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_4, "name")))
+  strain_rate_vil_graph_scram_5 <- set.vertex.attribute(strain_rate_vil_graph_scram_5, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_5, "name")))
+  strain_rate_vil_graph_scram_6 <- set.vertex.attribute(strain_rate_vil_graph_scram_6, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_6, "name")))
+  strain_rate_vil_graph_scram_7 <- set.vertex.attribute(strain_rate_vil_graph_scram_7, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_7, "name")))
+  strain_rate_vil_graph_scram_8 <- set.vertex.attribute(strain_rate_vil_graph_scram_8, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_8, "name")))
+  strain_rate_vil_graph_scram_9 <- set.vertex.attribute(strain_rate_vil_graph_scram_9, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_9, "name")))
+  strain_rate_vil_graph_scram_10 <- set.vertex.attribute(strain_rate_vil_graph_scram_10, "name",
+                                       value = sample(vertex_attr(strain_rate_vil_graph_scram_10, "name")))
+  strain_rate_vil_graph_scram_11 <- set.vertex.attribute(strain_rate_vil_graph_scram_11, "name",
+                                       value = sample(vertex_attr(strain_rate_vil_graph_scram_11, "name")))
+  strain_rate_vil_graph_scram_12 <- set.vertex.attribute(strain_rate_vil_graph_scram_12, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_12, "name")))
+  strain_rate_vil_graph_scram_13 <- set.vertex.attribute(strain_rate_vil_graph_scram_13, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_13, "name")))
+  strain_rate_vil_graph_scram_14 <- set.vertex.attribute(strain_rate_vil_graph_scram_14, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_14, "name")))
+  strain_rate_vil_graph_scram_15 <- set.vertex.attribute(strain_rate_vil_graph_scram_15, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_15, "name")))
+  strain_rate_vil_graph_scram_16 <- set.vertex.attribute(strain_rate_vil_graph_scram_16, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_16, "name")))
+  strain_rate_vil_graph_scram_17 <- set.vertex.attribute(strain_rate_vil_graph_scram_17, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_17, "name")))
+  strain_rate_vil_graph_scram_18 <- set.vertex.attribute(strain_rate_vil_graph_scram_18, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_18, "name")))
+
+  
+  perm_null_weights_1[i] <- median(c(E(intersection(strain_rate_vil_graph_scram_1,sn_vil_graph_1))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_2,sn_vil_graph_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_3,sn_vil_graph_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_4,sn_vil_graph_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_5,sn_vil_graph_5))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_6,sn_vil_graph_6))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_7,sn_vil_graph_7))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_8,sn_vil_graph_8))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_9,sn_vil_graph_9))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_10,sn_vil_graph_10))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_11,sn_vil_graph_11))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_12,sn_vil_graph_12))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_13,sn_vil_graph_13))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_14,sn_vil_graph_14))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_15,sn_vil_graph_15))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_16,sn_vil_graph_16))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_17,sn_vil_graph_17))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_18,sn_vil_graph_18))$weight),
+                             na.rm = TRUE)
+  
+  
+  perm_null_weights_2[i] <- median(c(E(intersection(strain_rate_vil_graph_scram_1,sn_vil_graph_1_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_2,sn_vil_graph_2_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_3,sn_vil_graph_3_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_4,sn_vil_graph_4_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_5,sn_vil_graph_5_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_6,sn_vil_graph_6_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_7,sn_vil_graph_7_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_8,sn_vil_graph_8_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_9,sn_vil_graph_9_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_10,sn_vil_graph_10_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_11,sn_vil_graph_11_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_12,sn_vil_graph_12_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_13,sn_vil_graph_13_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_14,sn_vil_graph_14_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_15,sn_vil_graph_15_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_16,sn_vil_graph_16_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_17,sn_vil_graph_17_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_18,sn_vil_graph_18_dg_2))$weight),
+                             na.rm = TRUE)
+
+
+  
+  perm_null_weights_3[i] <- median(c(E(intersection(strain_rate_vil_graph_scram_1,sn_vil_graph_1_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_2,sn_vil_graph_2_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_3,sn_vil_graph_3_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_4,sn_vil_graph_4_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_5,sn_vil_graph_5_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_6,sn_vil_graph_6_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_7,sn_vil_graph_7_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_8,sn_vil_graph_8_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_9,sn_vil_graph_9_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_10,sn_vil_graph_10_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_11,sn_vil_graph_11_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_12,sn_vil_graph_12_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_13,sn_vil_graph_13_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_14,sn_vil_graph_14_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_15,sn_vil_graph_15_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_16,sn_vil_graph_16_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_17,sn_vil_graph_17_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_18,sn_vil_graph_18_dg_3))$weight),
+                             na.rm = TRUE)
+  
+
+  
+  perm_null_weights_4[i] <- median(c(E(intersection(strain_rate_vil_graph_scram_1,sn_vil_graph_1_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_2,sn_vil_graph_2_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_3,sn_vil_graph_3_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_4,sn_vil_graph_4_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_5,sn_vil_graph_5_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_6,sn_vil_graph_6_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_7,sn_vil_graph_7_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_8,sn_vil_graph_8_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_9,sn_vil_graph_9_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_10,sn_vil_graph_10_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_11,sn_vil_graph_11_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_12,sn_vil_graph_12_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_13,sn_vil_graph_13_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_14,sn_vil_graph_14_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_15,sn_vil_graph_15_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_16,sn_vil_graph_16_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_17,sn_vil_graph_17_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_18,sn_vil_graph_18_dg_4))$weight),
+                             na.rm = TRUE)
+  
+
+  #Check progress
+  if(i%%100 == 0){
+    print(i)
+  }
+
+}
+
+sum(perm_null_weights_1 >= observed_weights_1)/1000
+sum(perm_null_weights_2 >= observed_weights_2)/1000
+sum(perm_null_weights_3 >= observed_weights_3)/1000
+sum(perm_null_weights_4 >= observed_weights_4)/1000
+
+deg_df <- data.frame(Model = rep(c("Strain Network", "Null Network"), each = 4),
+                     Degree = c(1,2,3,4, 1,2,3,4),
+                     Precision = c(observed_weights_1, observed_weights_2, observed_weights_3, observed_weights_4,
+                                   mean(perm_null_weights_1), mean(perm_null_weights_2), mean(perm_null_weights_3), mean(perm_null_weights_4)),
+                     SD = c(0,0,0,0,sd(perm_null_weights_1), sd(perm_null_weights_2), sd(perm_null_weights_3), sd(perm_null_weights_4)))
+
+
+#Damn doesn't change, wrird the 4th degree has gone down more, I noow have mroe 4th degree from the bigger networks
+
+deg_df$Model[deg_df$Model == "Strain Network"] <- "Strain-Sharing Network"
+#deg_df$Model[deg_df$Model == "Strain Network"] <- "Species-Sharing Network"
+deg_df$Model <- factor(deg_df$Model)
+deg_df$Model <- factor(deg_df$Model, levels = rev(levels(deg_df$Model)))
+
+ssr_by_degree_plot <- ggplot(deg_df, aes(x=Degree, y=Precision, group=Model, color = Model)) +
+  geom_line(aes(color=Model, linetype = Model))+
+  geom_pointrange(aes(ymin=Precision-SD, ymax=Precision+SD))+
+  scale_linetype_manual(values=c("solid", "dashed")) + 
+  scale_color_manual(values = c("#2E9FDF", "#FC4E07"))+
+  #ggtitle("Average Strain-Sharing Rate By Geodesic Distance") +
+  ylab("Median Strain-Sharing Rate (%)") + 
+  xlab("Geodesic Distance") +
+  theme_pubr() +
+  theme(legend.position = c(0.75, 0.75),
+        plot.title = element_text(hjust = .5),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12)) + 
+  labs_pubr()
+
+#Damn it's true
+SN %>% distinct(pair_key, .keep_all = TRUE) %>% pull(strain_sharing_rate) %>% median(na.rm= TRUE)
+ssr_by_degree_plot
+```
+
+Check if similarity goes down in large networks
+```{r}
+sim_deg_df <- data.frame(village = village_names,
+           num_first_deg_cons = c(length(E(sn_vil_graph_1)),
+                                  length(E(sn_vil_graph_2)),
+                                  length(E(sn_vil_graph_3)),
+                                  length(E(sn_vil_graph_4)),
+                                  length(E(sn_vil_graph_5)),
+                                  length(E(sn_vil_graph_6)),
+                                  length(E(sn_vil_graph_7)),
+                                  length(E(sn_vil_graph_8)),
+                                  length(E(sn_vil_graph_9)),
+                                  length(E(sn_vil_graph_10)),
+                                  length(E(sn_vil_graph_11)),
+                                  length(E(sn_vil_graph_12)),
+                                  length(E(sn_vil_graph_13)),
+                                  length(E(sn_vil_graph_14)),
+                                  length(E(sn_vil_graph_15)),
+                                  length(E(sn_vil_graph_16)),
+                                  length(E(sn_vil_graph_17)),
+                                  length(E(sn_vil_graph_18))),
+           num_second_deg_cons = c(length(E(sn_vil_graph_1_dg_2)),
+                                  length(E(sn_vil_graph_2_dg_2)),
+                                  length(E(sn_vil_graph_3_dg_2)),
+                                  length(E(sn_vil_graph_4_dg_2)),
+                                  length(E(sn_vil_graph_5_dg_2)),
+                                  length(E(sn_vil_graph_6_dg_2)),
+                                  length(E(sn_vil_graph_7_dg_2)),
+                                  length(E(sn_vil_graph_8_dg_2)),
+                                  length(E(sn_vil_graph_9_dg_2)),
+                                  length(E(sn_vil_graph_10_dg_2)),
+                                  length(E(sn_vil_graph_11_dg_2)),
+                                  length(E(sn_vil_graph_12_dg_2)),
+                                  length(E(sn_vil_graph_13_dg_2)),
+                                  length(E(sn_vil_graph_14_dg_2)),
+                                  length(E(sn_vil_graph_15_dg_2)),
+                                  length(E(sn_vil_graph_16_dg_2)),
+                                  length(E(sn_vil_graph_17_dg_2)),
+                                  length(E(sn_vil_graph_18_dg_2))),
+           num_third_deg_cons = c(length(E(sn_vil_graph_1_dg_3)),
+                                  length(E(sn_vil_graph_2_dg_3)),
+                                  length(E(sn_vil_graph_3_dg_3)),
+                                  length(E(sn_vil_graph_4_dg_3)),
+                                  length(E(sn_vil_graph_5_dg_3)),
+                                  length(E(sn_vil_graph_6_dg_3)),
+                                  length(E(sn_vil_graph_7_dg_3)),
+                                  length(E(sn_vil_graph_8_dg_3)),
+                                  length(E(sn_vil_graph_9_dg_3)),
+                                  length(E(sn_vil_graph_10_dg_3)),
+                                  length(E(sn_vil_graph_11_dg_3)),
+                                  length(E(sn_vil_graph_12_dg_3)),
+                                  length(E(sn_vil_graph_13_dg_3)),
+                                  length(E(sn_vil_graph_14_dg_3)),
+                                  length(E(sn_vil_graph_15_dg_3)),
+                                  length(E(sn_vil_graph_16_dg_3)),
+                                  length(E(sn_vil_graph_17_dg_3)),
+                                  length(E(sn_vil_graph_18_dg_3))),
+           num_fourth_deg_cons = c(length(E(sn_vil_graph_1_dg_4)),
+                                  length(E(sn_vil_graph_2_dg_4)),
+                                  length(E(sn_vil_graph_3_dg_4)),
+                                  length(E(sn_vil_graph_4_dg_4)),
+                                  length(E(sn_vil_graph_5_dg_4)),
+                                  length(E(sn_vil_graph_6_dg_4)),
+                                  length(E(sn_vil_graph_7_dg_4)),
+                                  length(E(sn_vil_graph_8_dg_4)),
+                                  length(E(sn_vil_graph_9_dg_4)),
+                                  length(E(sn_vil_graph_10_dg_4)),
+                                  length(E(sn_vil_graph_11_dg_4)),
+                                  length(E(sn_vil_graph_12_dg_4)),
+                                  length(E(sn_vil_graph_13_dg_4)),
+                                  length(E(sn_vil_graph_14_dg_4)),
+                                  length(E(sn_vil_graph_15_dg_4)),
+                                  length(E(sn_vil_graph_16_dg_4)),
+                                  length(E(sn_vil_graph_17_dg_4)),
+                                  length(E(sn_vil_graph_18_dg_4)))
+           )
+
+
+
+
+
+for(i in 1:length(village_names)){
+  vil_ids <- get(paste0("village_ids_",i))
+  vil_strain <- strain_rate[rownames(strain_rate) %in% vil_ids,
+                            colnames(strain_rate) %in% vil_ids]
+  vil_strain[lower.tri(vil_strain,diag = TRUE)] <- NA
+  vil_bray <- species_bray[rownames(species_bray) %in% vil_ids,
+                            colnames(species_bray) %in% vil_ids]
+  vil_bray[lower.tri(vil_bray,diag = TRUE)] <- NA
+  vil_jaccard <- species_jaccard_sim[rownames(species_jaccard_sim) %in% vil_ids,
+                            colnames(species_jaccard_sim) %in% vil_ids]
+  vil_jaccard[lower.tri(vil_jaccard,diag = TRUE)] <- NA
+  sim_deg_df$avg_ssr_all[i] <- median(vil_strain, na.rm = TRUE)
+  sim_deg_df$avg_bray_all[i] <- median(vil_bray, na.rm = TRUE)
+  sim_deg_df$avg_jaccard_all[i] <- median(vil_jaccard, na.rm = TRUE)
+}
+
+
+sim_deg_df$four_to_one_ratio <- sim_deg_df$num_fourth_deg_cons/sim_deg_df$num_first_deg_cons
+
+sim_deg_df$three_to_one_ratio <- sim_deg_df$num_third_deg_cons/sim_deg_df$num_first_deg_cons
+
+sim_deg_df$two_to_one_ratio <- sim_deg_df$num_second_deg_cons/sim_deg_df$num_first_deg_cons
+
+
+ssr_4_1 <- ggplot(sim_deg_df, aes(x = four_to_one_ratio, avg_ssr_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal()+
+  ylab("Village Median Strain-Sharing Rate") +
+  xlab("Ratio of 4th to 1st Degree Connection")
+
+ssr_3_1 <- ggplot(sim_deg_df, aes(x = three_to_one_ratio, avg_ssr_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal()+
+  ylab("Village Median Strain-Sharing Rate") +
+  xlab("Ratio of 3rd to 1st Degree Connection")
+
+ssr_2_1 <- ggplot(sim_deg_df, aes(x = two_to_one_ratio, avg_ssr_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal() +
+  ylab("Village Median Strain-Sharing Rate") +
+  xlab("Ratio of 2nd to 1st Degree Connection")
+
+
+
+
+bray_4_1 <- ggplot(sim_deg_df, aes(x = four_to_one_ratio, avg_bray_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal()+
+  ylab("Village Median Bray-Curtis Similarity") +
+  xlab("Ratio of 4th to 1st Degree Connection")
+
+bray_3_1 <- ggplot(sim_deg_df, aes(x = three_to_one_ratio, avg_bray_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal()+
+  ylab("Village Median Bray-Curtis Similarity") +
+  xlab("Ratio of 3rd to 1st Degree Connection")
+
+bray_2_1 <- ggplot(sim_deg_df, aes(x = two_to_one_ratio, avg_bray_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal() +
+  ylab("Village Median Bray-Curtis Similarity") +
+  xlab("Ratio of 2nd to 1st Degree Connection")
+
+
+
+jaccard_4_1 <- ggplot(sim_deg_df, aes(x = four_to_one_ratio, avg_jaccard_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal()+
+  ylab("Village Median Jaccard Index") +
+  xlab("Ratio of 4th to 1st Degree Connection")
+
+jaccard_3_1 <- ggplot(sim_deg_df, aes(x = three_to_one_ratio, avg_jaccard_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal()+
+  ylab("Village Median Jaccard Index") +
+  xlab("Ratio of 3rd to 1st Degree Connection")
+
+jaccard_2_1 <- ggplot(sim_deg_df, aes(x = two_to_one_ratio, avg_jaccard_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal() +
+  ylab("Village Median Jaccard Index") +
+  xlab("Ratio of 2nd to 1st Degree Connection")
+
+
+
+```
+
+
+```{r}
+
+sfig11 <- ggarrange(ggarrange(ssr_4_1, ssr_3_1, ssr_2_1, nrow = 1, labels = c("A", "B", "C")),
+                    ggarrange(bray_4_1, bray_3_1, bray_2_1, nrow = 1, labels = c("D", "E", "F")),
+                    ggarrange(jaccard_4_1, jaccard_3_1, jaccard_2_1, nrow = 1, labels = c("G", "H", "I")),
+                    nrow = 3
+                    )
+
+sfig11 <- ggarrange(ssr_4_1, bray_4_1, jaccard_4_1, nrow = 1, labels = c("A", "B", "C"))
+
+svglite("../FiguresNew/SFigure11/sfigure11_full.svg")
+sfig11
+dev.off()
+
+```
+
+
+
+
+
+
+
+
+```{r}
+sim_deg_df <- data.frame(village = village_names,
+           average_first_deg_sim = c(sum(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1))$weight)/length(E(sn_vil_graph_1)),
+                                     sum(E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2))$weight)/length(E(sn_vil_graph_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3))$weight)/length(E(sn_vil_graph_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4))$weight)/length(E(sn_vil_graph_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5))$weight)/length(E(sn_vil_graph_5)),
+                                     sum(E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6))$weight)/length(E(sn_vil_graph_6)),
+                                     sum(E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7))$weight)/length(E(sn_vil_graph_7)),
+                                     sum(E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8))$weight)/length(E(sn_vil_graph_8)),
+                                     sum(E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9))$weight)/length(E(sn_vil_graph_9))),
+           num_first_deg_cons = c(length(E(sn_vil_graph_1)),
+                                  length(E(sn_vil_graph_2)),
+                                  length(E(sn_vil_graph_3)),
+                                  length(E(sn_vil_graph_4)),
+                                  length(E(sn_vil_graph_5)),
+                                  length(E(sn_vil_graph_6)),
+                                  length(E(sn_vil_graph_7)),
+                                  length(E(sn_vil_graph_8)),
+                                  length(E(sn_vil_graph_9))),
+           average_second_deg_sim = c(sum(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_2))$weight)/length(E(sn_vil_graph_1_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_2))$weight)/length(E(sn_vil_graph_2_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_2))$weight)/length(E(sn_vil_graph_3_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_2))$weight)/length(E(sn_vil_graph_4_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_2))$weight)/length(E(sn_vil_graph_5_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_2))$weight)/length(E(sn_vil_graph_6_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_2))$weight)/length(E(sn_vil_graph_7_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_2))$weight)/length(E(sn_vil_graph_8_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_2))$weight)/length(E(sn_vil_graph_9_dg_2))),
+           num_second_deg_cons = c(length(E(sn_vil_graph_1_dg_2)),
+                                  length(E(sn_vil_graph_2_dg_2)),
+                                  length(E(sn_vil_graph_3_dg_2)),
+                                  length(E(sn_vil_graph_4_dg_2)),
+                                  length(E(sn_vil_graph_5_dg_2)),
+                                  length(E(sn_vil_graph_6_dg_2)),
+                                  length(E(sn_vil_graph_7_dg_2)),
+                                  length(E(sn_vil_graph_8_dg_2)),
+                                  length(E(sn_vil_graph_9_dg_2))),
+           average_third_deg_sim = c(sum(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_3))$weight)/length(E(sn_vil_graph_1_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_3))$weight)/length(E(sn_vil_graph_2_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_3))$weight)/length(E(sn_vil_graph_3_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_3))$weight)/length(E(sn_vil_graph_4_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_3))$weight)/length(E(sn_vil_graph_5_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_3))$weight)/length(E(sn_vil_graph_6_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_3))$weight)/length(E(sn_vil_graph_7_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_3))$weight)/length(E(sn_vil_graph_8_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_3))$weight)/length(E(sn_vil_graph_9_dg_3))),
+           num_third_deg_cons = c(length(E(sn_vil_graph_1_dg_3)),
+                                  length(E(sn_vil_graph_2_dg_3)),
+                                  length(E(sn_vil_graph_3_dg_3)),
+                                  length(E(sn_vil_graph_4_dg_3)),
+                                  length(E(sn_vil_graph_5_dg_3)),
+                                  length(E(sn_vil_graph_6_dg_3)),
+                                  length(E(sn_vil_graph_7_dg_3)),
+                                  length(E(sn_vil_graph_8_dg_3)),
+                                  length(E(sn_vil_graph_9_dg_3))),
+           average_fourth_deg_sim = c(sum(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_4))$weight)/length(E(sn_vil_graph_1_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_4))$weight)/length(E(sn_vil_graph_2_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_4))$weight)/length(E(sn_vil_graph_3_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_4))$weight)/length(E(sn_vil_graph_4_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_4))$weight)/length(E(sn_vil_graph_5_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_4))$weight)/length(E(sn_vil_graph_6_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_4))$weight)/length(E(sn_vil_graph_7_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_4))$weight)/length(E(sn_vil_graph_8_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_4))$weight)/length(E(sn_vil_graph_9_dg_4))),
+           num_fourth_deg_cons = c(length(E(sn_vil_graph_1_dg_4)),
+                                  length(E(sn_vil_graph_2_dg_4)),
+                                  length(E(sn_vil_graph_3_dg_4)),
+                                  length(E(sn_vil_graph_4_dg_4)),
+                                  length(E(sn_vil_graph_5_dg_4)),
+                                  length(E(sn_vil_graph_6_dg_4)),
+                                  length(E(sn_vil_graph_7_dg_4)),
+                                  length(E(sn_vil_graph_8_dg_4)),
+                                  length(E(sn_vil_graph_9_dg_4)))
+           )
+
+
+
+
+
+for(i in 1:length(village_names)){
+  vil_ids <- get(paste0("village_ids_",i))
+  vil_strain <- strain_rate[rownames(strain_rate) %in% vil_ids,
+                            colnames(strain_rate) %in% vil_ids]
+  vil_strain[lower.tri(vil_strain,diag = TRUE)] <- NA
+  sim_deg_df$avg_sim_all[i] <- mean(vil_strain, na.rm = TRUE)
+}
+
+ggplot(sim_deg_df, aes(x = num_first_deg_cons, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth")
+
+ggplot(sim_deg_df, aes(x = num_second_deg_cons, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth")
+
+ggplot(sim_deg_df, aes(x = num_third_deg_cons, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth")
+
+ggplot(sim_deg_df, aes(x = num_fourth_deg_cons, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth")
+
+summary(lm(avg_sim_all ~ num_first_deg_cons, data = sim_deg_df))
+summary(lm(avg_sim_all ~ num_second_deg_cons, data = sim_deg_df))
+summary(lm(avg_sim_all ~ num_third_deg_cons, data = sim_deg_df))
+summary(lm(avg_sim_all ~ num_fourth_deg_cons, data = sim_deg_df))
+
+
+sim_deg_df$four_to_one_ratio <- sim_deg_df$num_fourth_deg_cons/sim_deg_df$num_first_deg_cons
+
+sim_deg_df$three_to_one_ratio <- sim_deg_df$num_third_deg_cons/sim_deg_df$num_first_deg_cons
+
+sim_deg_df$two_to_one_ratio <- sim_deg_df$num_second_deg_cons/sim_deg_df$num_first_deg_cons
+
+names(sim_deg_df)
+sim_deg_df %>%
+  dplyr::select(-c(average_first_deg_sim, average_second_deg_sim, average_third_deg_sim, average_fourth_deg_sim)) %>%
+  arrange(avg_sim_all)
+
+ggplot(sim_deg_df, aes(x = four_to_one_ratio, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal()+
+  ylab("Village Average Strain-Sharing Rate") +
+  xlab("Ratio of 4th to 1st Degree Connection")
+
+ggplot(sim_deg_df, aes(x = three_to_one_ratio, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal()+
+  ylab("Village Average Strain-Sharing Rate") +
+  xlab("Ratio of 3rd to 1st Degree Connection")
+
+ggplot(sim_deg_df, aes(x = two_to_one_ratio, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal() +
+  ylab("Village Average Strain-Sharing Rate") +
+  xlab("Ratio of 2nd to 1st Degree Connection")
+
+```
+
+
+
+
+OLD Strain-Sharing by Degree
+```{r}
+#Get connected graphs for each village
+i <- 1
+for(i in 1:length(village_names)){
+  #Create second degree
+  assign(paste0("sn_vil_graph_all_", i,"_dg_2"),
+         difference(connect(get(paste0("sn_vil_graph_all_",i)),2), get(paste0("sn_vil_graph_all_",i))))
+  
+  assign(paste0("sn_vil_graph_scram_all_", i,"_dg_2"), get(paste0("sn_vil_graph_all_", i,"_dg_2")))
+  
+  #Create third degree
+  assign(paste0("sn_vil_graph_all_", i,"_dg_3"),
+         difference(connect(get(paste0("sn_vil_graph_all_",i)),3), connect(get(paste0("sn_vil_graph_all_",i)),2)))
+  
+  assign(paste0("sn_vil_graph_scram_all_", i,"_dg_3"), get(paste0("sn_vil_graph_all_", i,"_dg_3")))
+  
+  #Create fourth degree
+  assign(paste0("sn_vil_graph_all_", i,"_dg_4"),
+         difference(connect(get(paste0("sn_vil_graph_all_",i)),4), connect(get(paste0("sn_vil_graph_all_",i)),3)))
+  
+  assign(paste0("sn_vil_graph_scram_all_", i,"_dg_4"), get(paste0("sn_vil_graph_all_", i,"_dg_4")))
+  
+  #Filter just to nodes in our strain sharing set
+  assign(paste0("sn_vil_graph_scram_all_", i,"_dg_2"),
+         get(paste0("sn_vil_graph_all_", i,"_dg_2")))
+  
+  assign(paste0("sn_vil_graph_scram_all_", i,"_dg_2"),
+         subgraph(get(paste0("sn_vil_graph_all_", i,"_dg_2")),
+                V(get(paste0("sn_vil_graph_", i)))))
+  
+}
+V(sn_vil_graph_all_1)$name
+
+delete_vertices(sn_vil_graph_all_1,
+                V(sn_vil_graph_all_1)$name[!V(sn_vil_graph_all_1)$name %in% V(sn_vil_graph_1)$name])
+
+V(get(paste0("sn_vil_graph_", i)))$name
+
+#Strain Sharing Rate Test
+perm_null_weights_1 <- rep(NA, 1000)
+perm_null_weights_2 <- rep(NA, 1000)
+perm_null_weights_3 <- rep(NA, 1000)
+perm_null_weights_4 <- rep(NA, 1000)
+
+
+observed_weights_1 <- sum(c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1))$weight,
+                        E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2))$weight,
+                        E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3))$weight,
+                        E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4))$weight,
+                        E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5))$weight,
+                        E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6))$weight,
+                        E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7))$weight,
+                        E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8))$weight,
+                        E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9))$weight))/
+  (length(E(sn_vil_graph_1)) + length(E(sn_vil_graph_2)) + length(E(sn_vil_graph_3)) + length(E(sn_vil_graph_4)) + length(E(sn_vil_graph_5)) + length(E(sn_vil_graph_6)) + length(E(sn_vil_graph_7)) + length(E(sn_vil_graph_8)) + length(E(sn_vil_graph_9)))
+
+observed_weights_2 <- sum(c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_2))$weight))/
+  (length(E(sn_vil_graph_1_dg_2)) + length(E(sn_vil_graph_2_dg_2)) + length(E(sn_vil_graph_3_dg_2)) + length(E(sn_vil_graph_4_dg_2)) + length(E(sn_vil_graph_5_dg_2)) + length(E(sn_vil_graph_6_dg_2)) + length(E(sn_vil_graph_7_dg_2)) + length(E(sn_vil_graph_8_dg_2)) + length(E(sn_vil_graph_9_dg_2)))
+
+observed_weights_3 <- sum(c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_3))$weight))/
+  (length(E(sn_vil_graph_1_dg_3)) + length(E(sn_vil_graph_2_dg_3)) + length(E(sn_vil_graph_3_dg_3)) + length(E(sn_vil_graph_4_dg_3)) + length(E(sn_vil_graph_5_dg_3)) + length(E(sn_vil_graph_6_dg_3)) + length(E(sn_vil_graph_7_dg_3)) + length(E(sn_vil_graph_8_dg_3)) + length(E(sn_vil_graph_9_dg_3)))
+
+observed_weights_4 <- sum(c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_4))$weight))/
+  (length(E(sn_vil_graph_1_dg_4)) + length(E(sn_vil_graph_2_dg_4)) + length(E(sn_vil_graph_3_dg_4)) + length(E(sn_vil_graph_4_dg_4)) + length(E(sn_vil_graph_5_dg_4)) + length(E(sn_vil_graph_6_dg_4)) + length(E(sn_vil_graph_7_dg_4)) + length(E(sn_vil_graph_8_dg_4)) + length(E(sn_vil_graph_9_dg_4)))
+
+
+for(i in 1:1000){
+  strain_rate_vil_graph_scram_1 <- set.vertex.attribute(strain_rate_vil_graph_scram_1, "name",
+                                       value = sample(vertex_attr(strain_rate_vil_graph_scram_1, "name")))
+  strain_rate_vil_graph_scram_2 <- set.vertex.attribute(strain_rate_vil_graph_scram_2, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_2, "name")))
+  strain_rate_vil_graph_scram_3 <- set.vertex.attribute(strain_rate_vil_graph_scram_3, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_3, "name")))
+  strain_rate_vil_graph_scram_4 <- set.vertex.attribute(strain_rate_vil_graph_scram_4, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_4, "name")))
+  strain_rate_vil_graph_scram_5 <- set.vertex.attribute(strain_rate_vil_graph_scram_5, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_5, "name")))
+  strain_rate_vil_graph_scram_6 <- set.vertex.attribute(strain_rate_vil_graph_scram_6, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_6, "name")))
+  strain_rate_vil_graph_scram_7 <- set.vertex.attribute(strain_rate_vil_graph_scram_7, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_7, "name")))
+  strain_rate_vil_graph_scram_8 <- set.vertex.attribute(strain_rate_vil_graph_scram_8, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_8, "name")))
+  strain_rate_vil_graph_scram_9 <- set.vertex.attribute(strain_rate_vil_graph_scram_9, "name",
+                                                  value = sample(vertex_attr(strain_rate_vil_graph_scram_9, "name")))
+  
+  perm_null_weights_1[i] <- sum(c(E(intersection(strain_rate_vil_graph_scram_1,sn_vil_graph_1))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_2,sn_vil_graph_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_3,sn_vil_graph_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_4,sn_vil_graph_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_5,sn_vil_graph_5))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_6,sn_vil_graph_6))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_7,sn_vil_graph_7))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_8,sn_vil_graph_8))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_9,sn_vil_graph_9))$weight))/
+  (length(E(sn_vil_graph_1)) + length(E(sn_vil_graph_2)) + length(E(sn_vil_graph_3)) + length(E(sn_vil_graph_4)) + length(E(sn_vil_graph_5)) + length(E(sn_vil_graph_6)) + length(E(sn_vil_graph_7)) + length(E(sn_vil_graph_8)) + length(E(sn_vil_graph_9)))
+  
+  perm_null_weights_2[i] <- sum(c(E(intersection(strain_rate_vil_graph_scram_1,sn_vil_graph_1_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_2,sn_vil_graph_2_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_3,sn_vil_graph_3_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_4,sn_vil_graph_4_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_5,sn_vil_graph_5_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_6,sn_vil_graph_6_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_7,sn_vil_graph_7_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_8,sn_vil_graph_8_dg_2))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_9,sn_vil_graph_9_dg_2))$weight))/
+  (length(E(sn_vil_graph_1_dg_2)) + length(E(sn_vil_graph_2_dg_2)) + length(E(sn_vil_graph_3_dg_2)) + length(E(sn_vil_graph_4_dg_2)) + length(E(sn_vil_graph_5_dg_2)) + length(E(sn_vil_graph_6_dg_2)) + length(E(sn_vil_graph_7_dg_2)) + length(E(sn_vil_graph_8_dg_2)) + length(E(sn_vil_graph_9_dg_2)))
+  
+  perm_null_weights_3[i] <- sum(c(E(intersection(strain_rate_vil_graph_scram_1,sn_vil_graph_1_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_2,sn_vil_graph_2_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_3,sn_vil_graph_3_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_4,sn_vil_graph_4_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_5,sn_vil_graph_5_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_6,sn_vil_graph_6_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_7,sn_vil_graph_7_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_8,sn_vil_graph_8_dg_3))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_9,sn_vil_graph_9_dg_3))$weight))/
+  (length(E(sn_vil_graph_1_dg_3)) + length(E(sn_vil_graph_2_dg_3)) + length(E(sn_vil_graph_3_dg_3)) + length(E(sn_vil_graph_4_dg_3)) + length(E(sn_vil_graph_5_dg_3)) + length(E(sn_vil_graph_6_dg_3)) + length(E(sn_vil_graph_7_dg_3)) + length(E(sn_vil_graph_8_dg_3)) + length(E(sn_vil_graph_9_dg_3)))
+  
+  perm_null_weights_4[i] <- sum(c(E(intersection(strain_rate_vil_graph_scram_1,sn_vil_graph_1_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_2,sn_vil_graph_2_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_3,sn_vil_graph_3_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_4,sn_vil_graph_4_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_5,sn_vil_graph_5_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_6,sn_vil_graph_6_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_7,sn_vil_graph_7_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_8,sn_vil_graph_8_dg_4))$weight,
+                      E(intersection(strain_rate_vil_graph_scram_9,sn_vil_graph_9_dg_4))$weight))/
+  (length(E(sn_vil_graph_1_dg_4)) + length(E(sn_vil_graph_2_dg_4)) + length(E(sn_vil_graph_3_dg_4)) + length(E(sn_vil_graph_4_dg_4)) + length(E(sn_vil_graph_5_dg_4)) + length(E(sn_vil_graph_6_dg_4)) + length(E(sn_vil_graph_7_dg_4)) + length(E(sn_vil_graph_8_dg_4)) + length(E(sn_vil_graph_9_dg_4)))
+  #Check progress
+  if(i%%100 == 0){
+    print(i)
+  }
+
+}
+
+sum(perm_null_weights_1 >= observed_weights_1)/1000
+sum(perm_null_weights_2 >= observed_weights_2)/1000
+sum(perm_null_weights_3 >= observed_weights_3)/1000
+sum(perm_null_weights_4 >= observed_weights_4)/1000
+
+deg_df <- data.frame(Model = rep(c("Strain Network", "Null Network"), each = 4),
+                     Degree = c(1,2,3,4, 1,2,3,4),
+                     Precision = c(observed_weights_1, observed_weights_2, observed_weights_3, observed_weights_4,
+                                   mean(perm_null_weights_1), mean(perm_null_weights_2), mean(perm_null_weights_3), mean(perm_null_weights_4)),
+                     SD = c(0,0,0,0,sd(perm_null_weights_1), sd(perm_null_weights_2), sd(perm_null_weights_3), sd(perm_null_weights_4)))
+
+
+
+
+deg_df$Model[deg_df$Model == "Strain Network"] <- "Strain-Sharing Network"
+deg_df$Model[deg_df$Model == "Strain Network"] <- "Species-Sharing Network"
+deg_df$Model <- factor(deg_df$Model)
+deg_df$Model <- factor(deg_df$Model, levels = rev(levels(deg_df$Model)))
+
+ssr_by_degree_plot <- ggplot(deg_df, aes(x=Degree, y=Precision, group=Model, color = Model)) +
+  geom_line(aes(color=Model, linetype = Model))+
+  geom_pointrange(aes(ymin=Precision-SD, ymax=Precision+SD))+
+  scale_linetype_manual(values=c("solid", "dashed")) + 
+  scale_color_manual(values = c("#2E9FDF", "#FC4E07"))+
+  ggtitle("Average Strain-Sharing Rate By Geodesic Distance") +
+  ylab("Average Strain-Sharing Rate") + 
+  xlab("Geodesic Distance") +
+  theme_minimal() +
+  theme(legend.position = c(0.75, 0.75),
+        plot.title = element_text(hjust = .5),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12))
+
+
+ssr_by_degree_plot
+
+ssr_by_degree_plot <- ggplot(deg_df, aes(x=Degree, y=Precision, group=Model, color = Model)) +
+  geom_line(aes(color=Model, linetype = Model))+
+  geom_pointrange(aes(ymin=Precision-SD, ymax=Precision+SD))+
+  scale_linetype_manual(values=c("solid", "dashed")) + 
+  scale_color_manual(values = c("#2E9FDF", "#FC4E07"))+
+  ggtitle("Average Bray-Curtis Distance By Geodesic Distance") +
+  ylab("Average Bray-Curtis Distance") + 
+  xlab("Geodesic Distance") +
+  theme_minimal() +
+  theme(legend.position = c(0.75, 0.75),
+        plot.title = element_text(hjust = .5),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12)) +
+  coord_cartesian(ylim=c(.65,.72))
+
+ssr_by_degree_plot
+
+
+sim_deg_df <- data.frame(village = village_names,
+           average_first_deg_sim = c(sum(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1))$weight)/length(E(sn_vil_graph_1)),
+                                     sum(E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2))$weight)/length(E(sn_vil_graph_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3))$weight)/length(E(sn_vil_graph_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4))$weight)/length(E(sn_vil_graph_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5))$weight)/length(E(sn_vil_graph_5)),
+                                     sum(E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6))$weight)/length(E(sn_vil_graph_6)),
+                                     sum(E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7))$weight)/length(E(sn_vil_graph_7)),
+                                     sum(E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8))$weight)/length(E(sn_vil_graph_8)),
+                                     sum(E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9))$weight)/length(E(sn_vil_graph_9))),
+           num_first_deg_cons = c(length(E(sn_vil_graph_1)),
+                                  length(E(sn_vil_graph_2)),
+                                  length(E(sn_vil_graph_3)),
+                                  length(E(sn_vil_graph_4)),
+                                  length(E(sn_vil_graph_5)),
+                                  length(E(sn_vil_graph_6)),
+                                  length(E(sn_vil_graph_7)),
+                                  length(E(sn_vil_graph_8)),
+                                  length(E(sn_vil_graph_9))),
+           average_second_deg_sim = c(sum(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_2))$weight)/length(E(sn_vil_graph_1_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_2))$weight)/length(E(sn_vil_graph_2_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_2))$weight)/length(E(sn_vil_graph_3_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_2))$weight)/length(E(sn_vil_graph_4_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_2))$weight)/length(E(sn_vil_graph_5_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_2))$weight)/length(E(sn_vil_graph_6_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_2))$weight)/length(E(sn_vil_graph_7_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_2))$weight)/length(E(sn_vil_graph_8_dg_2)),
+                                     sum(E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_2))$weight)/length(E(sn_vil_graph_9_dg_2))),
+           num_second_deg_cons = c(length(E(sn_vil_graph_1_dg_2)),
+                                  length(E(sn_vil_graph_2_dg_2)),
+                                  length(E(sn_vil_graph_3_dg_2)),
+                                  length(E(sn_vil_graph_4_dg_2)),
+                                  length(E(sn_vil_graph_5_dg_2)),
+                                  length(E(sn_vil_graph_6_dg_2)),
+                                  length(E(sn_vil_graph_7_dg_2)),
+                                  length(E(sn_vil_graph_8_dg_2)),
+                                  length(E(sn_vil_graph_9_dg_2))),
+           average_third_deg_sim = c(sum(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_3))$weight)/length(E(sn_vil_graph_1_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_3))$weight)/length(E(sn_vil_graph_2_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_3))$weight)/length(E(sn_vil_graph_3_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_3))$weight)/length(E(sn_vil_graph_4_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_3))$weight)/length(E(sn_vil_graph_5_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_3))$weight)/length(E(sn_vil_graph_6_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_3))$weight)/length(E(sn_vil_graph_7_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_3))$weight)/length(E(sn_vil_graph_8_dg_3)),
+                                     sum(E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_3))$weight)/length(E(sn_vil_graph_9_dg_3))),
+           num_third_deg_cons = c(length(E(sn_vil_graph_1_dg_3)),
+                                  length(E(sn_vil_graph_2_dg_3)),
+                                  length(E(sn_vil_graph_3_dg_3)),
+                                  length(E(sn_vil_graph_4_dg_3)),
+                                  length(E(sn_vil_graph_5_dg_3)),
+                                  length(E(sn_vil_graph_6_dg_3)),
+                                  length(E(sn_vil_graph_7_dg_3)),
+                                  length(E(sn_vil_graph_8_dg_3)),
+                                  length(E(sn_vil_graph_9_dg_3))),
+           average_fourth_deg_sim = c(sum(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_4))$weight)/length(E(sn_vil_graph_1_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_4))$weight)/length(E(sn_vil_graph_2_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_4))$weight)/length(E(sn_vil_graph_3_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_4))$weight)/length(E(sn_vil_graph_4_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_4))$weight)/length(E(sn_vil_graph_5_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_4))$weight)/length(E(sn_vil_graph_6_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_4))$weight)/length(E(sn_vil_graph_7_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_4))$weight)/length(E(sn_vil_graph_8_dg_4)),
+                                     sum(E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_4))$weight)/length(E(sn_vil_graph_9_dg_4))),
+           num_fourth_deg_cons = c(length(E(sn_vil_graph_1_dg_4)),
+                                  length(E(sn_vil_graph_2_dg_4)),
+                                  length(E(sn_vil_graph_3_dg_4)),
+                                  length(E(sn_vil_graph_4_dg_4)),
+                                  length(E(sn_vil_graph_5_dg_4)),
+                                  length(E(sn_vil_graph_6_dg_4)),
+                                  length(E(sn_vil_graph_7_dg_4)),
+                                  length(E(sn_vil_graph_8_dg_4)),
+                                  length(E(sn_vil_graph_9_dg_4)))
+           )
+
+
+
+
+names(sim_deg_df)
+
+for(i in 1:length(village_names)){
+  vil_ids <- get(paste0("village_ids_",i))
+  vil_strain <- strain_rate[rownames(strain_rate) %in% vil_ids,
+                            colnames(strain_rate) %in% vil_ids]
+  vil_strain[lower.tri(vil_strain,diag = TRUE)] <- NA
+  sim_deg_df$avg_sim_all[i] <- mean(vil_strain, na.rm = TRUE)
+}
+
+ggplot(sim_deg_df, aes(x = num_first_deg_cons, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth")
+
+ggplot(sim_deg_df, aes(x = num_second_deg_cons, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth")
+
+ggplot(sim_deg_df, aes(x = num_third_deg_cons, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth")
+
+ggplot(sim_deg_df, aes(x = num_fourth_deg_cons, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth")
+
+summary(lm(avg_sim_all ~ num_first_deg_cons, data = sim_deg_df))
+summary(lm(avg_sim_all ~ num_second_deg_cons, data = sim_deg_df))
+summary(lm(avg_sim_all ~ num_third_deg_cons, data = sim_deg_df))
+summary(lm(avg_sim_all ~ num_fourth_deg_cons, data = sim_deg_df))
+
+
+sim_deg_df$four_to_one_ratio <- sim_deg_df$num_fourth_deg_cons/sim_deg_df$num_first_deg_cons
+
+sim_deg_df$three_to_one_ratio <- sim_deg_df$num_third_deg_cons/sim_deg_df$num_first_deg_cons
+
+sim_deg_df$two_to_one_ratio <- sim_deg_df$num_second_deg_cons/sim_deg_df$num_first_deg_cons
+
+names(sim_deg_df)
+sim_deg_df %>%
+  dplyr::select(-c(average_first_deg_sim, average_second_deg_sim, average_third_deg_sim, average_fourth_deg_sim)) %>%
+  arrange(avg_sim_all)
+
+ggplot(sim_deg_df, aes(x = four_to_one_ratio, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal()+
+  ylab("Village Average Strain-Sharing Rate") +
+  xlab("Ratio of 4th to 1st Degree Connection")
+
+ggplot(sim_deg_df, aes(x = three_to_one_ratio, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal()+
+  ylab("Village Average Strain-Sharing Rate") +
+  xlab("Ratio of 3rd to 1st Degree Connection")
+
+ggplot(sim_deg_df, aes(x = two_to_one_ratio, avg_sim_all)) +
+  geom_point()+
+  stat_smooth(method = "lm",
+              formula = y ~ x,
+              geom = "smooth") +
+  theme_minimal() +
+  ylab("Village Average Strain-Sharing Rate") +
+  xlab("Ratio of 2nd to 1st Degree Connection")
+
+plot(average_first_deg_sim ~ num_first_deg_cons , data = sim_deg_df)
+plot(average_second_deg_sim ~ num_second_deg_cons , data = sim_deg_df)
+plot(average_third_deg_sim ~ num_third_deg_cons , data = sim_deg_df)
+plot(average_fourth_deg_sim ~ num_fourth_deg_cons , data = sim_deg_df)
+
+cor.test(sim_deg_df)
+
+```
+
+Test if average similarity goes down in big networks.
+```{r}
+
+strain_size_df
+
+#This is wrong. I'm exclusing the zeros
+#Should be the sum ok good catch
+
+#Fuck
+
+sum(c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1))$weight,
+       E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2))$weight,
+       E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3))$weight,
+       E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4))$weight,
+       E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5))$weight,
+       E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6))$weight,
+       E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7))$weight,
+       E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8))$weight,
+       E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9))$weight))/
+  (length(E(sn_vil_graph_1)) + length(E(sn_vil_graph_2)) + length(E(sn_vil_graph_3)) + length(E(sn_vil_graph_4)) + length(E(sn_vil_graph_5)) + length(E(sn_vil_graph_6)) + length(E(sn_vil_graph_7)) + length(E(sn_vil_graph_8)) + length(E(sn_vil_graph_9)))
+
+
+strain_size_df_2 <- data.frame()
+
+
+observed_weights_2 <- mean(c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_2))$weight,
+                             E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_2))$weight))
+
+observed_weights_3 <- mean(c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_3))$weight,
+                             E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_3))$weight))
+
+observed_weights_4 <- mean(c(E(intersection(strain_rate_vil_graph_1,sn_vil_graph_1_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_2,sn_vil_graph_2_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_3,sn_vil_graph_3_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_4,sn_vil_graph_4_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_5,sn_vil_graph_5_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_6,sn_vil_graph_6_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_7,sn_vil_graph_7_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_8,sn_vil_graph_8_dg_4))$weight,
+                             E(intersection(strain_rate_vil_graph_9,sn_vil_graph_9_dg_4))$weight))
+
+
+
+
+
+
+
+
+
+
+for(i in 1:length(village_names)){
+  sn_vil <- SN %>% filter(village_name_w3 == village_names[i])
+  vil_ids <- unique(c(sn_vil$ego, sn_vil$alter))
+  edge_size <- nrow(sn_vil %>% distinct(pair_key))
+  strain_vil <- strain_rate[rownames(strain_rate) %in% vil_ids,
+                            colnames(strain_rate) %in% vil_ids]
+  strain_vil[lower.tri(strain_vil, diag = TRUE)] <- NA
+  if(i == 1){
+    strain_size_df <- data.frame(vil_name = village_names[i],
+                                 num_people = length(vil_ids),
+                                 num_edges = edge_size,
+                                 avg_ssr = (mean(strain_vil, na.rm = TRUE)))
+  }
+  else{
+    strain_size_df <- rbind(strain_size_df, data.frame(vil_name = village_names[i],
+                                 num_people = length(vil_ids),
+                                 num_edges = edge_size,
+                                 avg_ssr = (mean(strain_vil, na.rm = TRUE))))
+  }
+  # print(paste(village_names[i],
+  #             round(mean(strain_vil, na.rm = TRUE),4),
+  #             length(vil_ids)))
+  #mean(strain_vil, na.rm = TRUE)
+  
+  
+}
+
+plot(strain_size_df$num_people, strain_size_df$num_edges)
+cor.test(strain_size_df$avg_ssr, strain_size_df$num_people)
+cor.test(strain_size_df$num_people, strain_size_df$num_edges)
+
+```
+

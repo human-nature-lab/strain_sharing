@@ -1,0 +1,1241 @@
+---
+title: "Analysis"
+output: html_document
+date: "2022-12-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+if (!require("ggplot2")) install.packages("ggplot2")
+library(ggplot2)
+if (!require("lmerTest")) install.packages("lmerTest")
+library(lmerTest)
+if (!require("pROC")) install.packages("pROC")
+library(pROC)
+if (!require("ggpubr")) install.packages("ggpubr")
+library(ggpubr)
+if (!require("svglite")) install.packages("svglite")
+library(svglite)
+
+```
+
+
+
+```{r}
+#Get Summary of shared strains by relationship type
+shared_summary <- SN %>% 
+  distinct(pair_key, relationship, .keep_all = TRUE) %>% #Symmetrize network to avoid reccipricol nominations
+  group_by(relationship) %>%
+  summarise(Proportion_With_Shared_Strains = round(mean(strain_sharing_rate>0,
+                                                        na.rm = TRUE),2),
+            Median_Strain_Sharing_Rate = round(median(strain_sharing_rate,
+                                                        na.rm = TRUE),2),
+            n = n()) %>%
+  arrange(desc(Proportion_With_Shared_Strains))
+
+#Get shared strain rates for unnominated individuals in the same village
+count <- 0
+for(i in 1:length(village_names)){
+  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
+  count <- count + length(village_ids) *(length(village_ids)-1)/2
+}
+
+
+
+for(i in 1:length(village_names)){
+  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
+  strain_rate_vil <- strain_rate[rownames(strain_rate) %in% village_ids ,
+                                 colnames(strain_rate) %in% village_ids]
+  for(j in 1:nrow(SN_Village)){
+    strain_rate_vil[rownames(strain_rate_vil) == SN_Village$ego[j] ,
+                    colnames(strain_rate_vil) == SN_Village$alter[j]] <- NA
+    strain_rate_vil[rownames(strain_rate_vil) == SN_Village$alter[j] ,
+                    colnames(strain_rate_vil) == SN_Village$ego[j]] <- NA
+  }
+  strain_rate_vil[lower.tri(strain_rate_vil, diag = TRUE)] <- NA
+
+  if(i ==1){
+    unrelated_rate <- c(na.omit(unlist(as.list(strain_rate_vil))))
+  }
+  else{
+    unrelated_rate <- c(unrelated_rate,na.omit(unlist(as.list(strain_rate_vil))))
+  }
+
+  
+}
+
+#Get counts across for individuals in different villages
+strain_2_rate <- strain_rate
+
+for(i in 1:length(village_names)){
+  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
+  for(j in 1:(length(village_ids)-1)){
+    for(k in j:length(village_ids)){
+      strain_2_rate[rownames(strain_2_rate) == village_ids[j],
+                    colnames(strain_2_rate) == village_ids[k]] <- NA
+      strain_2_rate[rownames(strain_2_rate) == village_ids[k],
+                    colnames(strain_2_rate) == village_ids[j]] <- NA
+    }
+  }
+}
+
+
+#Make matrix lower triangular and in list form
+strain_2_rate[lower.tri(strain_2_rate, diag = TRUE)] <- NA
+strain_2_rate <- na.omit(unlist(as.list(strain_2_rate)))
+
+#add on unnominated individuals and individuals in different villages to summary
+shared_summary <- shared_summary %>%
+  add_row(
+    relationship = "No Nomination - Same Village",
+    Proportion_With_Shared_Strains = round(mean(unrelated_rate >0,
+                                                na.rm = TRUE), 2),
+    Median_Strain_Sharing_Rate = round(median(unrelated_rate,
+                                                na.rm = TRUE), 2),
+    n = length(unrelated_rate)
+  )
+
+shared_summary <- shared_summary %>%
+  add_row(
+    relationship = "No Nomination - Different Village",
+    Proportion_With_Shared_Strains = round(mean(strain_2_rate > 0,
+                                                na.rm = TRUE), 2),
+    Median_Strain_Sharing_Rate = round(median(strain_2_rate,
+                                                na.rm = TRUE), 2),
+    n = length(strain_2_rate)
+  )
+
+
+#add on row for non-kin in a different house relationships
+#Creat non-kin and different house network for sensitivity analysis
+family_house_pairs <- unique(SN$pair_key[SN$same_building == 1 |
+                                           SN$relationship %in% c("father", "mother", "sibling", "child_over12_other_house")])
+SN_Non_Kin_House <- SN %>% filter(!pair_key %in% family_house_pairs)
+
+
+non_kin_different_house_row <- SN_Non_Kin_House %>% 
+  distinct(pair_key, .keep_all = TRUE) %>% 
+  summarise(relationship = "Non-Kin and Different House",
+            Proportion_With_Shared_Strains = round(mean(strain_sharing_rate>0,
+                                                na.rm = TRUE),2),
+            Median_Strain_Sharing_Rate = round(median(strain_sharing_rate,
+                                                na.rm = TRUE),2),
+            n = n()) %>%
+  arrange(desc(Proportion_With_Shared_Strains))
+
+shared_summary <- shared_summary %>% add_row(non_kin_different_house_row)
+
+#Add on summary row for people living in the same house
+same_house <- SN %>% 
+  distinct(pair_key, .keep_all = TRUE) %>% 
+  filter(same_building == 1) %>%
+  summarise(relationship = "Same Building",
+            Proportion_With_Shared_Strains = round(mean(strain_sharing_rate>0,
+                                                na.rm = TRUE),2),
+            Median_Strain_Sharing_Rate = round(median(strain_sharing_rate,
+                                                na.rm = TRUE),2),
+            n = n()) %>%
+  arrange(desc(Proportion_With_Shared_Strains))
+
+shared_summary <- shared_summary %>% add_row(same_house)
+
+
+names(shared_summary) <- c("Relationship",
+                           "Proportion_With_Shared_Strains",
+                           "Median_Strain_Sharing_Rate",
+                           "Count")
+
+shared_summary <- shared_summary %>% arrange(desc(Median_Strain_Sharing_Rate))
+
+shared_summary
+
+
+```
+
+
+Create graphics of strain sharing rate by relationship
+
+```{r}
+#Get unique dataframes for all relationship types
+SN_DF_simple <- SN %>% 
+  distinct(pair_key,relationship,.keep_all = TRUE) %>% 
+  dplyr::select(relationship, strain_sharing_rate)
+
+SN_Non_Kin_House_simple <- SN_Non_Kin_House %>% 
+  distinct(pair_key,.keep_all = TRUE) %>% 
+  dplyr::select(relationship, strain_sharing_rate)
+
+SN_Non_Kin_House_simple$relationship <- "Non-Kin and Different House"
+
+SN_Same_Building_simple <- SN %>%
+  filter(same_building == 1) %>%
+  distinct(pair_key,.keep_all = TRUE) %>% 
+  dplyr::select(relationship, strain_sharing_rate)
+
+SN_Same_Building_simple$relationship <- "Same Building"
+
+same_vil_unrelated <- data.frame(relationship = rep("No Nomination - Same Village", length(unrelated_rate)),
+                                 strain_sharing_rate = unrelated_rate)
+
+dif_vil_unrelated <- data.frame(relationship = rep("No Nomination - Different Village", length(strain_2_rate)),
+                                strain_sharing_rate = strain_2_rate)
+
+#Combine into dataframe with all relationship types relationships
+
+
+SN_All_Relationship_DF <- rbind(SN_DF_simple,SN_Non_Kin_House_simple,SN_Same_Building_simple, same_vil_unrelated, dif_vil_unrelated)
+
+
+#Make relationship factor variable for plotting
+SN_All_Relationship_DF$relationship <- reorder(as.factor(SN_All_Relationship_DF$relationship),
+                                               -SN_All_Relationship_DF$strain_sharing_rate,
+                                               FUN = median, na.rm=TRUE)
+
+
+#Change names for plotting
+#Make sure this is correct still
+levels(SN_All_Relationship_DF$relationship) <- c("Partner",
+                                                 "Same Building",
+                                                 "Mother",
+                                                 "Child",
+                                                 "Father",
+                                                 "Free Time",
+                                                 "Personal/\nPrivate",
+                                                 "Sibling",
+                                                 "Non-Kin\nDif-House",
+                                                 "Close Friend",
+                                                 "No-Nom\nSame-Vil",
+                                                 "No-Nom\nDif-Vil")
+
+
+#Get means by group or strain sharing rate
+median_rels_ssr <- aggregate(strain_sharing_rate ~  relationship, SN_All_Relationship_DF, median, na.rm=TRUE)
+
+#Get test statistics
+kruskal.test(strain_sharing_rate ~  relationship, data = SN_All_Relationship_DF)
+nrow(SN_All_Relationship_DF)
+
+rels_pvals <- compare_means(strain_sharing_rate ~ relationship,
+                   data = SN_All_Relationship_DF,
+                   method = "wilcox.test",
+                   p.adjust.method = "BH")
+
+rels_pvals <- rels_pvals %>% filter(p.signif == "ns") %>%
+  mutate(y.position = c(40,37.5,35,32.5))
+
+
+
+```
+
+
+```{r}
+
+
+relationships_all_plot <- ggboxplot(
+  SN_All_Relationship_DF,
+  y = "strain_sharing_rate",
+  x = "relationship",
+  color = "relationship",
+  outlier.shape = NA,
+  show.legend = FALSE
+) + 
+  xlab("Relationship") +
+  ylab("Strain-Sharing Rate (%)") +
+  theme_pubr() +
+  labs_pubr() +
+  coord_cartesian(ylim = c(0, 45)) +
+  theme(
+    axis.text.x = element_text(
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  stat_pvalue_manual(rels_pvals, label = "p.signif", tip.length = 0)   +
+  geom_text(data = median_rels_ssr,
+            aes(label = paste0(sprintf(
+              "%0.1f", round(strain_sharing_rate, digits = 2)
+            ),"%"),
+            y = 46,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_All_Relationship_DF$relationship),
+    "\n(N=",
+    table(SN_All_Relationship_DF$relationship),
+    ")"
+  ))+
+  font("ylab", face = "bold", size = 12)
+
+
+```
+
+
+
+Free Time and meals
+
+```{r}
+#Create dictionary with frequency mappings
+Free_Time_Numeric_Dict <- c(
+  "Every day"=4,
+  "A few days a week"=3,
+  "A few days a month"=2,
+  "Rarely/never" = 1
+)
+
+Meals_Numeric_Dict <- c(
+  "Almost every day"=4,
+  "About once a week"=3,
+  "A few times a month"=2,
+  "About once a month or less" = 1
+)
+
+
+#Make frequency numeric from dictionary
+SN$a2701_numeric <- Free_Time_Numeric_Dict[SN$a2701]
+SN$a2702_numeric <- Meals_Numeric_Dict[SN$a2702]
+SN_Non_Kin_House$a2701_numeric <- Free_Time_Numeric_Dict[SN_Non_Kin_House$a2701]
+SN_Non_Kin_House$a2702_numeric <- Meals_Numeric_Dict[SN_Non_Kin_House$a2702]
+
+
+
+#Symmetrize network to most frequent reported contact
+SN_Symmetrized <- SN %>%
+  group_by(pair_key) %>% 
+  filter(!is.na(a2701_numeric), !is.na(a2702_numeric)) %>%
+  mutate(a2701_numeric_max = max(a2701_numeric),
+         a2702_numeric_max = max(a2702_numeric)) %>%
+  ungroup() %>% distinct(pair_key, .keep_all = TRUE)
+
+SN_Non_Kin_House_Symmetrized <- SN_Non_Kin_House %>%
+  group_by(pair_key) %>% 
+  filter(!is.na(a2701_numeric), !is.na(a2702_numeric)) %>%
+  mutate(a2701_numeric_max = max(a2701_numeric),
+         a2702_numeric_max = max(a2702_numeric)) %>%
+  ungroup() %>% distinct(pair_key, .keep_all = TRUE)
+
+#Reverse map on values from survey
+SN_Symmetrized <- SN_Symmetrized %>% mutate(
+  Free_Time = case_when(
+    a2701_numeric_max == 4 ~ "Every day",
+    a2701_numeric_max == 3 ~ "A few days a week",
+    a2701_numeric_max == 2 ~ "A few days a month",
+    a2701_numeric_max == 1 ~ "Rarely/never",
+),
+Meals = case_when(
+  a2702_numeric_max == 4 ~ "Almost every day",
+  a2702_numeric_max == 3 ~ "Once a week",
+  a2702_numeric_max == 2 ~ "Few times a month",
+  a2702_numeric_max == 1 ~ "Once a month"
+))
+
+SN_Non_Kin_House_Symmetrized <- SN_Non_Kin_House_Symmetrized %>% mutate(
+  Free_Time = case_when(
+    a2701_numeric_max == 4 ~ "Every day",
+    a2701_numeric_max == 3 ~ "A few days a week",
+    a2701_numeric_max == 2 ~ "A few days a month",
+    a2701_numeric_max == 1 ~ "Rarely/never",
+  ),
+  Meals = case_when(
+    a2702_numeric_max == 4 ~ "Almost every day",
+    a2702_numeric_max == 3 ~ "Once a week",
+    a2702_numeric_max == 2 ~ "Few times a month",
+    a2702_numeric_max == 1 ~ "Once a month"
+  ))
+
+#Rarely/never category in Free time may be biased with a very low count
+#drop these since there are only 18
+table(SN_Symmetrized$Free_Time)
+table(SN_Symmetrized$Meals)
+
+#Rarely/never category in Free time may be biased with a very low count
+#drop these since there are only 12
+table(SN_Non_Kin_House_Symmetrized$Free_Time)
+table(SN_Non_Kin_House_Symmetrized$Meals)
+
+
+
+#Get median by group
+meals_ssr_median <- aggregate(strain_sharing_rate ~  Meals, SN_Symmetrized,
+                              median, na.rm=TRUE)
+
+
+
+#Reorder relationship factor variable for plotting
+SN_Symmetrized$Meals <- reorder(as.factor(SN_Symmetrized$Meals),
+                                -SN_Symmetrized$strain_sharing_rate,
+                                median,na.rm=TRUE)
+
+#Get test-statistics
+kruskal.test(strain_sharing_rate ~ Meals, data = SN_Symmetrized)
+
+nrow(SN_Symmetrized)
+
+meal_pvals <- compare_means(strain_sharing_rate ~ Meals,
+                            data = SN_Symmetrized,
+                            method = "wilcox.test",
+                            p.adjust.method = "BH")
+
+meal_pvals <- meal_pvals %>% filter(p.signif == "ns") %>%
+  mutate(y.position = c(25, 22.5))
+
+#Plot differences between groups for meals based on strain sharing rate
+
+
+meals_all_plot <- ggboxplot(
+  SN_Symmetrized,
+  y = "strain_sharing_rate",
+  x = "Meals",
+  outlier.shape = NA,
+  color = "Meals"
+) +
+  geom_jitter(aes(color = Meals),
+              alpha = .25,
+              width = .25,
+              show.legend = FALSE) +
+  xlab("Shared Meal Frequency") +
+  ylab("Strain Sharing Rate (%)") +
+  coord_cartesian(ylim = c(0, 40)) +
+  theme_pubr() +
+  labs_pubr() +
+  theme(
+    axis.text.x = element_text(
+      angle = 0,
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = meals_ssr_median,
+            aes(label = paste0(sprintf(
+              "%0.1f", round(strain_sharing_rate, digits = 2)
+            ),"%"),
+            y = 40,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_Symmetrized$Meals),
+    "\n(N=",
+    table(SN_Symmetrized$Meals),
+    ")"
+  )) +
+  stat_pvalue_manual(meal_pvals, label = "p.signif", tip.length = 0)+
+  font("ylab", face = "bold", size = 12)
+
+  
+
+```
+
+Meals non-kin dif-house
+```{r}
+
+
+#Get median by group
+meals_ssr_median_nkh <- aggregate(strain_sharing_rate ~  Meals,
+                                  SN_Non_Kin_House_Symmetrized, median, na.rm=TRUE)
+
+
+#Reorder relationship factor variable for plotting
+SN_Non_Kin_House_Symmetrized$Meals <- reorder(as.factor(SN_Non_Kin_House_Symmetrized$Meals),
+                                -SN_Non_Kin_House_Symmetrized$strain_sharing_rate,
+                                median, na.rm=TRUE)
+
+#Get test-statistics
+kruskal.test(strain_sharing_rate ~ Meals,
+             data = SN_Non_Kin_House_Symmetrized)
+
+nrow(SN_Non_Kin_House_Symmetrized)
+
+meal_pvals_nkh <- compare_means(strain_sharing_rate ~ Meals,
+                            data = SN_Non_Kin_House_Symmetrized,
+                            method = "wilcox.test",
+                            p.adjust.method = "BH")
+
+meal_pvals_nkh <- meal_pvals_nkh %>% filter(p.signif == "ns") %>%
+  mutate(y.position = c(30,27.5))
+
+#Plot differences between groups for meals based on strain sharing rate
+
+meals_all_plot_nkh <- ggboxplot(
+  SN_Non_Kin_House_Symmetrized,
+  y = "strain_sharing_rate",
+  x = "Meals",
+  outlier.shape = NA,
+  color = "Meals"
+) +
+  geom_jitter(aes(color = Meals),
+              alpha = .25,
+              width = .25,
+              show.legend = FALSE) +
+  xlab("Shared Meal Frequency (Non-Kin Dif-House)") +
+  ylab("Strain Sharing Rate (%)") +
+  coord_cartesian(ylim = c(0, 40)) +
+  theme_pubr() +
+  labs_pubr() +
+  theme(
+    axis.text.x = element_text(
+      angle = 0,
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = meals_ssr_median_nkh,
+            aes(label = paste0(sprintf(
+              "%0.1f", round(strain_sharing_rate, digits = 2)
+            ), "%"),
+            y = 40,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_Non_Kin_House_Symmetrized$Meals),
+    "\n(N=",
+    table(SN_Non_Kin_House_Symmetrized$Meals),
+    ")"
+  )) +
+  stat_pvalue_manual(meal_pvals_nkh, label = "p.signif", tip.length = 0)+
+  font("ylab", face = "bold", size = 12)
+
+```
+
+
+
+
+```{r}
+#Same analysis but for free time
+
+SN_Symmetrized_2 <- SN_Symmetrized %>% filter(Free_Time != "Rarely/never")
+SN_Non_Kin_House_Symmetrized_2 <- SN_Non_Kin_House_Symmetrized %>% filter(Free_Time != "Rarely/never")
+
+
+free_time_ssr_median <- aggregate(strain_sharing_rate ~  Free_Time, SN_Symmetrized_2,
+                                  median, na.rm = TRUE)
+
+#Reorder relationship factor variable for plotting
+SN_Symmetrized_2$Free_Time <- reorder(as.factor(SN_Symmetrized_2$Free_Time),
+                                              -SN_Symmetrized_2$strain_sharing_rate,
+                                               median, na.rm = TRUE)
+
+table(SN_Symmetrized_2$Free_Time)
+#Get test statistics
+kruskal.test(strain_sharing_rate ~ Free_Time, data = SN_Symmetrized_2)
+
+nrow(SN_Symmetrized_2)
+
+free_time_pvals <- compare_means(strain_sharing_rate ~ Free_Time,
+                            data = SN_Symmetrized_2,
+                            method = "wilcox.test",
+                            p.adjust.method = "BH")
+
+free_time_pvals <- free_time_pvals %>% filter(p.signif == "ns") %>%
+  mutate(y.position = c(25))
+
+#Something is weird with the jitter here
+
+free_time_all_plot <-ggboxplot(
+  SN_Symmetrized_2,
+  y = "strain_sharing_rate",
+  x = "Free_Time",
+  outlier.shape = NA,
+  color = "Free_Time"
+) +
+  geom_jitter(aes(color = Free_Time),
+              alpha = .25,
+              width = .25,
+              show.legend = FALSE) +
+  xlab("Frequency of Contact") +
+  ylab("Strain-Sharing Rate (%)") +
+  coord_cartesian(ylim = c(0, 40)) +
+  theme_pubr() +
+  labs_pubr() +
+  theme(
+    axis.text.x = element_text(
+      angle = 0,
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = free_time_ssr_median,
+            aes(label = paste0(sprintf(
+              "%0.1f", round(strain_sharing_rate, digits = 2)
+            ),"%"),
+            y = 40,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_Symmetrized_2$Free_Time),
+    "\n(N=",
+    table(SN_Symmetrized_2$Free_Time),
+    ")"
+  )) +
+  stat_pvalue_manual(free_time_pvals, label = "p.signif", tip.length = 0)+
+  font("ylab", face = "bold", size = 12)
+```
+
+Free-time Non-Kin Dif-House
+```{r}
+free_time_ssr_median_nkh <- aggregate(strain_sharing_rate ~  Free_Time,
+                                      SN_Non_Kin_House_Symmetrized_2, median, na.rm = TRUE)
+
+#Reorder relationship factor variable for plotting
+SN_Non_Kin_House_Symmetrized_2$Free_Time <-
+  reorder(as.factor(SN_Non_Kin_House_Symmetrized_2$Free_Time),
+          -SN_Non_Kin_House_Symmetrized_2$strain_sharing_rate,
+          median, na.rm = TRUE)
+
+
+#Get test statistics
+kruskal.test(strain_sharing_rate ~ Free_Time, data = SN_Non_Kin_House_Symmetrized_2)
+
+nrow(SN_Non_Kin_House_Symmetrized_2)
+
+free_time_pvals_nkh <- compare_means(strain_sharing_rate ~ Free_Time,
+                            data = SN_Non_Kin_House_Symmetrized_2,
+                            method = "wilcox.test",
+                            p.adjust.method = "BH")
+
+free_time_pvals_nkh <- free_time_pvals_nkh %>% filter(p.signif == "ns") %>%
+  mutate(y.position = c(25))
+
+#Plot differences between groups for meals based on strain sharing rate
+
+free_time_all_plot_nkh <-ggboxplot(
+  SN_Non_Kin_House_Symmetrized_2,
+  y = "strain_sharing_rate",
+  x = "Free_Time",
+  outlier.shape = NA,
+  color = "Free_Time"
+) +
+  geom_jitter(aes(color = Free_Time),
+              alpha = .25,
+              width = .25,
+              show.legend = FALSE) +
+  xlab("Frequency of Contact (Non-Kin Dif-House") +
+  ylab("Strain-Sharing Rate (%)") +
+  coord_cartesian(ylim = c(0, 40)) +
+  theme_pubr() +
+  labs_pubr() +
+  theme(
+    axis.text.x = element_text(
+      angle = 0,
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = free_time_ssr_median_nkh,
+            aes(label = paste0(sprintf(
+              "%0.1f", round(strain_sharing_rate, digits = 2)
+            ),"%"),
+            y = 40,
+            fontface = "bold")) +
+  scale_x_discrete(labels = paste0(
+    levels(SN_Non_Kin_House_Symmetrized_2$Meals),
+    "\n(N=",
+    table(SN_Non_Kin_House_Symmetrized_2$Meals),
+    ")"
+  )) +
+  stat_pvalue_manual(free_time_pvals_nkh, label = "p.signif", tip.length = 0)+
+  font("ylab", face = "bold", size = 12)
+```
+
+
+Greeting Types
+```{r}
+#Difference by greeting types
+SN_Greeting <- SN %>% filter(!is.na(a2701))
+#Code greetings by epidemiological riskiness as derived from our codebook
+
+SN_Greeting$a2703a[!is.na(SN_Greeting$a2703a)] <- 1
+SN_Greeting$a2703a <- as.numeric(SN_Greeting$a2703a)
+SN_Greeting$a2703b[!is.na(SN_Greeting$a2703b)] <- 2
+SN_Greeting$a2703b <- as.numeric(SN_Greeting$a2703b)
+SN_Greeting$a2703c[!is.na(SN_Greeting$a2703c)] <- 3
+SN_Greeting$a2703c <- as.numeric(SN_Greeting$a2703c)
+SN_Greeting$a2703d[!is.na(SN_Greeting$a2703d)] <- 4
+SN_Greeting$a2703d <- as.numeric(SN_Greeting$a2703d)
+SN_Greeting$a2703e[!is.na(SN_Greeting$a2703e)] <- 5
+SN_Greeting$a2703e <- as.numeric(SN_Greeting$a2703e)
+SN_Greeting$a2703f[!is.na(SN_Greeting$a2703f)] <- 6
+SN_Greeting$a2703f <- as.numeric(SN_Greeting$a2703f)
+SN_Greeting$a2703g[!is.na(SN_Greeting$a2703g)] <- 7
+SN_Greeting$a2703g <- as.numeric(SN_Greeting$a2703g)
+SN_Greeting$a2703h[!is.na(SN_Greeting$a2703h)] <- 0
+SN_Greeting$a2703h <- as.numeric(SN_Greeting$a2703h)
+SN_Greeting$a2703[!is.na(SN_Greeting$a2703)] <- 0
+SN_Greeting$a2703 <- as.numeric(SN_Greeting$a2703)
+
+SN_Greeting$a2704a[!is.na(SN_Greeting$a2704a)] <- 1
+SN_Greeting$a2704a <- as.numeric(SN_Greeting$a2704a)
+SN_Greeting$a2704b[!is.na(SN_Greeting$a2704b)] <- 2
+SN_Greeting$a2704b <- as.numeric(SN_Greeting$a2704b)
+SN_Greeting$a2704c[!is.na(SN_Greeting$a2704c)] <- 3
+SN_Greeting$a2704c <- as.numeric(SN_Greeting$a2704c)
+SN_Greeting$a2704d[!is.na(SN_Greeting$a2704d)] <- 4
+SN_Greeting$a2704d <- as.numeric(SN_Greeting$a2704d)
+SN_Greeting$a2704e[!is.na(SN_Greeting$a2704e)] <- 5
+SN_Greeting$a2704e <- as.numeric(SN_Greeting$a2704e)
+SN_Greeting$a2704f[!is.na(SN_Greeting$a2704f)] <- 6
+SN_Greeting$a2704f <- as.numeric(SN_Greeting$a2704f)
+SN_Greeting$a2704g[!is.na(SN_Greeting$a2704g)] <- 7
+SN_Greeting$a2704g <- as.numeric(SN_Greeting$a2704g)
+SN_Greeting$a2704h[!is.na(SN_Greeting$a2703h)] <- 0
+SN_Greeting$a2704h <- as.numeric(SN_Greeting$a2704h)
+SN_Greeting$a2704[!is.na(SN_Greeting$a2704)] <- 0
+SN_Greeting$a2704 <- as.numeric(SN_Greeting$a2704)
+
+
+#Get most risky greeting by nomination
+
+SN_Greeting$max_greeting <- apply(X = SN_Greeting%>% select(a2703:a2704g),
+                                  MARGIN = 1, FUN = max, na.rm = TRUE)
+
+#Group by pairs to get most risky greeting by pair
+SN_Greeting <- SN_Greeting %>%
+  group_by(pair_key) %>%
+  mutate(max_greeting = max(max_greeting)) %>%
+  ungroup() %>% distinct(pair_key, .keep_all = TRUE)
+
+#Reverse map on values from survey
+# SN_Greeting <- SN_Greeting %>% mutate(
+#   Riskiest_Greeting = case_when(
+#     max_greeting == 7 ~ "Kiss on\nthe cheek",
+#     max_greeting == 6 ~ "Hug",
+#     max_greeting == 5 ~ "Pat on\nthe back",
+#     max_greeting == 4 ~ "Handshake\nor hi-five",
+#     max_greeting == 3 ~ "Verbal salute\n(Hello)",
+#     max_greeting == 2 ~ "A gesture\n(wave, nod, etc.)",
+#     max_greeting == 1 ~ "A smile",
+#     max_greeting == 0 ~ "Other/Refused",
+#   ))
+
+
+
+SN_Greeting <- SN_Greeting %>% mutate(
+  Riskiest_Greeting = case_when(
+    max_greeting == 7 ~ "Kiss on the cheek",
+    max_greeting == 6 ~ "Hug",
+    max_greeting == 5 ~ "Pat on the back",
+    max_greeting == 4 ~ "Handshake or hi-five",
+    max_greeting == 3 ~ "Verbal salute (Hello)",
+    max_greeting == 2 ~ "A gesture (wave, nod, etc.)",
+    max_greeting == 1 ~ "A smile",
+    max_greeting == 0 ~ "Other/Refused",
+  ))
+
+#Drop other/Refused
+table(SN_Greeting$Riskiest_Greeting)
+SN_Greeting <- SN_Greeting %>% filter(Riskiest_Greeting != "Other/Refused")
+
+
+
+# SN_Greeting$Riskiest_Greeting <- factor(SN_Greeting$Riskiest_Greeting,
+#                                         levels=c("A gesture\n(wave, nod, etc.)",
+#                                                  "A smile",
+#                                                  "Verbal salute\n(Hello)",
+#                                                  "Handshake\nor hi-five",
+#                                                  "Pat on\nthe back",
+#                                                  "Hug",
+#                                                  "Kiss on\nthe cheek"))
+
+# SN_Greeting$Riskiest_Greeting <- factor(SN_Greeting$Riskiest_Greeting,
+#                                         levels=c("A gesture (wave, nod, etc.)",
+#                                                  "A smile",
+#                                                  "Verbal salute (Hello)",
+#                                                  "Handshake or hi-five",
+#                                                  "Pat on the back",
+#                                                  "Hug",
+#                                                  "Kiss on the cheek"))
+
+SN_Greeting$Riskiest_Greeting <- factor(SN_Greeting$Riskiest_Greeting,
+                                        levels=c("Kiss on the cheek",
+                                                 "Hug",
+                                                 "Pat on the back",
+                                                 "Handshake or hi-five",
+                                                 "Verbal salute (Hello)",
+                                                 "A smile",
+                                                 "A gesture (wave, nod, etc.)"))
+
+greeting_median <- aggregate(strain_sharing_rate ~  Riskiest_Greeting,
+                             SN_Greeting, median, na.rm = TRUE)
+
+kruskal.test(strain_sharing_rate ~ Riskiest_Greeting,
+                                 data = SN_Greeting)
+nrow(SN_Greeting)
+
+greetings_pvals <- compare_means(strain_sharing_rate ~ Riskiest_Greeting,
+                                 data = SN_Greeting,
+                                 p.adjust.method = "BH"
+                                 )
+
+```
+
+
+```{r}
+greeting_plot <- ggboxplot(
+  SN_Greeting,
+  y = "strain_sharing_rate",
+  x = "Riskiest_Greeting",
+  color = "Riskiest_Greeting",
+  outlier.shape = NA
+) +
+  geom_jitter(
+    aes(color = Riskiest_Greeting),
+    alpha = .25,
+    width = .25,
+    show.legend = FALSE
+  ) +
+  xlab("Greeting Type") +
+  scale_x_discrete(labels = paste0(
+    levels(as.factor(SN_Greeting$Riskiest_Greeting)),
+    "\n(N=",
+    table(SN_Greeting$Riskiest_Greeting),
+    ")"
+  )) +
+  ylab("Strain-Sharing Rate (%)") +
+  coord_cartesian(ylim = c(0, 40)) +
+  theme_pubr() +
+  labs_pubr() +
+  theme(
+    axis.text.x = element_text(
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = greeting_median,
+            aes(
+              label = paste0(sprintf(
+                "%0.1f", round(strain_sharing_rate, digits = 2)
+              ),"%"),
+              y = 40,
+              fontface = "bold"
+            )) +
+  font("ylab", face = "bold", size = 12)
+
+```
+
+Saving the ggpubr is better
+```{r}
+# svglite("../Figures/Figure1/A.svg")
+# relationships_all_plot
+# dev.off()
+# 
+# #This figure is saved in the relationship scramble code
+# svglite("../Figures/Figure1/B.svg")
+# rel_scramb_p
+# dev.off()
+# 
+# svglite("../Figures/Figure1/C.svg")
+# free_time_all_plot
+# dev.off()
+# 
+# svglite("../Figures/Figure1/D.svg")
+# meals_all_plot
+# dev.off()
+# 
+# svglite("../Figures/Figure1/E.svg")
+# greeting_plot
+# dev.off()
+```
+
+
+```{r}
+# p1 <- ggarrange(relationships_all_plot,
+#                 rel_scramb_p,
+#                 labels = c("A", "B"),
+#                 ncol = 2, nrow = 1,
+#                 widths = c(3,1),
+#                 label.y = 1)
+
+p1 <- ggarrange(relationships_all_plot,
+                labels = c("A"),
+                ncol = 1, nrow = 1,
+                label.y = 1)
+
+p2 <- ggarrange(free_time_all_plot  ,
+                    meals_all_plot  ,
+                    labels = c("B", "C"),
+                    align = "h",
+                    ncol = 2,
+                    label.y = 1)
+
+greeting_plot <- ggarrange(greeting_plot,
+                           labels = c("D"),
+                           label.y = 1)
+
+fig1 <- ggarrange(p1, p2,greeting_plot, nrow = 3,
+          heights = c(1.5,1,1))
+
+# svglite("../Figures/Figure2/figure2_full.svg")
+# fig1
+# dev.off()
+
+svglite("../FiguresNew/Figure2/figure2_full_updated.svg",
+        width = 13,
+        height = 10)
+fig1
+dev.off()
+
+
+# annotate_figure(fig1,left = text_grob("Strain-Sharing Rate (%)",
+#                                  rot = 90,
+#                                  size = 14),
+#                                  fig.lab.face ="bold")
+```
+
+Greeting Type non-kin dif-house
+
+```{r}
+#Difference by greeting types
+SN_Greeting_Non_Kin_House <- SN_Non_Kin_House %>% filter(!is.na(a2701))
+#Code greetings by epidemiological riskiness as derived from our codebook
+
+SN_Greeting_Non_Kin_House$a2703a[!is.na(SN_Greeting_Non_Kin_House$a2703a)] <- 1
+SN_Greeting_Non_Kin_House$a2703a <- as.numeric(SN_Greeting_Non_Kin_House$a2703a)
+SN_Greeting_Non_Kin_House$a2703b[!is.na(SN_Greeting_Non_Kin_House$a2703b)] <- 2
+SN_Greeting_Non_Kin_House$a2703b <- as.numeric(SN_Greeting_Non_Kin_House$a2703b)
+SN_Greeting_Non_Kin_House$a2703c[!is.na(SN_Greeting_Non_Kin_House$a2703c)] <- 3
+SN_Greeting_Non_Kin_House$a2703c <- as.numeric(SN_Greeting_Non_Kin_House$a2703c)
+SN_Greeting_Non_Kin_House$a2703d[!is.na(SN_Greeting_Non_Kin_House$a2703d)] <- 4
+SN_Greeting_Non_Kin_House$a2703d <- as.numeric(SN_Greeting_Non_Kin_House$a2703d)
+SN_Greeting_Non_Kin_House$a2703e[!is.na(SN_Greeting_Non_Kin_House$a2703e)] <- 5
+SN_Greeting_Non_Kin_House$a2703e <- as.numeric(SN_Greeting_Non_Kin_House$a2703e)
+SN_Greeting_Non_Kin_House$a2703f[!is.na(SN_Greeting_Non_Kin_House$a2703f)] <- 6
+SN_Greeting_Non_Kin_House$a2703f <- as.numeric(SN_Greeting_Non_Kin_House$a2703f)
+SN_Greeting_Non_Kin_House$a2703g[!is.na(SN_Greeting_Non_Kin_House$a2703g)] <- 7
+SN_Greeting_Non_Kin_House$a2703g <- as.numeric(SN_Greeting_Non_Kin_House$a2703g)
+SN_Greeting_Non_Kin_House$a2703h[!is.na(SN_Greeting_Non_Kin_House$a2703h)] <- 0
+SN_Greeting_Non_Kin_House$a2703h <- as.numeric(SN_Greeting_Non_Kin_House$a2703h)
+SN_Greeting_Non_Kin_House$a2703[!is.na(SN_Greeting_Non_Kin_House$a2703)] <- 0
+SN_Greeting_Non_Kin_House$a2703 <- as.numeric(SN_Greeting_Non_Kin_House$a2703)
+
+SN_Greeting_Non_Kin_House$a2704a[!is.na(SN_Greeting_Non_Kin_House$a2704a)] <- 1
+SN_Greeting_Non_Kin_House$a2704a <- as.numeric(SN_Greeting_Non_Kin_House$a2704a)
+SN_Greeting_Non_Kin_House$a2704b[!is.na(SN_Greeting_Non_Kin_House$a2704b)] <- 2
+SN_Greeting_Non_Kin_House$a2704b <- as.numeric(SN_Greeting_Non_Kin_House$a2704b)
+SN_Greeting_Non_Kin_House$a2704c[!is.na(SN_Greeting_Non_Kin_House$a2704c)] <- 3
+SN_Greeting_Non_Kin_House$a2704c <- as.numeric(SN_Greeting_Non_Kin_House$a2704c)
+SN_Greeting_Non_Kin_House$a2704d[!is.na(SN_Greeting_Non_Kin_House$a2704d)] <- 4
+SN_Greeting_Non_Kin_House$a2704d <- as.numeric(SN_Greeting_Non_Kin_House$a2704d)
+SN_Greeting_Non_Kin_House$a2704e[!is.na(SN_Greeting_Non_Kin_House$a2704e)] <- 5
+SN_Greeting_Non_Kin_House$a2704e <- as.numeric(SN_Greeting_Non_Kin_House$a2704e)
+SN_Greeting_Non_Kin_House$a2704f[!is.na(SN_Greeting_Non_Kin_House$a2704f)] <- 6
+SN_Greeting_Non_Kin_House$a2704f <- as.numeric(SN_Greeting_Non_Kin_House$a2704f)
+SN_Greeting_Non_Kin_House$a2704g[!is.na(SN_Greeting_Non_Kin_House$a2704g)] <- 7
+SN_Greeting_Non_Kin_House$a2704g <- as.numeric(SN_Greeting_Non_Kin_House$a2704g)
+SN_Greeting_Non_Kin_House$a2704h[!is.na(SN_Greeting_Non_Kin_House$a2703h)] <- 0
+SN_Greeting_Non_Kin_House$a2704h <- as.numeric(SN_Greeting_Non_Kin_House$a2704h)
+SN_Greeting_Non_Kin_House$a2704[!is.na(SN_Greeting_Non_Kin_House$a2704)] <- 0
+SN_Greeting_Non_Kin_House$a2704 <- as.numeric(SN_Greeting_Non_Kin_House$a2704)
+
+
+#Get most risky greeting by nomination
+
+SN_Greeting_Non_Kin_House$max_greeting <- apply(X = SN_Greeting_Non_Kin_House%>% select(a2703:a2704g),
+                                  MARGIN = 1, FUN = max, na.rm = TRUE)
+
+#Group by pairs to get most risky greeting by pair
+SN_Greeting_Non_Kin_House <- SN_Greeting_Non_Kin_House %>%
+  group_by(pair_key) %>%
+  mutate(max_greeting = max(max_greeting)) %>%
+  ungroup() %>% distinct(pair_key, .keep_all = TRUE)
+
+#Reverse map on values from survey
+# SN_Greeting_Non_Kin_House <- SN_Greeting_Non_Kin_House %>% mutate(
+#   Riskiest_Greeting = case_when(
+#     max_greeting == 7 ~ "Kiss on\nthe cheek",
+#     max_greeting == 6 ~ "Hug",
+#     max_greeting == 5 ~ "Pat on\nthe back",
+#     max_greeting == 4 ~ "Handshake\nor hi-five",
+#     max_greeting == 3 ~ "Verbal salute\n(Hello)",
+#     max_greeting == 2 ~ "A gesture\n(wave, nod, etc.)",
+#     max_greeting == 1 ~ "A smile",
+#     max_greeting == 0 ~ "Other/Refused",
+#   ))
+
+SN_Greeting_Non_Kin_House <- SN_Greeting_Non_Kin_House %>% mutate(
+  Riskiest_Greeting = case_when(
+    max_greeting == 7 ~ "Kiss on the cheek",
+    max_greeting == 6 ~ "Hug",
+    max_greeting == 5 ~ "Pat on the back",
+    max_greeting == 4 ~ "Handshake or hi-five",
+    max_greeting == 3 ~ "Verbal salute (Hello)",
+    max_greeting == 2 ~ "A gesture (wave, nod, etc.)",
+    max_greeting == 1 ~ "A smile",
+    max_greeting == 0 ~ "Other/Refused",
+  ))
+
+#Drop other/Refused
+table(SN_Greeting_Non_Kin_House$Riskiest_Greeting)
+SN_Greeting_Non_Kin_House <- SN_Greeting_Non_Kin_House %>% filter(Riskiest_Greeting != "Other/Refused")
+
+greeting_median_nkh <- aggregate(strain_sharing_rate ~  Riskiest_Greeting, SN_Greeting_Non_Kin_House, median)
+
+# SN_Greeting_Non_Kin_House$Riskiest_Greeting <- factor(SN_Greeting_Non_Kin_House$Riskiest_Greeting,
+#                                         levels=c("A gesture\n(wave, nod, etc.)",
+#                                                  "A smile",
+#                                                  "Verbal salute\n(Hello)",
+#                                                  "Handshake\nor hi-five",
+#                                                  "Pat on\nthe back",
+#                                                  "Hug",
+#                                                  "Kiss on\nthe cheek"))
+
+# SN_Greeting_Non_Kin_House$Riskiest_Greeting <- factor(SN_Greeting_Non_Kin_House$Riskiest_Greeting,
+#                                         levels=c("A gesture (wave, nod, etc.)",
+#                                                  "A smile",
+#                                                  "Verbal salute (Hello)",
+#                                                  "Handshake or hi-five",
+#                                                  "Pat on the back",
+#                                                  "Hug",
+#                                                  "Kiss on the cheek"))
+
+SN_Greeting_Non_Kin_House$Riskiest_Greeting <- factor(SN_Greeting_Non_Kin_House$Riskiest_Greeting,
+                                        levels=c("Kiss on the cheek",
+                                                 "Hug",
+                                                 "Pat on the back",
+                                                 "Handshake or hi-five",
+                                                 "A smile",
+                                                 "Verbal salute (Hello)",
+                                                 "A gesture (wave, nod, etc.)"))
+
+
+kruskal.test(strain_sharing_rate ~ Riskiest_Greeting,
+                                 data = SN_Greeting_Non_Kin_House)
+nrow(SN_Greeting_Non_Kin_House)
+
+#Should double check this
+greetings_pvals_nkh <- compare_means(strain_sharing_rate ~ Riskiest_Greeting,
+                                 data = SN_Greeting_Non_Kin_House,
+                                 p.adjust.method = "BH"
+                                 )
+
+
+greeting_plot_nkh <- ggboxplot(
+  SN_Greeting_Non_Kin_House,
+  y = "strain_sharing_rate",
+  x = "Riskiest_Greeting",
+  color = "Riskiest_Greeting",
+  outlier.shape = NA
+) +
+  geom_jitter(
+    aes(color = Riskiest_Greeting),
+    alpha = .25,
+    width = .25,
+    show.legend = FALSE
+  ) +
+  xlab("Riskiest Greeting Type (Non-Kin Dif-House)") +
+  scale_x_discrete(labels = paste0(
+    levels(as.factor(SN_Greeting_Non_Kin_House$Riskiest_Greeting)),
+    "\n(N=",
+    table(SN_Greeting_Non_Kin_House$Riskiest_Greeting),
+    ")"
+  )) +
+  ylab("Strain-Sharing Rate (%)") +
+  coord_cartesian(ylim = c(0, 40)) +
+  theme_pubr() +
+  labs_pubr() +
+  theme(
+    axis.text.x = element_text(
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  geom_text(data = greeting_median_nkh,
+            aes(
+              label = paste0(sprintf(
+                "%0.1f", round(strain_sharing_rate, digits = 2)
+              ),"%"),
+              y = 40,
+              fontface = "bold"
+            )) +
+  font("ylab", face = "bold", size = 12)
+
+```
+
+
+
+```{r}
+p2_nkh <- ggarrange(free_time_all_plot_nkh  ,
+                    meals_all_plot_nkh  ,
+                    labels = c("A", "B"),
+                    align = "h",
+                    ncol = 2)
+
+greeting_plot_nkh <- ggarrange(greeting_plot_nkh,
+                           labels = c("C"))
+
+fig1_nkh <- ggarrange(p2_nkh,greeting_plot_nkh, nrow = 2)
+
+# svglite("../Figures/Figure2/figure2_full.svg")
+# fig1
+# dev.off()
+
+svglite("../FiguresNew/SFigure4/sfigure4_full.svg", width = 12)
+fig1_nkh
+dev.off()
+
+```
+
+
+
+
+
+
+```{r}
+#Dichotomize to physical and non-physical greetings
+SN_Greeting <- SN_Greeting %>%
+  mutate(Physical = case_when(
+    max_greeting %in% c(1,2,3) ~ 0,
+    max_greeting %in% c(4,5,6,7) ~ 1,
+  ))
+
+
+physical_means <- aggregate(strain_sharing_rate ~  Physical, SN_Greeting, median)
+
+phys_greeting_plot <- ggplot(SN_Greeting,
+       aes(y = strain_sharing_rate,
+           x = as.factor(Physical),
+           fill = as.factor(Physical))) +
+  geom_boxplot(outlier.shape = NA, show.legend = FALSE) +
+  xlab("Greeting Type") +
+  scale_x_discrete(labels= paste0(c("Non-Physical", "Physical"),
+                                 "\n(N=",
+                                 table(SN_Greeting$Physical),
+                                 ")")) +
+  ylab("Strain Sharing Rate (%)") +
+  #ggtitle("Strain Sharing Rate by Riskiest Greeting Type") + 
+  coord_cartesian(ylim=c(0, 38)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(vjust = 1, hjust=.5, size = 12),
+        plot.title = element_text(hjust = 0.5)) +
+  geom_text(data = physical_means,
+            aes(label = round(strain_sharing_rate,2),
+                y = strain_sharing_rate + 1)) +
+  stat_compare_means(label.y = 35)+
+  theme_pubr() +
+  labs_pubr()
+
+
+#Dichotomize to physical and non-physical greetings
+SN_Greeting_Non_Kin_House <- SN_Greeting_Non_Kin_House %>%
+  mutate(Physical = case_when(
+    max_greeting %in% c(1,2,3) ~ 0,
+    max_greeting %in% c(4,5,6,7) ~ 1,
+  ))
+
+
+physical_means <- aggregate(strain_sharing_rate ~  Physical, SN_Greeting_Non_Kin_House, median)
+
+phys_greeting_plot_nkh <- ggplot(SN_Greeting_Non_Kin_House,
+       aes(y = strain_sharing_rate,
+           x = as.factor(Physical),
+           fill = as.factor(Physical))) +
+  geom_boxplot(outlier.shape = NA, show.legend = FALSE) +
+  xlab("Greeting Type (Non-Kin Dif-House)") +
+  scale_x_discrete(labels= paste0(c("Non-Physical", "Physical"),
+                                 "\n(N=",
+                                 table(SN_Greeting_Non_Kin_House$Physical),
+                                 ")")) +
+  ylab("Strain Sharing Rate (%)") +
+  #ggtitle("Strain Sharing Rate by Riskiest Greeting Type") + 
+  coord_cartesian(ylim=c(0, 38)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(vjust = 1, hjust=.5, size = 12),
+        plot.title = element_text(hjust = 0.5)) +
+  geom_text(data = physical_means,
+            aes(label = round(strain_sharing_rate,2),
+                y = strain_sharing_rate + 1)) +
+  stat_compare_means(label.y = 35) +
+  theme_pubr() +
+  labs_pubr()
+
+svglite("../FiguresNew/SFigure5/sfigure5_full.svg")
+ggarrange(phys_greeting_plot, phys_greeting_plot_nkh, labels = c("A", "B"))
+dev.off()
+
+
+```
+
+
+
+
+
+Control for relationship type (old)
+
+```{r}
+names(SN_Greeting)
+
+unique(SN_Greeting$a2702_numeric)
+?cor.test
+cor.test(SN_Greeting$max_greeting , SN_Greeting$a2702_numeric)
+
+lm.test <- lmer(strain_sharing_rate ~ Physical  + a2701_numeric +
+                  Physical*a2701_numeric + (1|village_name_w3),
+     data = SN_Greeting)
+
+wilcox.test(SN_Greeting$strain_sharing_rate[SN_Greeting$Physical == 0 &
+                                              SN_Greeting$a2702_numeric == 1],
+            SN_Greeting$strain_sharing_rate[SN_Greeting$Physical == 1 &
+                                              SN_Greeting$a2702_numeric == 1])
+
+mean(SN_Greeting$strain_sharing_rate[SN_Greeting$Physical == 0 &
+                                              SN_Greeting$a2702_numeric == 1])
+mean(SN_Greeting$strain_sharing_rate[SN_Greeting$Physical == 1 &
+                                              SN_Greeting$a2702_numeric == 1])
+
+summary(lm.test)
+
+SN_Greeting$pair_gender
+
+#Create unique pair identifier
+for(i in 1:nrow(SN_Greeting)){
+  combo <- paste0(SN_Greeting$gender_ego[i], SN_Greeting$gender_alter[i])
+  SN_Greeting$pair_gender[i] <- paste((sort(str_split(combo,"")[[1]])),sep="", collapse="")
+}
+
+lm.test <- lmer(strain_sharing_rate ~  age_dif + (1|village_name_w3),
+     data = SN_Greeting)
+
+summary(lm.test)
+
+names(SN_Greeting)
+
+SN_Greeting$age_dif <- abs(SN_Greeting$age_at_survey_ego - SN_Greeting$age_at_survey_alter)
+
+cor.test(SN_Greeting$a2702_numeric, SN_Greeting$a2701_numeric)
+
+
+wilcox.test(strain_sharing)
+
+
+```
+
+
