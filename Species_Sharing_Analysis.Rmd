@@ -10,6 +10,91 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+gatherpairs <- function(data, ..., 
+                        xkey = '.xkey', xvalue = '.xvalue',
+                        ykey = '.ykey', yvalue = '.yvalue',
+                        na.rm = FALSE, convert = FALSE, factor_key = FALSE) {
+  vars <- quos(...)
+  xkey <- enquo(xkey)
+  xvalue <- enquo(xvalue)
+  ykey <- enquo(ykey)
+  yvalue <- enquo(yvalue)
+
+  data %>% {
+    cbind(gather(., key = !!xkey, value = !!xvalue, !!!vars,
+                 na.rm = na.rm, convert = convert, factor_key = factor_key),
+          select(., !!!vars)) 
+  } %>% gather(., key = !!ykey, value = !!yvalue, !!!vars,
+               na.rm = na.rm, convert = convert, factor_key = factor_key)
+}
+```
+
+
+MDS of BC-dissimilarity of species per village
+```{r}
+mds_bc <- cmdscale(species_bray) |> 
+  as.data.frame() |> 
+  tibble::rownames_to_column('respondent_master_id') |> 
+  inner_join(hmb_census) |> 
+  filter(village_name_deid %in% names(sort(table(hmb_census$village_name_deid), decreasing = TRUE)[1:5])) |> 
+  select(respondent_master_id, V1, V2, village_name_deid)
+```
+
+```{r mds_all_villages_tri, fig.height=10, fig.width=14}
+lapply(combn(unique(mds_bc$village_name_deid), 2, simplify = FALSE), function(k){
+  mds_bc |> 
+    filter(village_name_deid %in% k) |> 
+    mutate(pair1 = k[1], pair2=k[2])
+}) |> 
+  bind_rows() |> 
+  mutate(pair1=factor(pair1),
+         pair2=factor(pair2)) |> 
+ggplot() +
+  geom_point(aes(V1,V2, color=fct_relevel(village_name_deid, c('Sestao', 'Hondarribia','Tolosa', 'Madera', 'Erandio')))) +
+  lemon::facet_rep_grid(fct_relevel(pair2, c('Tolosa','Hondarribia','Erandio','Sestao'), )~fct_relevel(pair1, c('Madera','Tolosa','Hondarribia','Erandio')), switch = 'y', repeat.tick.labels = TRUE) +
+  cowplot::theme_cowplot() +
+  theme(strip.background = element_blank(),
+        strip.placement = 'outside') +
+  xlab('MDS1') + ylab('MDS2') +
+  scale_color_brewer('Village name', palette = 'Set1',type = 'qual', ) +
+  guides(color = FALSE)
+```
+```{r mds_all_villages, fig.height=6, fig.width=9}
+mds_bc |> 
+  ggplot() +
+  geom_point(aes(V1,V2, color=fct_relevel(village_name_deid, c('Sestao', 'Hondarribia','Tolosa', 'Madera', 'Erandio')))) +
+  cowplot::theme_cowplot() +
+  xlab('MDS1') + ylab('MDS2') +
+  scale_color_brewer('Village name', palette = 'Set1',type = 'qual', )
+```
+
+
+tSNE of species per village
+```{r, fig.height=12, fig.width=15}
+set.seed(0)
+tnse_species <- Rtsne::Rtsne(t(species_data_clr), num_threads = 10, perplexity =5)
+
+rownames(tnse_species$Y) <- colnames(species_data_clr)
+tsne_ds <- tnse_species$Y |> 
+  as.data.frame() |> 
+  tibble::rownames_to_column('respondent_master_id') |> 
+  inner_join(hmb_census) |> 
+  filter(village_name_deid %in% names(sort(table(hmb_census$village_name_deid), decreasing = TRUE)[1:5])) |> 
+  select(respondent_master_id, V1, V2, village_name_deid)
+
+lapply(combn(unique(tsne_ds$village_name_deid), 2, simplify = FALSE), function(k){
+  tsne_ds |> 
+    filter(village_name_deid %in% k) |> 
+    mutate(pair1 = k[1], pair2=k[2])
+}) |> 
+  bind_rows() |> 
+ggplot() +
+  geom_point(aes(V1,V2, color=village_name_deid)) +
+  facet_grid(pair1~pair2)
+```
+
+
+```{r}
 shared_summary <- SN %>% 
   distinct(pair_key, relationship, .keep_all = TRUE) %>% #Symmetrize network to avoid reccipricol nominations
   group_by(relationship) %>%
