@@ -6,6 +6,7 @@ date: "2022-12-12"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(readr.show_col_types = FALSE) 
 ```
 
 Install necessary packages
@@ -42,13 +43,36 @@ library(forcats)
 
 Load batch data
 ```{r message=TRUE, warning=FALSE, include=FALSE}
-extraction_batch <- bind_rows(read_csv('~/F_BEGHINI_HM/Rn338 gDNA 032822.csv') |> select(`Sample ID`, `WIKI ID`, Plate) |> rename(SampleID = `Sample ID`, WIKI = `WIKI ID`), 
-          read_csv('~/F_BEGHINI_HM/Honduras_gDNA_11052020.csv') |> select(SampleID, WIKI, `gDNA Plate`) |> rename(Plate = `gDNA Plate`),
-          read_csv('~/F_BEGHINI_HM/Ejl54 stool WGS 010523.csv') |> select(SampleID, WIKI, `gDNA Plate`) |> rename(Plate = `gDNA Plate`)) |> 
+extraction_batch <- bind_rows(read_csv('~/F_BEGHINI_HM/Rn338 gDNA 032822.csv') |> select(SampleID = `Sample ID`, WIKI = `WIKI ID`, Plate, DNA_conc = `gDNA, ng/uL(Nanodrop)`), 
+          read_csv('~/F_BEGHINI_HM/Honduras_gDNA_11052020.csv') |> select(SampleID, WIKI, Plate = `gDNA Plate`, DNA_conc = `NanoDrop,ng/uL`),
+          read_csv('~/F_BEGHINI_HM/Ejl54 stool WGS 010523.csv') |> select(SampleID, WIKI, Plate = `gDNA Plate`, DNA_conc = `NanoDrop, ng/uL`)) |> 
   mutate( Plate = factor(str_extract(Plate, '[0-9]{6}')),
           WIKI = factor(str_split_i(WIKI, '-', 1)))
+
+sequencing_depth <- bind_rows(
+read_csv("/WORKAREA/home/fb343/F_BEGHINI_HM/read_counts/RQ13084_Read_Counts.csv") |> 
+  select(SampleID=`Sample ID`, Reads), 
+
+read_csv("/WORKAREA/home/fb343/F_BEGHINI_HM/read_counts/RQ17122_Read_Counts.csv") |> 
+  select(SampleID = Sample, Reads = `Read Pairs`), 
+
+read_csv("/WORKAREA/home/fb343/F_BEGHINI_HM/read_counts/RQ19764_Read_Counts.csv") |> 
+  select(SampleID=`Sample ID`, Reads)) |> 
+  group_by(SampleID) |> 
+  summarize(Reads=sum(Reads))
+
 ```
 
+```{r}
+extraction_batch |> 
+  inner_join(sequencing_depth, by = join_by(SampleID)) |> #write_tsv('extraction_sequencing_batch.tsv')
+  filter(str_detect(SampleID, '-15', negate=TRUE)) |> 
+  arrange(SampleID) |> 
+  filter(DNA_conc >= 0) |> 
+  mutate(a=1) |> 
+  group_by(a) |> 
+  summarize(broom::tidy(cor.test(Reads, DNA_conc)))
+```
 
 Download Microbiome census Data
 ```{r}
@@ -60,40 +84,55 @@ hmb_c2 <- read_csv("~/F_BEGHINI_HM/COHORT2/v2/hmb_respondents_cohort2_v2_f_beghi
 hmb_c2$mb_m05[is.na(hmb_c2$mb_m05)] <- hmb_c2$mb_m00[is.na(hmb_c2$mb_m05)]
 hmb_c2$mb_m05 <- paste0(substr(hmb_c2$mb_m05,0,10), "5")
 
+#One individual was coded incorrectly
+hmb_c2$village_code[!is.na(hmb_c2$village_code) & hmb_c2$village_code == 18] <- 17
+
 #Missing certain ones, need to clean that up
 
 master_key <- bind_rows(hmb_c1 |> select(mb_m05, respondent_master_id),
                   hmb_c2 |> select(mb_m05, respondent_master_id)
 )
 
-# #Filter census data to covariates of interest
-# hmb_c1 <- hmb_c1 %>%
-#   dplyr::select("respondent_master_id", "gender","marital_name", "age_at_survey", "building_id", "building_latitude", "building_longitude","village_name")
-# 
-# hmb_c2 <- hmb_c2 %>%
-#   dplyr::select("respondent_master_id", "gender","marital_name", "age_at_survey", "building_id", "building_latitude", "building_longitude","village_name")
-
 hmb_census <- bind_rows(hmb_c1,hmb_c2) |> 
   rename(sampling_date = mb_m0100) |> 
   mutate(BMI = (mb_d0100 / mb_d0200 **2) * 10000)
 
-#One individual was coded incorrectly
-hmb_census$village_name[!is.na(hmb_census$village_name) & hmb_census$village_name == "Carrizalito 2"] <- "Carrizalito 1"
+
+# Map village id to Spaniard villages
+village_map <- tribble(~village_code, ~village_name_deid,
+  18 , "Ermua",
+  21 , "Azpeitia",
+  26 , "Mungia",
+  73 , "Tolosa",
+  116 , "Basauri",
+  144 , "Hondarribia",
+  145 , "Hernani",
+  162 , "Erandio",
+  169 , "Sestao",
+  118 , "Bermeo",
+  14 , "Madera",
+  41 , "Pasaia",
+  140 , "Zarautz",
+  89 , "Lekeitio",
+  58 , "Laguardia",
+  110 , "Zumaia",
+  174 , "Getaria",
+  5 , "Irun"
+)
+
+hmb_census <- full_join(hmb_census, village_map)
 
 #RCT Data
-demographics <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_respondents_WAVE3_v3_F_BEGHINI_2021-07-28.csv")
-demographics <- demographics %>%
-   dplyr::select("respondent_master_id", "building_id_w3","village_name_w3",
-        "b0100", "b0200","b0600","b0800","b0900")
+demographics <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_respondents_WAVE3_v3_F_BEGHINI_2023-10-23.csv") |> 
+  dplyr::select("respondent_master_id", "building_id_w3","village_name_w3",
+         "b0100", "b0200","b0600","b0800","b0900")
 
 ```
 
 
-
-New Strain Share
+Strain Share
 ```{r}
-test_ssr <- readRDS("data/sharing_rate_with_zero.RDS")
-test_ssr_num <- as.matrix(test_ssr)
+test_ssr_num <- as.matrix(readRDS("data/sharing_rate_with_zero.RDS"))
 
 test_ssr_num <- test_ssr_num[order(rownames(test_ssr_num)),
                              order(colnames(test_ssr_num))]
@@ -129,45 +168,54 @@ species_bray <- as.matrix(species_bray)
 
 #Calculate jaccard index manually
 species_jaccard_sim <- vegdist(t(species_data), method = 'jaccard')
+species_jaccard_sim <- as.data.frame(species_jaccard_sim)
 ```
 
 Calculate coverage rates and update social network to match hmb census
 ```{r}
 #Full edge dataframe
-all_edges <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v3_F_BEGHINI_2021-09-27.csv", as.is = TRUE)
-#Remove not get along
-all_edges <- all_edges %>% filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'))
+all_edges <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v3_F_BEGHINI_2021-09-27.csv", as.is = TRUE) |> 
+              filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling')) #Remove not get along
 #Filter to villages for people we have microbiome information from
 all_vils <- hmb_census %>%
   filter(respondent_master_id %in% rownames(strain_rate)) %>%
-  dplyr::select(village_name) %>% distinct() %>% pull(village_name)
+  dplyr::select(village_code) %>% distinct() %>% pull(village_code)
 
-#Calculate coverage rates with network data as denominator
 village_names <- c()
+vill_cov = data.frame()
 for(i in 1:length(all_vils)){
-  vil <- all_edges %>% filter(all_edges$village_name_w3 == all_vils[i])
+  vil <- all_edges %>% filter(all_edges$village_code_w3 == all_vils[i])
   vil_ids <- unique(c(vil$ego, vil$alter))
   coverage_rate <- mean(vil_ids %in% rownames(strain_rate))
   num_ppl <- sum(vil_ids %in% rownames(strain_rate))
-  print(paste(all_vils[i],":", round(coverage_rate, 3), num_ppl))
-  if(!is.na(coverage_rate) & num_ppl>=10){
+  vill_cov <- bind_rows(vill_cov,c(village_code = all_vils[i], cov= round(coverage_rate, 3), num_ppl_mb = num_ppl, num_ppl_sn = length(vil_ids)))
+  #print(paste(all_vils[i],":", round(coverage_rate, 3), num_ppl, length(vil_ids)))
+  if(!is.na(coverage_rate) & coverage_rate >=.3 & num_ppl>=10){
     village_names <- c(village_names, all_vils[i])
   }
 }
 
+demographics <- demographics |> filter(village_code_w3 %in% village_names)
+```
 
+```{r}
 #Filter edgelist to the villages that with sufficient microbiome coverage
 #People must be in the same village as when we collected their microbiome data This always holds
 all_edges <- all_edges %>%
-  filter(village_name_w3 %in% village_names)
+  filter(village_code_w3 %in% village_names)
 
 all_network_ids <- c(all_edges$ego, all_edges$alter)
 
 #Filter edgelist to study participants who we have microbiome data for
 SN <- all_edges %>% filter(ego %in% rownames(strain_rate) , alter %in% rownames(strain_rate))
 
+
 hmb_census <- hmb_census |> 
-  filter(respondent_master_id %in% rownames(strain_rate))
+  filter(respondent_master_id %in% colnames(species_data))
+
+hmb_census <- hmb_census %>%
+  filter(village_code %in% village_names)
+
 #Check if people moved villages or houses for whom we have study data for
 hmb_census_ego <- hmb_census
 names(hmb_census_ego) <- paste0(names(hmb_census_ego),"_ego")
@@ -181,21 +229,14 @@ SN_census <- merge(SN, hmb_census_ego) %>% merge(hmb_census_alter)
 ```
 
 ```{r}
-hmb_census <- hmb_census %>%
-  filter(village_name %in% village_names)
-
 #Household data
 print("Average Household Size from Microbiome Villages")
-hmb_census %>% group_by(building_id) %>%
+demographics %>% group_by(household_id_w3) %>%
   summarise(n = n()) %>% pull(n) %>% mean()
 ```
 
 
 ```{r}
-#Village size
-hmb_census %>% group_by(village_name) %>%
-  summarise(n = n()) %>% arrange(n)
-
 #Get summary statistics for individuals we have microbiome and network data for
 hmb_census <- hmb_census %>% filter(respondent_master_id %in% rownames(strain_rate),
                                     respondent_master_id %in% all_network_ids)
@@ -229,16 +270,16 @@ print(paste("Total Sample Size:",nrow(hmb_census)))
 
 ```{r}
 #Use HMB census data and only keep rct data for values we don't have
-covariates <- merge(hmb_census, demographics) %>%
+covariates <- inner_join(hmb_census, demographics, by = join_by(respondent_master_id)) %>%
   dplyr::select(-c("building_id_w3", "village_name_w3"))
 
 
 #Merge on household wealth index data
-household_wealth_data <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_households_WAVE3_v3_F_BEGHINI_2021-07-28.csv")
+household_wealth_data <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_households_WAVE3_v3_F_BEGHINI_2023_10-23.csv")
 household_wealth_data <- household_wealth_data %>% dplyr::select(building_id, household_wealth_index_w3)
 
 #Merge covariates with household wealth data
-covariates <- merge(covariates, household_wealth_data)
+covariates <- inner_join(covariates, household_wealth_data)
 
 #Calculate distance between villages
 names(covariates)
@@ -367,7 +408,6 @@ family_house_pairs <- unique(SN$pair_key[SN$same_building == 1 |
 
 Create helpful datasets at the village level
 ```{r}
-#all_edges %>% filter(village_name_w3 == village_names[6])
 #Create auxiliary networks
 #Note on data trustworthiness, do we want to impute, pareent child relationships/sibling relationships
 #How to make sure we're not dropping cases that don't share anything with their first degree
@@ -382,9 +422,9 @@ for(i in 1:nrow(all_edges)){
 
 for(i in 1:length(village_names)){
   #Create social networks edge lists
-  assign(paste0("sn_vil_", i), SN %>% filter(village_name_w3 == village_names[i]))
+  assign(paste0("sn_vil_", i), SN %>% filter(village_code_w3 == village_ids[i]))
   
-  assign(paste0("sn_vil_all_", i), all_edges %>% filter(village_name_w3 == village_names[i]))
+  assign(paste0("sn_vil_all_", i), all_edges %>% filter(village_code_w3 == village_ids[i]))
   
   #Create social network graphs
   assign(paste0("sn_vil_graph_", i),
@@ -441,24 +481,24 @@ for(i in 1:length(village_names)){
   assign(paste0("bray_vil_graph_scram_", i),
          get(paste0("bray_vil_graph_", i)))  
   
-  #Create jaccard adjacency
-  assign(paste0("jaccard_vil_", i),
-         species_jaccard_sim[rownames(species_jaccard_sim) %in% get(paste0("village_ids_", i)),
-                     colnames(species_jaccard_sim) %in% get(paste0("village_ids_", i))])
-  
-  #Create jaccard graph
-  assign(
-    paste0("jaccard_vil_graph_", i),
-    igraph::simplify(graph_from_adjacency_matrix(
-      get(paste0("jaccard_vil_", i)),
-      weighted = TRUE,
-      mode = c("undirected")
-    ))
-  )
-  
-  #Create jaccard graph for scrambling
-  assign(paste0("jaccard_vil_graph_scram_", i),
-         get(paste0("jaccard_vil_graph_", i))) 
+  # #Create jaccard adjacency
+  # assign(paste0("jaccard_vil_", i),
+  #        species_jaccard_sim[rownames(species_jaccard_sim) %in% get(paste0("village_ids_", i)),
+  #                    colnames(species_jaccard_sim) %in% get(paste0("village_ids_", i))])
+  # 
+  # #Create jaccard graph
+  # assign(
+  #   paste0("jaccard_vil_graph_", i),
+  #   igraph::simplify(graph_from_adjacency_matrix(
+  #     get(paste0("jaccard_vil_", i)),
+  #     weighted = TRUE,
+  #     mode = c("undirected")
+  #   ))
+  # )
+  # 
+  # #Create jaccard graph for scrambling
+  # assign(paste0("jaccard_vil_graph_scram_", i),
+  #        get(paste0("jaccard_vil_graph_", i))) 
   
 }
 
@@ -466,39 +506,4 @@ for(i in 1:length(village_names)){
 
 Change SN names to random villages in Spain
 ```{r}
-village_names
-#add extra villages
-village_map <- c(
-  18 = "Ermua",
-  21 = "Azpeitia",
-  26 = "Mungia",
-  73 = "Tolosa",
-  116 = "Basauri",
-  144 = "Hondarribia",
-  145 = "Hernani",
-  162 = "Erandio",
-  169 = "Sestao",
-  118 = "Bermeo",
-  14 = "Madera",
-  41 = "Pasaia",
-  140 = "Zarautz",
-  89 = "Lekeitio",
-  58 = "Laguardia",
-  110 = "Zumaia",
-  174 = "Getaria",
-  5 = "Irun"
-)
-
-hmb_census$village_name_deid <- village_map[hmb_census$village_name]
-
-for(i in 1:nrow(SN)){
-  SN$village_name_deid[i] <- village_map[SN$village_name_w3[i]]
-}
-
-for(i in 1:nrow(all_edges)){
-  all_edges$village_name_deid[i] <- village_map[all_edges$village_name_w3[i]]
-}
-
-village_names <- unname(village_map)
-
 ```
