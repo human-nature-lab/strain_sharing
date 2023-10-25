@@ -19,9 +19,9 @@ library(ggplotify)
 Calculate Diversity
 ```{r}
 #Calculate diversity indices
-richness  <- rowSums(species_data > 0)
-shannon <- vegan::diversity(species_data, index = "shannon")
-invsimpson <- vegan::diversity(species_data, index = "invsimpson")
+richness  <- rowSums(t(species_data) > 0)
+shannon <- vegan::diversity(t(species_data), index = "shannon")
+invsimpson <- vegan::diversity(t(species_data), index = "invsimpson")
 diversity_df <- data.frame(respondent_master_id = names(richness),
                            richness = unname(richness),
                            shannon = unname(shannon),
@@ -37,8 +37,8 @@ count <- 0
 length(unique(c(SN$ego, SN$alter)))
 #From the few villages we dropped?
 for(i in 1:length(village_names)){
-  sn_vil <- SN %>% filter(village_name_w3 == village_names[i])
-  sn_vil_all <- all_edges %>% filter(village_name_w3 == village_names[i])
+  sn_vil <- SN %>% filter(village_code_w3 == village_names[i])
+  sn_vil_all <- all_edges %>% filter(village_code_w3 == village_names[i])
   village_ids <- unique(c(sn_vil$ego, sn_vil$alter))
   count <- count + length(village_ids)
   sn_vil <- simplify(graph_from_data_frame(sn_vil, directed = FALSE))
@@ -140,7 +140,10 @@ sim_deg_one_df <- data.frame(sim_deg_one = sim_deg_one,
 centrality_sim_df <- merge(centrality_df,sim_deg_one_df)
 centrality_sim_df <- merge(centrality_sim_df, diversity_df)
 centrality_sim_df_covars <- merge(centrality_sim_df, covariates)
-centrality_sim_df_covars_all <- merge(centrality_sim_df_covars, shiv_covar_df)
+
+
+centrality_sim_df_covars_all <- inner_join(extraction_batch, sequencing_depth, by=join_by(SampleID)) |> 
+  inner_join(centrality_sim_df_covars, by=join_by(SampleID==mb_m05))
 
 #We lose 240 people for not having covariates, look into this
 head(centrality_sim_df_covars_all)
@@ -200,7 +203,6 @@ cluster_bucket_fig <- ggboxplot(
   labs_pubr() +
   theme(legend.position = "none") +
   coord_cartesian(ylim = c(0,40))
-?stat_pvalue_manual
 ```
 
 Make some plots
@@ -283,7 +285,8 @@ clustering_coef_fig <-
   theme_minimal()
 
 #Color plots by Rarity of species?
-deg_c_sharing_fig <- ggarrange(deg_c_sharing_all,deg_c_sharing_first,
+deg_c_sharing_fig <- ggarrange(deg_c_sharing_all + stat_cor() ,
+                               deg_c_sharing_first + stat_cor(),
                                labels = c("4a", "4b"))
 
 annotate_figure(deg_c_sharing_fig,
@@ -302,6 +305,18 @@ species_pop_deg_c <-
   theme_minimal()
 
 ```
+Test for correlation, Figure 4B,D
+```{r}
+broom::tidy(cor.test(centrality_sim_df$degree_c, centrality_sim_df$strain_sim_all)) |> 
+  select(cor=estimate, p.value) |> 
+  mutate(test='degree_c~strain_sim_all') |> 
+  bind_rows(
+broom::tidy(cor.test(centrality_sim_df$degree_c, centrality_sim_df$sim_deg_one)) |> 
+  select(cor=estimate, p.value) |> 
+  mutate(test='degree_c~strain_sim_first_degree'))
+
+```
+
 
 No diversity reelationship
 ```{r}
@@ -607,87 +622,99 @@ lm.1 <- lmerTest::lmer(sim_deg_one ~ cluster_coef_all + age_at_survey +household
                          gender+ (1|village_name),
              data = centrality_sim_df_covars)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
                          gender+ (1|village),
              data = centrality_sim_df_covars)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ between_c_all + age_at_survey +household_wealth_index_w3 +
                          gender+ (1|village),
              data = centrality_sim_df_covars)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
                          gender+ (1|village),
              data = centrality_sim_df_covars)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ between_c_all + age_at_survey +household_wealth_index_w3 +
                          gender+ (1|village),
              data = centrality_sim_df_covars)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
                          gender+ (1|village),
              data = centrality_sim_df_covars)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
                          gender+ (1|village),
              data = centrality_sim_df_covars)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c + age_at_survey +household_wealth_index_w3  + birth_in_village+
                          gender+ (1|village),
              data = centrality_sim_df_covars)
 
+```
 
-#All covariates
-
-
-
+All covariates
+```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ cluster_coef_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ dna_conc + BMI +(1|village_name),
+                         gender+  DNA_conc + BMI + Plate + WIKI + Reads +(1|village_name),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ dna_conc + BMI +(1|village),
+                         gender+ DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ between_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ dna_conc + BMI +(1|village),
+                         gender+  DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ dna_conc + BMI +(1|village),
+                         gender+  DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
+```
 
+```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ between_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ dna_conc + BMI +(1|village),
+                         gender + DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ dna_conc + BMI +(1|village),
+                         gender+ DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ dna_conc + BMI  +(1|village),
+                         gender+ DNA_conc + BMI + Plate + WIKI + Reads + (1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
-
+```
+```{r}
 lm.1 <- lmerTest::lmer(invsimpson ~ between_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ dna_conc + BMI  +(1|village),
+                         gender+ DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
-names(centrality_sim_df_covars_all)
-
 ```
 
 
@@ -718,11 +745,11 @@ wilcox.test(centrality_sim_df_covars$strain_sim_all[centrality_sim_df_covars$b08
             centrality_sim_df_covars$strain_sim_all[centrality_sim_df_covars$b0800 != "Since birth"],
             alternative = "greater")
 
-immigrant_df <- centrality_sim_df_covars %>% filter(!(b0800 %in% c("Dont_Know", "Less than a year")))
+immigrant_df <- centrality_sim_df_covars_all %>% filter(!(b0800 %in% c("Dont_Know", "Less than a year")))
 
 
 lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c + age_at_survey +household_wealth_index_w3 +
-                         gender+  b0800+ (1|village),
+                         gender +  DNA_conc + Reads + Plate + WIKI + b0800+ (1|village),
              data = immigrant_df)
 
 summary(lm.1)
@@ -730,7 +757,7 @@ summary(lm.1)
 immigrant_df_time <- centrality_sim_df_covars %>% filter(time_in_vil <= 5)
 
 lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c + age_at_survey +household_wealth_index_w3 +
-                         gender+  time_in_vil+ (1|village),
+                         gender +  DNA_conc + Reads + Plate + WIKI +  time_in_vil+ (1|village),
              data = immigrant_df_time)
 
 #This is negative, super weird
@@ -1432,7 +1459,7 @@ summary(lm.3)
 building_diversity_covars <- merge(building_diversity, covariates)
 
 lm.1 <- lmerTest::lmer(richness ~ building_count + age_at_survey +household_wealth_index_w3 +
-                         gender+ (1|village_name),
+                         gender+ BMI + DNA_conc + WIKI + Reads + Plate + (1|village_name),
              data = building_diversity_covars)
 summary(lm.1)
 
@@ -1472,7 +1499,7 @@ building_diversity_covars_all <- merge(building_diversity_covars, shiv_covars)
 
 
 lm.1 <- lmerTest::lmer(richness ~ building_count + age_at_survey +household_wealth_index_w3 +
-                         gender+ dna_conc_shiv + BMI_shiv +(1|village_name),
+                         gender+ BMI + DNA_conc + WIKI + Reads + Plate +(1|village_name),
              data = building_diversity_covars_all)
 summary(lm.1)
 lm.2 <- lmerTest::lmer(invsimpson ~ building_count + age_at_survey +household_wealth_index_w3 +
