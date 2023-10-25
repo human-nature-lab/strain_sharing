@@ -40,7 +40,7 @@ shared_summary <- SN %>%
 #Get shared strain rates for unnominated individuals in the same village
 count <- 0
 for(i in 1:length(village_names)){
-  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  SN_Village <- SN %>% filter(village_code_w3 == village_names[i])
   village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
   count <- count + length(village_ids) *(length(village_ids)-1)/2
 }
@@ -48,7 +48,7 @@ for(i in 1:length(village_names)){
 
 
 for(i in 1:length(village_names)){
-  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  SN_Village <- SN %>% filter(village_code_w3 == village_names[i])
   village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
   strain_rate_vil <- strain_rate[rownames(strain_rate) %in% village_ids ,
                                  colnames(strain_rate) %in% village_ids]
@@ -74,7 +74,7 @@ for(i in 1:length(village_names)){
 strain_2_rate <- strain_rate
 
 for(i in 1:length(village_names)){
-  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  SN_Village <- SN %>% filter(village_code_w3 == village_names[i])
   village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
   for(j in 1:(length(village_ids)-1)){
     for(k in j:length(village_ids)){
@@ -135,7 +135,7 @@ shared_summary <- shared_summary %>% add_row(non_kin_different_house_row)
 #Add on summary row for people living in the same house
 same_house <- SN %>% 
   distinct(pair_key, .keep_all = TRUE) %>% 
-  filter(same_building == 1) %>%
+  filter(building_id_ego == building_id_alter) %>%
   summarise(relationship = "Same Building",
             Proportion_With_Shared_Strains = round(mean(strain_sharing_rate>0,
                                                 na.rm = TRUE),2),
@@ -175,7 +175,7 @@ SN_Non_Kin_House_simple <- SN_Non_Kin_House %>%
 SN_Non_Kin_House_simple$relationship <- "Non-Kin and Different House"
 
 SN_Same_Building_simple <- SN %>%
-  filter(same_building == 1) %>%
+  filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key,.keep_all = TRUE) %>% 
   dplyr::select(relationship, strain_sharing_rate)
 
@@ -208,8 +208,8 @@ levels(SN_All_Relationship_DF$relationship) <- c("Partner",
                                                  "Father",
                                                  "Free Time",
                                                  "Personal/\nPrivate",
-                                                 "Sibling",
                                                  "Non-Kin\nDif-House",
+                                                 "Sibling",
                                                  "Close Friend",
                                                  "No-Nom\nSame-Vil",
                                                  "No-Nom\nDif-Vil")
@@ -228,9 +228,7 @@ rels_pvals <- compare_means(strain_sharing_rate ~ relationship,
                    p.adjust.method = "BH")
 
 rels_pvals <- rels_pvals %>% filter(p.signif == "ns") %>%
-  mutate(y.position = c(40,37.5,35,32.5))
-
-
+  mutate(y.position = c(40,37.5,35,32.5,27))
 
 ```
 
@@ -434,7 +432,7 @@ meals_all_plot <- ggboxplot(
   stat_pvalue_manual(meal_pvals, label = "p.signif", tip.length = 0)+
   font("ylab", face = "bold", size = 12)
 
-  
+  meals_all_plot
 
 ```
 
