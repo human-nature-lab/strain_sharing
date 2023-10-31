@@ -61,6 +61,12 @@ read_csv("/WORKAREA/home/fb343/F_BEGHINI_HM/read_counts/RQ19764_Read_Counts.csv"
   group_by(SampleID) |> 
   summarize(Reads=sum(Reads))
 
+shipping_batch <- 
+  read_csv('/WORKAREA/work/HONDURAS_MICROBIOME/F_BEGHINI/COHORT1/v3/hmb_shipments_cohort1_baseline_v3.csv') |> 
+  filter(str_detect(barcode, '-05$')) |> 
+  select(SampleID=`barcode`, shipment_batch) |> 
+  bind_rows(read_csv('/WORKAREA/home/fb343/F_BEGHINI_HM/shipment_batch_cohort2.csv'))
+
 ```
 
 ```{r}
@@ -94,9 +100,9 @@ master_key <- bind_rows(hmb_c1 |> select(mb_m05, respondent_master_id),
 )
 
 hmb_census <- bind_rows(hmb_c1,hmb_c2) |> 
-  rename(sampling_date = mb_m0100) |> 
-  mutate(BMI = (mb_d0100 / mb_d0200 **2) * 10000)
-
+  mutate(BMI = (mb_d0100 / mb_d0200 **2) * 10000,
+         mb_m0100 = if_else(is.na(mb_m0100), if_else(!is.na(completed_at_E6), lubridate::as_date(completed_at_E6), lubridate::as_date(completed_at_E5)), mb_m0100)) |> 
+ rename(sampling_date = mb_m0100)
 
 # Map village id to Spaniard villages
 village_map <- tribble(~village_code, ~village_name_deid,
@@ -502,8 +508,4 @@ for(i in 1:length(village_names)){
   
 }
 
-```
-
-Change SN names to random villages in Spain
-```{r}
 ```
