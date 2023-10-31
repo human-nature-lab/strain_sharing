@@ -143,7 +143,9 @@ centrality_sim_df_covars <- merge(centrality_sim_df, covariates)
 
 
 centrality_sim_df_covars_all <- inner_join(extraction_batch, sequencing_depth, by=join_by(SampleID)) |> 
+  inner_join(shipping_batch, by=join_by(SampleID)) |> 
   inner_join(centrality_sim_df_covars, by=join_by(SampleID==mb_m05))
+  
 
 #We lose 240 people for not having covariates, look into this
 head(centrality_sim_df_covars_all)
@@ -608,111 +610,53 @@ set.seed(1)
 ```
 
 
-
-
-
-
-
-
-```{r}
-#Non-shiv covariates
-
-
-lm.1 <- lmerTest::lmer(sim_deg_one ~ cluster_coef_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ (1|village_name),
-             data = centrality_sim_df_covars)
-summary(lm.1)
-```
-```{r}
-lm.1 <- lmerTest::lmer(sim_deg_one ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ (1|village),
-             data = centrality_sim_df_covars)
-summary(lm.1)
-```
-```{r}
-lm.1 <- lmerTest::lmer(sim_deg_one ~ between_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ (1|village),
-             data = centrality_sim_df_covars)
-summary(lm.1)
-```
-```{r}
-lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ (1|village),
-             data = centrality_sim_df_covars)
-summary(lm.1)
-```
-```{r}
-lm.1 <- lmerTest::lmer(strain_sim_all ~ between_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ (1|village),
-             data = centrality_sim_df_covars)
-summary(lm.1)
-```
-```{r}
-lm.1 <- lmerTest::lmer(strain_sim_all ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ (1|village),
-             data = centrality_sim_df_covars)
-summary(lm.1)
-```
-```{r}
-lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ (1|village),
-             data = centrality_sim_df_covars)
-summary(lm.1)
-```
-```{r}
-lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c + age_at_survey +household_wealth_index_w3  + birth_in_village+
-                         gender+ (1|village),
-             data = centrality_sim_df_covars)
-
-```
-
 All covariates
 ```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ cluster_coef_all + age_at_survey +household_wealth_index_w3 +
-                         gender+  DNA_conc + BMI + Plate + WIKI + Reads +(1|village_name),
+                         gender +  DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village_name),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
 ```
 ```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
+                         gender+ DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
 ```
 ```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ between_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+  DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
+                         gender+  DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
 ```
 ```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+  DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
+                         gender+  DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
 ```
 
 ```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ between_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender + DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
+                         gender + DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
 ```
 ```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
+                         gender+ DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
 ```
 ```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ DNA_conc + BMI + Plate + WIKI + Reads + (1|village),
+                         gender+ DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads + (1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
 ```
 ```{r}
 lm.1 <- lmerTest::lmer(invsimpson ~ between_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+ DNA_conc + BMI + Plate + WIKI + Reads +(1|village),
+                         gender+ DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
 ```
