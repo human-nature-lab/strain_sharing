@@ -16,6 +16,7 @@ Covars_ego <- covariates %>% merge(household_wealth_data) %>%
   rename(ego = respondent_master_id, ego_age = age_at_survey, ego_gender = gender,
          ego_household_wealth = household_wealth_index_w3, ego_education = b0100, ego_indigenous = b0200, 
          ego_religion = b0600, ego_length_in_village = b0800, ego_length_in_village_years = b0900,
+         ego_DDS = DDS, 
          ego_latitude = building_latitude, ego_longitude = building_longitude) %>%
   mutate(ego_education = recode(ego_education, "Have not completed any type of school" = 0,
                                 "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,

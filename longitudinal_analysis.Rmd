@@ -1,0 +1,470 @@
+---
+title: "Longitudinal Analysis"
+author: "Francesco Beghini"
+date: "2023-10-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE, warning = FALSE, message = FALSE, cache.lazy = FALSE)
+library(stringi)
+library(stringr)
+library(dplyr)
+library(readr)
+library(igraph)
+library(doParallel)
+library(foreach)
+library(ggplot2)
+library(tidyr)
+library(lmerTest)
+library(lme4)
+```
+
+```{r load_metadata_microbiome, message=FALSE, warning=FALSE}
+metadata_followup <- read_csv('/WORKAREA/home/fb343/F_BEGHINI_HM/COHORT1_FOLLOWUP/v2/hmb_respondents_cohort1_followup_v2_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
+  mutate(mb_m05 = str_replace(mb_m00, '-00$', '-15'),
+  marital_name = if_else(!is.na(mb_c004),mb_c004, 'Married')) |> 
+  filter(!is.na(mb_m05))
+metadata_baseline <- read_csv('/WORKAREA/home/fb343/F_BEGHINI_HM/COHORT1/v3/hmb_respondents_cohort1_baseline_v3_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
+  filter(respondent_master_id %in% metadata_followup$respondent_master_id,
+         !is.na(mb_m05))
+
+subset_samples <- c(metadata_followup$mb_m05, metadata_baseline$mb_m05)
+
+master_key <- bind_rows(metadata_baseline,metadata_followup) |> dplyr::select(mb_m05, respondent_master_id, village_code) |> tibble::column_to_rownames('mb_m05')
+```
+
+```{r load_social_network_waves, message=FALSE, warning=FALSE}
+SN_w3 <- read_csv("/WORKAREA/home/fb343/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v3_F_BEGHINI_2021-09-27.csv", guess_max = 50000,show_col_types = FALSE) |> 
+              filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'), #Remove not get along
+                     ego %in% metadata_followup$respondent_master_id, 
+                     alter %in% metadata_followup$respondent_master_id,
+                     ego %in% metadata_baseline$respondent_master_id, 
+                     alter %in% metadata_baseline$respondent_master_id
+                     ) |> 
+                mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
+                       wave = 3)
+
+SN_w4 <- read_csv("/WORKAREA/home/fb343/F_BEGHINI_G/WAVE4/v1/honduras_connections_WAVE4_v1_F_BEGHINI_2023-11-01.csv", guess_max = 50000,show_col_types = FALSE) |> 
+              filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'), #Remove not get along
+                     ego %in% metadata_followup$respondent_master_id, 
+                     alter %in% metadata_followup$respondent_master_id) |> 
+                mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
+                       wave = 4)
+respondents_w4 <- read_csv('/WORKAREA/home/fb343/F_BEGHINI_G/WAVE4/v1/honduras_respondents_WAVE4_v1_F_BEGHINI_2023-11-01.csv', guess_max = 50000,show_col_types = FALSE) |> 
+              filter(respondent_master_id %in% metadata_followup$respondent_master_id)
+```
+
+```{r collapse_multiple_ties}
+reduced_SN_w3 <- SN_w3 |> 
+  unite(a2703a, a2703a, a2704a, na.rm = TRUE,) |> 
+  unite(a2703b, a2703b, a2704b, na.rm = TRUE,) |> 
+  unite(a2703c, a2703c, a2704c, na.rm = TRUE,) |> 
+  unite(a2703d, a2703d, a2704d, na.rm = TRUE,) |> 
+  unite(a2703e, a2703e, a2704e, na.rm = TRUE,) |> 
+  unite(a2703f, a2703f, a2704f, na.rm = TRUE,) |> 
+  unite(a2703g, a2703g, a2704g, na.rm = TRUE,) |> 
+  mutate(across(starts_with('a2703'), ~ na_if(.x, ''))) |> 
+  select(-a2703, -a2704, -question,-a2703h, -alter_source, -office_w3, -municipality_w3) |> 
+  group_by(pair) |> 
+  summarize(ego, alter, relationship = paste(relationship, collapse = ','), across(starts_with('a2703'), ~ paste(unique(.x[!is.na(.x)]), collapse = ',')) , village_name_w3, village_code_w3) |> 
+  distinct(pair, .keep_all = TRUE) |> 
+  mutate(is_kin = grepl('mother|father|child|sibling', relationship)) |> 
+  select(ego, alter, everything()) |> 
+  ungroup()
+
+SN_w3_graph <- graph_from_data_frame((reduced_SN_w3 |> select(-village_name_w3, -village_code_w3)), 
+                                     directed = FALSE, 
+                                     vertices = (reduced_SN_w3 |> 
+                                                   select(ego, alter, starts_with('village')) |> 
+                                                   pivot_longer(cols = c(-village_name_w3, -village_code_w3), names_to = 'a', values_to = 'vertex') |> 
+                                                   select(vertex, starts_with('village')) |> 
+                                                   distinct()
+                                                 )
+                                     )
+
+SN_w1_graph <- graph_from_data_frame((reduced_SN_w1 |> select(-village_code_w1, -village_name_w1)),
+                                     directed = FALSE,
+                                     vertices = (reduced_SN_w1 |> 
+                                                   select(ego, alter, starts_with('village')) |> 
+                                                   pivot_longer(cols = c(-village_name_w1, -village_code_w1), names_to = 'a', values_to = 'vertex') |> 
+                                                   select(vertex, starts_with('village')) |> 
+                                                   distinct()
+                                                 )
+                                     )
+
+```
+
+
+```{r load_strainphlan_data, cache=FALSE}
+strain_shared <- readRDS('/SCRATCH/tmp/shared.RDS')  |> 
+    filter(s1 %in% subset_samples & s2 %in% subset_samples ) |> 
+    mutate(ego = master_key[s1, 'respondent_master_id' ],
+         alter = master_key[s2, 'respondent_master_id'],
+         pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
+         timepoint = case_when( 
+           str_sub(s1,10)=='05' & str_sub(s2,10) == '05' ~ 'T1',
+           str_sub(s1,10)=='15' & str_sub(s2,10) == '15' ~ 'T2',
+           str_sub(s1,10)=='05' & str_sub(s2,10) == '15' ~ 'T1/T2',
+           str_sub(s1,10)=='15' & str_sub(s2,10) == '05' ~ 'T2/T1',
+           )
+         ) |> 
+  left_join(SN_w3, by = join_by(pair))
+
+sharing_rate <- readRDS('/SCRATCH/tmp/sharing_rate_with_zero_long_with_followup.RDS') |> 
+  separate_wider_delim(pair, "=", names = c('s1','s2')) |> 
+  filter(s1 %in% subset_samples & s2 %in% subset_samples ) |> 
+  mutate(ego = master_key[s1, 'respondent_master_id' ],
+         alter = master_key[s2, 'respondent_master_id'],
+           pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
+         same_subject = str_sub(s1,1,8) == str_sub(s2,1,8),
+         village_code_ego = master_key[s1, 'village_code'],
+         village_code_alter = master_key[s2, 'village_code']
+  )
+
+sharing_rate_T1_w3 <- sharing_rate |> 
+  filter(timepoint=='T1') |> 
+  left_join(SN_w3, by = join_by(pair, alter, ego))
+
+sharing_rate_T2_w3 <- sharing_rate |> 
+  filter(timepoint=='T2') |> 
+  left_join(SN_w3, by = join_by(pair, alter, ego))
+
+sharing_rate_inter <- sharing_rate |> 
+  filter(timepoint=='T1/T2')
+
+sharing_w3 <- strain_shared |> 
+  left_join(SN_w3, by = join_by(pair), multiple = "all")
+
+```
+
+```{r edge_change_t1_t2, cache=FALSE}
+cluster <- multidplyr::new_cluster(20)
+multidplyr::cluster_library(cluster, "dplyr")
+status_sharing_w3 <- sharing_w3 |> 
+  filter(same_timepoint==TRUE) |> 
+  select(s1,s2, pair, dist, species, timepoint, relationship=relationship.x, shared ) |> 
+  distinct(pair, species, relationship, timepoint, .keep_all = TRUE) |> 
+  arrange(species, timepoint) |> 
+  group_by(pair, species, relationship) |> 
+  multidplyr::partition(cluster) |> 
+  summarise(status = dplyr::case_when(
+    n() == 1 & timepoint=='T1' & shared == TRUE ~ 'sharing_lost_at_t2',
+    n() == 1 & timepoint=='T2' & shared == TRUE ~ 'sharing_acquired_only_at_t2',
+    n() == 2 & shared == TRUE                   ~ 'kept_sharing',
+    .default = 'no_share'
+  )) |> 
+  collect()
+```
+```{r include=FALSE}
+sharing_w3 |> 
+  filter(same_subject==TRUE) |> 
+  mutate(trans = dist <= threshold) |> 
+  group_by(pair, timepoint) |>  
+  #mutate(shared_sgbs=n()) |>
+  #ungroup() |>
+  #distinct(pair, n, timepoint, .keep_all = TRUE) |>
+  #left_join(data.frame(pair=names(shared_sgbs), shared_sgbs=as.numeric(shared_sgbs))) |> 
+  summarize(ssr=sum(trans==TRUE)/n()) |> 
+  ggplot() + 
+    ggbeeswarm::geom_quasirandom(aes(timepoint, ssr))
+```
+
+
+```{r eval=FALSE, include=FALSE}
+status_sharing_w3 |> 
+  distinct() |> 
+  filter(!is.na(relationship)) |> 
+  ggplot(aes(relationship, fill=status)) +
+  geom_bar(position="stack", stat="count")
+```
+
+```{r eval=FALSE, include=FALSE}
+status_sharing_w3 |> 
+  sample_n(100)
+  distinct() |> 
+  filter(!is.na(relationship)) |> 
+  pivot_wider(-status)
+  group_by(pair) |> 
+  summarize()
+```
+```{r eval=FALSE, include=FALSE}
+cols = c('T1'=NA,'T2'=NA,'T1/T2'=NA,'T2/T1'=NA)
+all_pairs <- foreach(ego_l = c(SN_w3$ego, SN_w3$alter), .combine = 'rbind') %do% {
+  ego_n = make_ego_graph(SN_w3_graph, nodes = ego_l, mindist = 0)[[1]]
+  foreach(alter_l = setdiff(names(V(ego_n)), ego_l), .combine = 'rbind') %do%{
+    pair_l = stri_c(stri_sort(stri_split_boundaries(str_c(ego_l, alter_l), type='character')[[1]]), collapse = '')
+    c(pair_l, ego_l, alter_l)
+  } 
+}
+colnames(all_pairs) = c('pairs','ego','alter')
+all_pairs <- as.data.frame(all_pairs) |> 
+  distinct(pairs, .keep_all = TRUE)
+
+cl <- parallel::makeForkCluster(12)
+doParallel::registerDoParallel(cl)
+
+longitudinal_ds <- foreach(row = rownames(all_pairs), .combine = 'rbind') %dopar% {
+  pair_l = all_pairs[row,'pairs']
+  ego_l = all_pairs[row,'ego']
+  alter_l = all_pairs[row,'alter']
+  ego_kept_strain_overtime = strain_shared |> filter(ego==ego_l&alter==ego_l) |> select(-same_village,-threshold)
+  alter_kept_strain_overtime = strain_shared |> filter(ego==alter_l & alter==alter_l) |> select(-same_village,-threshold)
+    tmp <- strain_shared |> filter(pair == pair_l) |> 
+      pivot_wider(id_cols = everything(), names_from = timepoint, values_from = shared)
+    
+     tmp <- tibble::add_column(tmp, !!!cols[setdiff(names(cols),names(tmp))]) |> 
+      group_by(pair, species) |>
+      summarise(T1 = sum(T1, na.rm = TRUE), 
+                T2 = sum(T2, na.rm = TRUE),
+                `T1/T2` = sum(`T1/T2`, na.rm = TRUE),
+                `T2/T1` = sum(`T2/T1`, na.rm = TRUE)
+                ) |> 
+      arrange(species) |> 
+      left_join(ego_kept_strain_overtime |> filter(ego == ego_l) |> select(species, ego_kept=shared), by=join_by(species)) |> 
+      left_join(alter_kept_strain_overtime |> filter(alter == alter_l) |> select(species, alter_kept=shared), by=join_by(species)) |> 
+      mutate(across(where(is.logical), ~ if_else(is.na(.x), 0, as.integer(.x)))) |> 
+       ungroup()
+
+     tmp
+  
+}
+parallel::stopCluster(cl)
+```
+
+```{r eval=FALSE, include=FALSE}
+longitudinal_ds |> 
+  ungroup() |> 
+  mutate(trans_only_t1 = as.integer(T1==1 & rowSums(across(starts_with('T')))==1 & rowSums(across(contains('_kept'))) == 0),
+         trans_only_t2 = as.integer(T2==1 & rowSums(across(starts_with('T')))==1 & rowSums(across(contains('_kept'))) == 0),
+         retained = as.integer(T1 == 1 & T2 == 1 & rowSums(across(contains('_kept'))) == 2 & rowSums(across(contains('/'))) ==2 )
+         ) |> 
+  group_by(pair) |> 
+  summarize(srr = sum(retained) / n(),
+            ssr_t1 = sum(T1) / n(),
+            ssr_t2 = sum(T2) / n()) |> 
+  left_join(SN_w3, by=join_by(pair)) |> 
+  select(pair, relationship, srr, ssr_t1, ssr_t2) |> 
+  pivot_longer(cols = 3:5, names_to = 'rate', values_to = 'value') |> 
+  ggplot() +
+  geom_boxplot(aes(relationship, value, fill=rate))
+```
+
+
+```{r eval=FALSE, include=FALSE}
+# Cosine similarity species
+cosine_dis_long <- lsa::cosine(as.matrix(species_data)) |> 
+  as.data.frame() |> 
+  tibble::rownames_to_column('s') |> 
+  pivot_longer(-s, names_to = 's1', values_to = 'cos')
+
+species_bray_long <- species_bray |> 
+  as.data.frame() |> 
+  tibble::rownames_to_column('s') |> 
+  pivot_longer(-s, names_to = 's1', values_to = 'bc')
+```
+
+
+```{r}
+covariates <- readRDS('/SCRATCH/tmp/covariates')
+sub_covar <- covariates |> 
+  filter(respondent_master_id %in% metadata_followup$respondent_master_id) |> 
+  unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
+  dplyr::select(respondent_master_id,BMI, gender,indigenous_status, age_at_survey, DDS, household_wealth_index_w3) 
+sub_covar[sub_covar$respondent_master_id=='145q-7f4867c7-a4e1-47e8-9b7c-2d98a4294cdb','household_wealth_index_w3'] <- 5
+sub_covar[sub_covar$respondent_master_id=='nZno-6b2d0c05-ebeb-464b-836e-31493a161740','household_wealth_index_w3'] <- 4
+sub_covar[sub_covar$respondent_master_id=='cPP0-b47b9cbf-eeaf-430a-87bf-d6322e65108b','household_wealth_index_w3'] <- 2
+sub_covar[sub_covar$respondent_master_id=='nZno-b1e42724-5fd4-4aad-8835-80e8a7f430bf','household_wealth_index_w3'] <- 2
+sub_covar[sub_covar$respondent_master_id=='enz0-ce7dad59-da03-48d6-9649-40202eba50aa','household_wealth_index_w3'] <- 4
+sub_covar[sub_covar$respondent_master_id=='enz0-54c4a166-642d-4707-9dd9-eac58c3452b0','household_wealth_index_w3'] <- 4
+sub_covar[sub_covar$respondent_master_id=='cPP0-e7a61fe3-ea87-4f76-b992-bbfbde75393c','household_wealth_index_w3'] <- 4
+sub_covar[sub_covar$respondent_master_id=='h4Ru-14c55d32-c61c-44da-9088-6559224a1ae9','household_wealth_index_w3'] <- 3
+sub_covar[sub_covar$respondent_master_id=='nZno-66d3906b-0036-4943-bfbb-f5aabaa16123','household_wealth_index_w3'] <- 4
+sub_covar[sub_covar$indigenous_status == '','indigenous_status'] = 'None of the above'
+sub_covar$indigenous_status <- ifelse(sub_covar$indigenous_status=='None of the above', 0, 1)
+sub_covar$genderm <- ifelse(sub_covar$gender == 'man', 1, 0)
+sub_covar_mat <- sub_covar |> 
+  select(-gender) |> 
+  tibble::column_to_rownames('respondent_master_id')
+pairwise_mahalanomis <- biotools::D2.dist(sub_covar_mat, cov = cov(sub_covar_mat, use='complete'))
+pairwise_mahalanomis |> 
+  as.matrix() |> as.data.frame() |>
+  tibble::rownames_to_column('s1') |>
+  pivot_longer(-s1, names_to = 's2', values_to = 'maha_dist') |> 
+  rowwise() |> 
+  mutate(pair = stri_c(stri_sort(stri_split_boundaries(str_c(s1, s2), type='character')[[1]]), collapse = '')) |> 
+  distinct(pair, .keep_all = TRUE)-> pairwise_mahalanomis_long
+
+
+```
+
+
+```{r}
+strain_shared_only_relation <- subset(strain_shared, pair %in% reduced_SN_w3$pair)
+strain_shared_only_relation$tanh_r <- tanh(strain_shared_only_relation$threshold/strain_shared_only_relation$dist)
+```
+
+```{r}
+x <- sharing_w3 |> 
+  filter(same_subject == FALSE) |> 
+  dplyr::select(ego = ego.x, alter = alter.x, pair, relationship = relationship.x, timepoint, species, threshold, dist) |> 
+  distinct(pair, relationship, timepoint, species, .keep_all = TRUE) |> 
+  mutate(#tanh_r = tanh(threshold/dist),
+         relationship = replace_na(relationship, 'none')) |> 
+  pivot_wider(names_from = 'timepoint', values_from = 'dist') |> 
+  mutate(across(starts_with('T'), ~ replace_na(.x, 0))
+         )
+
+intra_distances <- sharing_w3 |> 
+  filter(same_subject==TRUE) |> 
+  mutate(#tanh_r = tanh(threshold/dist), 
+         timepoint ='intra'
+       ) |> 
+  pivot_wider(names_from = 'timepoint', values_from = 'dist') |> 
+  dplyr::select(respondent_master_id=ego.x, species, intra) 
+
+xcov <- merge(merge(x, sub_covar, by.x = "ego", by.y = 'respondent_master_id', ), sub_covar, by.x = 'alter', by.y = 'respondent_master_id', suffixes = c('_ego','_alter'))
+
+xcov <- merge(merge(xcov, intra_distances, by.x = c("ego",'species'), by.y = c('respondent_master_id','species'), all.x = TRUE), intra_distances, by.x =c('alter', 'species'), by.y =c('respondent_master_id', 'species'), suffixes = c('_ego','_alter'), all.x=TRUE)
+
+xcov$intra_alter[is.na(xcov$intra_alter)] <- 0
+xcov$intra_ego[is.na(xcov$intra_ego)] <- 0
+
+xcov$gender.mm <- xcov$gender_ego == "man" & xcov$gender_alter == "man"
+xcov$gender.mf <- xcov$gender_ego == "man" & xcov$gender_alter == "woman" | xcov$gender_ego == "woman" & xcov$gender_alter == "man"
+xcov$gender.ff <- xcov$gender_ego == "woman" & xcov$gender_alter == "woman"
+xcov$indigenous.both <- xcov$indigenous_status_ego != 'None of the above' & xcov$indigenous_status_alter != 'None of the above'
+xcov$indigenous.one <- xcov$indigenous_status_ego == 'None of the above' & xcov$indigenous_status_alter != 'None of the above' | xcov$indigenous_status_ego != 'None of the above' & xcov$indigenous_status_alter == 'None of the above'
+xcov$indigenous.none <- xcov$indigenous_status_ego == 'None of the above' & xcov$indigenous_status_alter == 'None of the above'
+xcov$age_difference_abs <- abs(xcov$age_at_survey_ego - xcov$age_at_survey_alter)
+xcov$average_age <- (xcov$age_at_survey_ego + xcov$age_at_survey_alter)/2
+xcov$wealth_difference_abs <- abs(xcov$household_wealth_index_w3_ego - xcov$household_wealth_index_w3_alter)
+xcov$average_wealth <- (xcov$household_wealth_index_w3_ego + xcov$household_wealth_index_w3_alter)/2
+xcov$DDS_difference_abs <- abs(xcov$DDS_ego - xcov$DDS_alter)
+xcov$DDS_average <- (xcov$DDS_ego + xcov$DDS_alter)/2
+
+colnames(xcov)[8] <- 'T2T1'
+colnames(xcov)[9] <- 'T1T2'
+
+xcov$T1_t <- xcov$T1 < xcov$threshold
+xcov$T2_t <- xcov$T2 < xcov$threshold
+xcov$T1T2_t <- xcov$T1T2 < xcov$threshold
+xcov$T2T1_t <- xcov$T2T1 < xcov$threshold
+xcov$intra_ego_t <- xcov$intra_ego < xcov$threshold
+xcov$intra_alter_t <- xcov$intra_alter < xcov$threshold
+
+xcov$relationship <- ifelse(xcov$relationship == 'none', FALSE, TRUE)
+xcov <- merge(xcov, pairwise_mahalanomis_long, by = 'pair')
+```
+
+
+# Mixed effect model
+
+T1, T2, T1T2, T2T1 are the genetic distances between the pair, the distances are calculated as the species-specific threshold divided by the raw genetic distance, then squeezed between 0 and 1 using tanh().
+
+T1T2 and T2T1 are the pairwise distances between the two strains across the two timepoints.
+
+intra_ego and intra_alter are the intra individual distance across the timepoints, calculated same as T1.
+
+In this model, T2 is used as outcome, all the other distances are then included as interaction terms plus the confounders.
+
+All the distances are significant, but I don’t feel that having the species split and as a random effect  is somehow meaningful.
+
+
+```{r}
+ # relationship + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS_difference_abs 
+glmer(data = xcov, T2_t ~ T1_t*T2T1_t*T1T2_t*intra_ego_t*intra_alter_t + maha_dist + relationship + (1|species), family = binomial, nAGQ=0) -> lmer_species_rand
+```
+
+```{r}
+summary(lmer_species_rand)
+```
+
+
+# Linear model 
+
+Same model, without the random effect, using lm 
+
+```{r}
+glm(data = xcov, T2_t ~ relationship + T1_t*T2T1_t*T1T2_t*intra_ego_t*intra_alter_t+ gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + wealth_difference_abs + average_age + DDS_difference_abs) -> lm_all_species
+```
+
+```{r}
+summary(lm_all_species)
+```
+```{r}
+sharing_rate_pairs_covariates <- sharing_rate |> 
+  filter(timepoint !='T1/T2') |> 
+  dplyr::select(ego, alter, pair, timepoint, same_subject, village_code_ego, village_code_alter, n1) |> 
+  pivot_wider(names_from = timepoint, values_from = n1) |> 
+  left_join((xcov |> dplyr::select(pair, relationship, contains('_'), contains('.'), -intra_ego, -intra_alter) |> distinct(pair, .keep_all = TRUE)), by = join_by('pair')) |> 
+  left_join((sharing_rate |> filter(same_subject==TRUE) |> dplyr::select(ego, intra=n1)), by = join_by('ego'=='ego')) |> 
+  left_join((sharing_rate |> filter(same_subject==TRUE) |> dplyr::select(alter, intra=n1)), by = join_by('alter'=='alter'), suffix = c('_ego','_alter'))
+
+```
+
+```{r}
+lmer(data = sharing_rate_pairs_covariates , T2 ~ relationship + T1*intra_ego*intra_alter+ maha_dist + (0+T1|village_code_ego)) -> lm_sharing_rate
+```
+
+```{r}
+summary(lm_sharing_rate)
+```
+
+
+
+# Stability w1 w3
+```{r overall_stability_across_waves}
+pruned_SN_w3_graph <- subgraph(SN_w3_graph, intersect(names(V(SN_w3_graph)),names(V(SN_w1_graph))))
+pruned_SN_w1_graph <- subgraph(SN_w1_graph, intersect(names(V(SN_w3_graph)),names(V(SN_w1_graph))))
+```
+
+```{r pervillage_stability_across_waves}
+foreach(village = unique(reduced_SN_w1$village_code_w1), .combine = rbind) %do% {
+  tmp_w3 <- subgraph(pruned_SN_w3_graph, subset(V(pruned_SN_w3_graph), V(pruned_SN_w3_graph)$village_code_w3 == village))
+  tmp_w1 <- subgraph(pruned_SN_w1_graph, subset(V(pruned_SN_w1_graph), V(pruned_SN_w1_graph)$village_code_w1 == village))
+  data.frame(village_code = as.character(village), stability=length(E(tmp_w3 %s% tmp_w1)) / length(E(tmp_w3 %u% tmp_w1)))
+} |> bind_rows(data.frame(village_code = 'overall', stability=length(E(pruned_SN_w3_graph %s% pruned_SN_w1_graph)) / length(E(pruned_SN_w3_graph %u% pruned_SN_w1_graph))))
+```
+
+# New egdes in W3
+```{r}
+new_edges <- igraph::difference(pruned_SN_w3_graph, pruned_SN_w1_graph)
+new_edges_attr_df <- data.frame(edge.attributes(new_edges))
+nrow(lost_edges_attr_df)
+```
+# Egdes lost in W3
+```{r}
+lost_edges <- igraph::difference(pruned_SN_w1_graph, pruned_SN_w3_graph)
+lost_edges_attr_df <- data.frame(edge.attributes(lost_edges))
+nrow(lost_edges_attr_df)
+```
+
+# Number of ties retained
+```{r eval=FALSE, include=FALSE}
+w1w3_intersection <-  graph.intersection(pruned_SN_w1_graph, pruned_SN_w3_graph, byname = TRUE)
+length(E(w1w3_intersection))
+```
+
+
+## Types of new relationships now disclosed in w3
+```{r eval=FALSE, include=FALSE}
+foreach(e = edge_attr(w1w3_intersection)$pair_1, .combine = c) %do% {
+  setdiff(
+    reduced_SN_w3 |> filter(pair == e ) |> pull(relationship) |> str_split(pattern = ',', simplify = TRUE) |> c(), 
+    reduced_SN_w1 |> filter(pair == e ) |> pull(relationship) |> str_split(pattern = ',', simplify = TRUE) |> c()
+  )
+} |> table()
+
+```
+
+## Types of relationships not disclosed anymore in w3
+```{r eval=FALSE, include=FALSE}
+foreach(e = edge_attr(w1w3_intersection)$pair_1, .combine = c) %do% {
+  setdiff(
+    reduced_SN_w1 |> filter(pair == e ) |> pull(relationship) |> str_split(pattern = ',', simplify = TRUE) |> c(), 
+    reduced_SN_w3 |> filter(pair == e ) |> pull(relationship) |> str_split(pattern = ',', simplify = TRUE) |> c()
+  )
+} |> table()
+
+```

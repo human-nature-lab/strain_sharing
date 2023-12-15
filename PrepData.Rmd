@@ -95,18 +95,20 @@ hmb_c2$village_code[!is.na(hmb_c2$village_code) & hmb_c2$village_code == 18] <- 
 
 #Missing certain ones, need to clean that up
 
-master_key <- bind_rows(hmb_c1 |> select(mb_m05, respondent_master_id),
-                  hmb_c2 |> select(mb_m05, respondent_master_id)
-)
+master_key <- bind_rows(hmb_c1 |> select(mb_m05, respondent_master_id, village_code),
+                  hmb_c2 |> select(mb_m05, respondent_master_id, village_code)
+) |> 
+  filter(str_detect(mb_m05, 'NA', negate=TRUE))
+
+#master_key <- tibble::column_to_rownames(master_key, 'mb_m05')
 
 hmb_census <- bind_rows(hmb_c1,hmb_c2) |> 
   mutate(BMI = (mb_d0100 / mb_d0200 **2) * 10000,
-         mb_m0100 = if_else(is.na(mb_m0100), if_else(!is.na(completed_at_E6), lubridate::as_date(completed_at_E6), lubridate::as_date(completed_at_E5)), mb_m0100)) |> 
- rename(sampling_date = mb_m0100)
+         sampling_date = if_else(is.na(mb_m0100), if_else(!is.na(completed_at_E6), lubridate::as_date(completed_at_E6), lubridate::as_date(completed_at_E5)), mb_m0100))
 
 # Map village id to Spaniard villages
 village_map <- tribble(~village_code, ~village_name_deid,
-  18 , "Ermua",
+  17 , "Ermua",
   21 , "Azpeitia",
   26 , "Mungia",
   73 , "Tolosa",
@@ -116,7 +118,7 @@ village_map <- tribble(~village_code, ~village_name_deid,
   162 , "Erandio",
   169 , "Sestao",
   118 , "Bermeo",
-  14 , "Madera",
+  14 , "Getxo",
   41 , "Pasaia",
   140 , "Zarautz",
   89 , "Lekeitio",
@@ -129,9 +131,7 @@ village_map <- tribble(~village_code, ~village_name_deid,
 hmb_census <- full_join(hmb_census, village_map)
 
 #RCT Data
-demographics <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_respondents_WAVE3_v3_F_BEGHINI_2023-10-23.csv") |> 
-  dplyr::select("respondent_master_id", "building_id_w3","village_name_w3",
-         "b0100", "b0200","b0600","b0800","b0900")
+demographics <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_respondents_WAVE3_v3_F_BEGHINI_2023-10-23.csv")
 
 ```
 Compute Diet Diversity Score
@@ -161,6 +161,7 @@ test_ssr_num <- as.matrix(readRDS("data/sharing_rate_with_zero.RDS"))
 test_ssr_num <- test_ssr_num[order(rownames(test_ssr_num)),
                              order(colnames(test_ssr_num))]
 
+test_ssr_num <- test_ssr_num[grep('-15', colnames(test_ssr_num), invert = TRUE), grep('-15', colnames(test_ssr_num), invert = TRUE)]
 
 rownames(test_ssr_num) <- master_key$respondent_master_id[match(rownames(test_ssr_num),
                                                             master_key$mb_m05)]
@@ -177,9 +178,10 @@ Download and prep species data
 species_data <- readr::read_tsv("data/mpa4_merged_profiles.tsv", skip = 1) |> 
   filter(stringr::str_detect(clade_name, 't__')) |> 
   select(clade_name, ends_with('-05')) |> 
-  tibble::column_to_rownames('clade_name')
+  tibble::column_to_rownames('clade_name') 
 species_data <- species_data / 100
 
+# species_data <- species_data[,hmb_census$mb_m05]
 colnames(species_data) <- master_key$respondent_master_id[match(colnames(species_data), master_key$mb_m05)]
 
 #Calculate CLR of species relative abundance data
@@ -299,7 +301,10 @@ covariates <- inner_join(hmb_census, demographics, by = join_by(respondent_maste
 
 
 #Merge on household wealth index data
+household_wealth_data4 <- read.csv("~/F_BEGHINI_G/WAVE4/v1/honduras_households_WAVE4_v1_F_BEGHINI_2023-11-01.csv")
 household_wealth_data <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_households_WAVE3_v3_F_BEGHINI_2023_10-23.csv")
+household_wealth_data2 <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_households_WAVE2_v5_F_BEGHINI_2022-11-01.csv")
+
 household_wealth_data <- household_wealth_data %>% dplyr::select(building_id, l0400, household_wealth_index_w3)
 
 #Merge covariates with household wealth data
@@ -375,10 +380,10 @@ for(i in 1:nrow(SN)){
                                            colnames(species_bray) == SN$alter[i]]
 }
 
-for(i in 1:nrow(SN)){
-  SN$jaccard_sim[i] <- species_jaccard_sim[rownames(species_jaccard_sim) == SN$ego[i],
-                                           colnames(species_jaccard_sim) == SN$alter[i]]
-}
+# for(i in 1:nrow(SN)){
+#   SN$jaccard_sim[i] <- species_jaccard_sim[rownames(species_jaccard_sim) == SN$ego[i],
+#                                            colnames(species_jaccard_sim) == SN$alter[i]]
+# }
 
 #Filter Microbiome data to who we also have social network data for
 strain_rate <- strain_rate[rownames(strain_rate) %in% unique(c(SN$ego, SN$alter)),
@@ -419,11 +424,12 @@ SN %>%
 
 
 #Download BMI and DNA Conc data from Shiv
-shiv_covar_df <- read.csv("../Data/shiv_phenotype.csv")
-shiv_covar_df <- shiv_covar_df %>% select(respondent_master_id, dna_conc, BMI)
+# shiv_covar_df <- read.csv("../Data/shiv_phenotype.csv")
+# shiv_covar_df <- shiv_covar_df %>% select(respondent_master_id, dna_conc, BMI)
 
 #Get list of pairs that are kin or living in the same house
-family_house_pairs <- unique(SN$pair_key[SN$same_building == 1 |
+
+family_house_pairs <- unique(SN$pair_key[SN$building_id_alter == SN$building_id_ego |
                                            SN$relationship %in% c("father", "mother", "sibling", "child_over12_other_house")])
 
 
@@ -446,9 +452,9 @@ for(i in 1:nrow(all_edges)){
 
 for(i in 1:length(village_names)){
   #Create social networks edge lists
-  assign(paste0("sn_vil_", i), SN %>% filter(village_code_w3 == village_ids[i]))
+  assign(paste0("sn_vil_", i), SN %>% filter(village_code_w3 == village_names[i]))
   
-  assign(paste0("sn_vil_all_", i), all_edges %>% filter(village_code_w3 == village_ids[i]))
+  assign(paste0("sn_vil_all_", i), all_edges %>% filter(village_code_w3 == village_names[i]))
   
   #Create social network graphs
   assign(paste0("sn_vil_graph_", i),

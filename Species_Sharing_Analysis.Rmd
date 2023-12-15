@@ -38,6 +38,7 @@ mds_bc <- cmdscale(species_bray) |>
   inner_join(hmb_census) |> 
   filter(village_name_deid %in% names(sort(table(hmb_census$village_name_deid), decreasing = TRUE)[1:5])) |> 
   select(respondent_master_id, V1, V2, village_name_deid)
+
 ```
 
 ```{r mds_all_villages_tri, fig.height=10, fig.width=14}
