@@ -24,46 +24,46 @@ for(i in 1:length(village_names)){
 }
 
 
-strain_rate_cluster_1_leiden <- cluster_leiden(strain_rate_vil_graph_1, r = quantile(strength(strain_rate_vil_graph_1))[2] / (gorder(strain_rate_vil_graph_1) - 1))
-strain_rate_cluster_2_leiden <- cluster_leiden(strain_rate_vil_graph_2, r = quantile(strength(strain_rate_vil_graph_2))[2] / (gorder(strain_rate_vil_graph_2) - 1))
-strain_rate_cluster_3_leiden <- cluster_leiden(strain_rate_vil_graph_3, r = quantile(strength(strain_rate_vil_graph_3))[2] / (gorder(strain_rate_vil_graph_3) - 1))
-strain_rate_cluster_4_leiden <- cluster_leiden(strain_rate_vil_graph_4, r = quantile(strength(strain_rate_vil_graph_4))[2] / (gorder(strain_rate_vil_graph_4) - 1))
-strain_rate_cluster_5_leiden <- cluster_leiden(strain_rate_vil_graph_5, r = quantile(strength(strain_rate_vil_graph_5))[2] / (gorder(strain_rate_vil_graph_5) - 1))
-strain_rate_cluster_6_leiden <- cluster_leiden(strain_rate_vil_graph_6, r = quantile(strength(strain_rate_vil_graph_6))[2] / (gorder(strain_rate_vil_graph_6) - 1))
-strain_rate_cluster_7_leiden <- cluster_leiden(strain_rate_vil_graph_7, r = quantile(strength(strain_rate_vil_graph_7))[2] / (gorder(strain_rate_vil_graph_7) - 1))
-strain_rate_cluster_8_leiden <- cluster_leiden(strain_rate_vil_graph_8, r = quantile(strength(strain_rate_vil_graph_8))[2] / (gorder(strain_rate_vil_graph_8) - 1))
-strain_rate_cluster_9_leiden <- cluster_leiden(strain_rate_vil_graph_9, r = quantile(strength(strain_rate_vil_graph_9))[2] / (gorder(strain_rate_vil_graph_9) - 1))
-strain_rate_cluster_10_leiden <- cluster_leiden(strain_rate_vil_graph_10, r = quantile(strength(strain_rate_vil_graph_10))[2] / (gorder(strain_rate_vil_graph_10) - 1))
-strain_rate_cluster_11_leiden <- cluster_leiden(strain_rate_vil_graph_11, r = quantile(strength(strain_rate_vil_graph_11))[2] / (gorder(strain_rate_vil_graph_11) - 1))
-strain_rate_cluster_12_leiden <- cluster_leiden(strain_rate_vil_graph_12, r = quantile(strength(strain_rate_vil_graph_12))[2] / (gorder(strain_rate_vil_graph_12) - 1))
-strain_rate_cluster_13_leiden <- cluster_leiden(strain_rate_vil_graph_13, r = quantile(strength(strain_rate_vil_graph_13))[2] / (gorder(strain_rate_vil_graph_13) - 1))
-strain_rate_cluster_14_leiden <- cluster_leiden(strain_rate_vil_graph_14, r = quantile(strength(strain_rate_vil_graph_14))[2] / (gorder(strain_rate_vil_graph_14) - 1))
-strain_rate_cluster_15_leiden <- cluster_leiden(strain_rate_vil_graph_15, r = quantile(strength(strain_rate_vil_graph_15))[2] / (gorder(strain_rate_vil_graph_15) - 1))
-strain_rate_cluster_16_leiden <- cluster_leiden(strain_rate_vil_graph_16, r = quantile(strength(strain_rate_vil_graph_16))[2] / (gorder(strain_rate_vil_graph_16) - 1))
-strain_rate_cluster_17_leiden <- cluster_leiden(strain_rate_vil_graph_17, r = quantile(strength(strain_rate_vil_graph_17))[2] / (gorder(strain_rate_vil_graph_17) - 1))
-strain_rate_cluster_18_leiden <- cluster_leiden(strain_rate_vil_graph_18, r = quantile(strength(strain_rate_vil_graph_18))[2] / (gorder(strain_rate_vil_graph_18) - 1))
+strain_rate_cluster_1_leiden <- cluster_leiden(strain_rate_vil_graph_1, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_1))[2] / (gorder(strain_rate_vil_graph_1) - 1))
+strain_rate_cluster_2_leiden <- cluster_leiden(strain_rate_vil_graph_2, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_2))[2] / (gorder(strain_rate_vil_graph_2) - 1))
+strain_rate_cluster_3_leiden <- cluster_leiden(strain_rate_vil_graph_3, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_3))[2] / (gorder(strain_rate_vil_graph_3) - 1))
+strain_rate_cluster_4_leiden <- cluster_leiden(strain_rate_vil_graph_4, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_4))[2] / (gorder(strain_rate_vil_graph_4) - 1))
+strain_rate_cluster_5_leiden <- cluster_leiden(strain_rate_vil_graph_5, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_5))[2] / (gorder(strain_rate_vil_graph_5) - 1))
+strain_rate_cluster_6_leiden <- cluster_leiden(strain_rate_vil_graph_6, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_6))[2] / (gorder(strain_rate_vil_graph_6) - 1))
+strain_rate_cluster_7_leiden <- cluster_leiden(strain_rate_vil_graph_7, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_7))[2] / (gorder(strain_rate_vil_graph_7) - 1))
+strain_rate_cluster_8_leiden <- cluster_leiden(strain_rate_vil_graph_8, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_8))[2] / (gorder(strain_rate_vil_graph_8) - 1))
+strain_rate_cluster_9_leiden <- cluster_leiden(strain_rate_vil_graph_9, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_9))[2] / (gorder(strain_rate_vil_graph_9) - 1))
+strain_rate_cluster_10_leiden <- cluster_leiden(strain_rate_vil_graph_10, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_10))[2] / (gorder(strain_rate_vil_graph_10) - 1))
+strain_rate_cluster_11_leiden <- cluster_leiden(strain_rate_vil_graph_11, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_11))[2] / (gorder(strain_rate_vil_graph_11) - 1))
+strain_rate_cluster_12_leiden <- cluster_leiden(strain_rate_vil_graph_12, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_12))[2] / (gorder(strain_rate_vil_graph_12) - 1))
+strain_rate_cluster_13_leiden <- cluster_leiden(strain_rate_vil_graph_13, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_13))[2] / (gorder(strain_rate_vil_graph_13) - 1))
+strain_rate_cluster_14_leiden <- cluster_leiden(strain_rate_vil_graph_14, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_14))[2] / (gorder(strain_rate_vil_graph_14) - 1))
+strain_rate_cluster_15_leiden <- cluster_leiden(strain_rate_vil_graph_15, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_15))[2] / (gorder(strain_rate_vil_graph_15) - 1))
+strain_rate_cluster_16_leiden <- cluster_leiden(strain_rate_vil_graph_16, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_16))[2] / (gorder(strain_rate_vil_graph_16) - 1))
+strain_rate_cluster_17_leiden <- cluster_leiden(strain_rate_vil_graph_17, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_17))[2] / (gorder(strain_rate_vil_graph_17) - 1))
+strain_rate_cluster_18_leiden <- cluster_leiden(strain_rate_vil_graph_18, objective_function = 'modularity') #r = quantile(strength(strain_rate_vil_graph_18))[2] / (gorder(strain_rate_vil_graph_18) - 1))
 
 set.seed(1)
 #Make sure to change this back to non overall graph
 #Get social network clustering for each village
-sn_cluster_1_leiden <- cluster_leiden(sn_vil_graph_1, r = quantile(strength(sn_vil_graph_1))[2] / (gorder(sn_vil_graph_1) - 1))
-sn_cluster_2_leiden <- cluster_leiden(sn_vil_graph_2, r = quantile(strength(sn_vil_graph_2))[2] / (gorder(sn_vil_graph_2) - 1))
-sn_cluster_3_leiden <- cluster_leiden(sn_vil_graph_3, r = quantile(strength(sn_vil_graph_3))[2] / (gorder(sn_vil_graph_3) - 1))
-sn_cluster_4_leiden <- cluster_leiden(sn_vil_graph_4, r = quantile(strength(sn_vil_graph_4))[2] / (gorder(sn_vil_graph_4) - 1))
-sn_cluster_5_leiden <- cluster_leiden(sn_vil_graph_5, r = quantile(strength(sn_vil_graph_5))[2] / (gorder(sn_vil_graph_5) - 1))
-sn_cluster_6_leiden <- cluster_leiden(sn_vil_graph_6, r = quantile(strength(sn_vil_graph_6))[2] / (gorder(sn_vil_graph_6) - 1))
-sn_cluster_7_leiden <- cluster_leiden(sn_vil_graph_7, r = quantile(strength(sn_vil_graph_7))[2] / (gorder(sn_vil_graph_7) - 1))
-sn_cluster_8_leiden <- cluster_leiden(sn_vil_graph_8, r = quantile(strength(sn_vil_graph_8))[2] / (gorder(sn_vil_graph_8) - 1))
-sn_cluster_9_leiden <- cluster_leiden(sn_vil_graph_9, r = quantile(strength(sn_vil_graph_9))[2] / (gorder(sn_vil_graph_9) - 1))
-sn_cluster_10_leiden <- cluster_leiden(sn_vil_graph_10, r = quantile(strength(sn_vil_graph_10))[2] / (gorder(sn_vil_graph_10) - 1))
-sn_cluster_11_leiden <- cluster_leiden(sn_vil_graph_11, r = quantile(strength(sn_vil_graph_11))[2] / (gorder(sn_vil_graph_11) - 1))
-sn_cluster_12_leiden <- cluster_leiden(sn_vil_graph_12, r = quantile(strength(sn_vil_graph_12))[2] / (gorder(sn_vil_graph_12) - 1))
-sn_cluster_13_leiden <- cluster_leiden(sn_vil_graph_13, r = quantile(strength(sn_vil_graph_13))[2] / (gorder(sn_vil_graph_13) - 1))
-sn_cluster_14_leiden <- cluster_leiden(sn_vil_graph_14, r = quantile(strength(sn_vil_graph_14))[2] / (gorder(sn_vil_graph_14) - 1))
-sn_cluster_15_leiden <- cluster_leiden(sn_vil_graph_15, r = quantile(strength(sn_vil_graph_15))[2] / (gorder(sn_vil_graph_15) - 1))
-sn_cluster_16_leiden <- cluster_leiden(sn_vil_graph_16, r = quantile(strength(sn_vil_graph_16))[2] / (gorder(sn_vil_graph_16) - 1))
-sn_cluster_17_leiden <- cluster_leiden(sn_vil_graph_17, r = quantile(strength(sn_vil_graph_17))[2] / (gorder(sn_vil_graph_17) - 1))
-sn_cluster_18_leiden <- cluster_leiden(sn_vil_graph_18, r = quantile(strength(sn_vil_graph_18))[2] / (gorder(sn_vil_graph_18) - 1))
+sn_cluster_1_leiden <- cluster_leiden(sn_vil_graph_1, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_1))[2] / (gorder(sn_vil_graph_1) - 1))
+sn_cluster_2_leiden <- cluster_leiden(sn_vil_graph_2, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_2))[2] / (gorder(sn_vil_graph_2) - 1))
+sn_cluster_3_leiden <- cluster_leiden(sn_vil_graph_3, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_3))[2] / (gorder(sn_vil_graph_3) - 1))
+sn_cluster_4_leiden <- cluster_leiden(sn_vil_graph_4, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_4))[2] / (gorder(sn_vil_graph_4) - 1))
+sn_cluster_5_leiden <- cluster_leiden(sn_vil_graph_5, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_5))[2] / (gorder(sn_vil_graph_5) - 1))
+sn_cluster_6_leiden <- cluster_leiden(sn_vil_graph_6, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_6))[2] / (gorder(sn_vil_graph_6) - 1))
+sn_cluster_7_leiden <- cluster_leiden(sn_vil_graph_7, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_7))[2] / (gorder(sn_vil_graph_7) - 1))
+sn_cluster_8_leiden <- cluster_leiden(sn_vil_graph_8, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_8))[2] / (gorder(sn_vil_graph_8) - 1))
+sn_cluster_9_leiden <- cluster_leiden(sn_vil_graph_9, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_9))[2] / (gorder(sn_vil_graph_9) - 1))
+sn_cluster_10_leiden <- cluster_leiden(sn_vil_graph_10, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_10))[2] / (gorder(sn_vil_graph_10) - 1))
+sn_cluster_11_leiden <- cluster_leiden(sn_vil_graph_11, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_11))[2] / (gorder(sn_vil_graph_11) - 1))
+sn_cluster_12_leiden <- cluster_leiden(sn_vil_graph_12, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_12))[2] / (gorder(sn_vil_graph_12) - 1))
+sn_cluster_13_leiden <- cluster_leiden(sn_vil_graph_13, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_13))[2] / (gorder(sn_vil_graph_13) - 1))
+sn_cluster_14_leiden <- cluster_leiden(sn_vil_graph_14, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_14))[2] / (gorder(sn_vil_graph_14) - 1))
+sn_cluster_15_leiden <- cluster_leiden(sn_vil_graph_15, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_15))[2] / (gorder(sn_vil_graph_15) - 1))
+sn_cluster_16_leiden <- cluster_leiden(sn_vil_graph_16, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_16))[2] / (gorder(sn_vil_graph_16) - 1))
+sn_cluster_17_leiden <- cluster_leiden(sn_vil_graph_17, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_17))[2] / (gorder(sn_vil_graph_17) - 1))
+sn_cluster_18_leiden <- cluster_leiden(sn_vil_graph_18, objective_function = 'modularity') # r = quantile(strength(sn_vil_graph_18))[2] / (gorder(sn_vil_graph_18) - 1))
 
 
 #Order names for both clusters
@@ -293,24 +293,24 @@ foreach(i= c(1:10000), .combine=rbind, .packages = c('igraph') ) %dopar% {
 
   #Get scrambled microbiome membership
   
-  strain_rate_cluster_1_scram <- cluster_leiden(strain_rate_vil_graph_scram_1, r = quantile(strength(strain_rate_vil_graph_scram_1))[2] / (gorder(strain_rate_vil_graph_scram_1) - 1))
-  strain_rate_cluster_2_scram <- cluster_leiden(strain_rate_vil_graph_scram_2, r = quantile(strength(strain_rate_vil_graph_scram_2))[2] / (gorder(strain_rate_vil_graph_scram_2) - 1))
-  strain_rate_cluster_3_scram <- cluster_leiden(strain_rate_vil_graph_scram_3, r = quantile(strength(strain_rate_vil_graph_scram_3))[2] / (gorder(strain_rate_vil_graph_scram_3) - 1))
-  strain_rate_cluster_4_scram <- cluster_leiden(strain_rate_vil_graph_scram_4, r = quantile(strength(strain_rate_vil_graph_scram_4))[2] / (gorder(strain_rate_vil_graph_scram_4) - 1))
-  strain_rate_cluster_5_scram <- cluster_leiden(strain_rate_vil_graph_scram_5, r = quantile(strength(strain_rate_vil_graph_scram_5))[2] / (gorder(strain_rate_vil_graph_scram_5) - 1))
-  strain_rate_cluster_6_scram <- cluster_leiden(strain_rate_vil_graph_scram_6, r = quantile(strength(strain_rate_vil_graph_scram_6))[2] / (gorder(strain_rate_vil_graph_scram_6) - 1))
-  strain_rate_cluster_7_scram <- cluster_leiden(strain_rate_vil_graph_scram_7, r = quantile(strength(strain_rate_vil_graph_scram_7))[2] / (gorder(strain_rate_vil_graph_scram_7) - 1))
-  strain_rate_cluster_8_scram <- cluster_leiden(strain_rate_vil_graph_scram_8, r = quantile(strength(strain_rate_vil_graph_scram_8))[2] / (gorder(strain_rate_vil_graph_scram_8) - 1))
-  strain_rate_cluster_9_scram <- cluster_leiden(strain_rate_vil_graph_scram_9, r = quantile(strength(strain_rate_vil_graph_scram_9))[2] / (gorder(strain_rate_vil_graph_scram_9) - 1))
-  strain_rate_cluster_10_scram <- cluster_leiden(strain_rate_vil_graph_scram_10, r = quantile(strength(strain_rate_vil_graph_scram_10))[2] / (gorder(strain_rate_vil_graph_scram_10) - 1))
-  strain_rate_cluster_11_scram <- cluster_leiden(strain_rate_vil_graph_scram_11, r = quantile(strength(strain_rate_vil_graph_scram_11))[2] / (gorder(strain_rate_vil_graph_scram_11) - 1))
-  strain_rate_cluster_12_scram <- cluster_leiden(strain_rate_vil_graph_scram_12, r = quantile(strength(strain_rate_vil_graph_scram_12))[2] / (gorder(strain_rate_vil_graph_scram_12) - 1))
-  strain_rate_cluster_13_scram <- cluster_leiden(strain_rate_vil_graph_scram_13, r = quantile(strength(strain_rate_vil_graph_scram_13))[2] / (gorder(strain_rate_vil_graph_scram_13) - 1))
-  strain_rate_cluster_14_scram <- cluster_leiden(strain_rate_vil_graph_scram_14, r = quantile(strength(strain_rate_vil_graph_scram_14))[2] / (gorder(strain_rate_vil_graph_scram_14) - 1))
-  strain_rate_cluster_15_scram <- cluster_leiden(strain_rate_vil_graph_scram_15, r = quantile(strength(strain_rate_vil_graph_scram_15))[2] / (gorder(strain_rate_vil_graph_scram_15) - 1))
-  strain_rate_cluster_16_scram <- cluster_leiden(strain_rate_vil_graph_scram_16, r = quantile(strength(strain_rate_vil_graph_scram_16))[2] / (gorder(strain_rate_vil_graph_scram_16) - 1))
-  strain_rate_cluster_17_scram <- cluster_leiden(strain_rate_vil_graph_scram_17, r = quantile(strength(strain_rate_vil_graph_scram_17))[2] / (gorder(strain_rate_vil_graph_scram_17) - 1))
-  strain_rate_cluster_18_scram <- cluster_leiden(strain_rate_vil_graph_scram_18, r = quantile(strength(strain_rate_vil_graph_scram_18))[2] / (gorder(strain_rate_vil_graph_scram_18) - 1))
+  strain_rate_cluster_1_scram <- cluster_leiden(strain_rate_vil_graph_scram_1, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_1))[2] / (gorder(strain_rate_vil_graph_scram_1) - 1))
+  strain_rate_cluster_2_scram <- cluster_leiden(strain_rate_vil_graph_scram_2, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_2))[2] / (gorder(strain_rate_vil_graph_scram_2) - 1))
+  strain_rate_cluster_3_scram <- cluster_leiden(strain_rate_vil_graph_scram_3, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_3))[2] / (gorder(strain_rate_vil_graph_scram_3) - 1))
+  strain_rate_cluster_4_scram <- cluster_leiden(strain_rate_vil_graph_scram_4, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_4))[2] / (gorder(strain_rate_vil_graph_scram_4) - 1))
+  strain_rate_cluster_5_scram <- cluster_leiden(strain_rate_vil_graph_scram_5, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_5))[2] / (gorder(strain_rate_vil_graph_scram_5) - 1))
+  strain_rate_cluster_6_scram <- cluster_leiden(strain_rate_vil_graph_scram_6, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_6))[2] / (gorder(strain_rate_vil_graph_scram_6) - 1))
+  strain_rate_cluster_7_scram <- cluster_leiden(strain_rate_vil_graph_scram_7, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_7))[2] / (gorder(strain_rate_vil_graph_scram_7) - 1))
+  strain_rate_cluster_8_scram <- cluster_leiden(strain_rate_vil_graph_scram_8, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_8))[2] / (gorder(strain_rate_vil_graph_scram_8) - 1))
+  strain_rate_cluster_9_scram <- cluster_leiden(strain_rate_vil_graph_scram_9, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_9))[2] / (gorder(strain_rate_vil_graph_scram_9) - 1))
+  strain_rate_cluster_10_scram <- cluster_leiden(strain_rate_vil_graph_scram_10, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_10))[2] / (gorder(strain_rate_vil_graph_scram_10) - 1))
+  strain_rate_cluster_11_scram <- cluster_leiden(strain_rate_vil_graph_scram_11, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_11))[2] / (gorder(strain_rate_vil_graph_scram_11) - 1))
+  strain_rate_cluster_12_scram <- cluster_leiden(strain_rate_vil_graph_scram_12, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_12))[2] / (gorder(strain_rate_vil_graph_scram_12) - 1))
+  strain_rate_cluster_13_scram <- cluster_leiden(strain_rate_vil_graph_scram_13, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_13))[2] / (gorder(strain_rate_vil_graph_scram_13) - 1))
+  strain_rate_cluster_14_scram <- cluster_leiden(strain_rate_vil_graph_scram_14, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_14))[2] / (gorder(strain_rate_vil_graph_scram_14) - 1))
+  strain_rate_cluster_15_scram <- cluster_leiden(strain_rate_vil_graph_scram_15, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_15))[2] / (gorder(strain_rate_vil_graph_scram_15) - 1))
+  strain_rate_cluster_16_scram <- cluster_leiden(strain_rate_vil_graph_scram_16, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_16))[2] / (gorder(strain_rate_vil_graph_scram_16) - 1))
+  strain_rate_cluster_17_scram <- cluster_leiden(strain_rate_vil_graph_scram_17, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_17))[2] / (gorder(strain_rate_vil_graph_scram_17) - 1))
+  strain_rate_cluster_18_scram <- cluster_leiden(strain_rate_vil_graph_scram_18, objective_function = 'modularity') #, r = quantile(strength(strain_rate_vil_graph_scram_18))[2] / (gorder(strain_rate_vil_graph_scram_18) - 1))
 
   
   #Order scrambled microbiome membership and make separate by villages
@@ -493,7 +493,7 @@ p_vals_leiden <- data.frame(
   )
 )
 
-for(i in 1:nrow(p_vals)){
+for(i in 1:nrow(p_vals_leiden)){
   if(p_vals_leiden$p_val[i] == 0){
     p_vals_leiden$p_val[i] <- paste0("p <= .0001")
   }
@@ -518,7 +518,7 @@ cluster_pvals_fig_leiden <- ggplot(null_clusters_leiden, aes(x=rand_inds ))+
   xlab("Adjusted Rand Index") +
   ggtitle("Permutation Null Distributions")+
   #scale_x_break(breaks = c(.3,.4), ticklabels=c(-.1,0,.05,.1,.15,.2,.25,.3,.4,.45)) +
-  geom_text(data = p_vals, aes(label = p_val,
+  geom_text(data = p_vals_leiden, aes(label = p_val,
                                y = 2000,
                                x = .52)) +
   theme_pubr()+
@@ -650,8 +650,8 @@ for(i in 1:length(village_names)){
   #Cluster
   #sum(is.na(E(mbiome_all)$weight))
   mbiome_all <- mbiome_all - E(mbiome_all)[is.na(E(mbiome_all)$weight)]
-  mbiome_cluster <- cluster_louvain(mbiome_all, weights = E(mbiome_all)$weight)
-  sn_cluster <- cluster_louvain(sn_vil)
+mbiome_cluster <-  cluster_leiden(mbiome_all, weights = E(mbiome_all)$weight, r = quantile(strength(mbiome_all))[2] / (gorder(mbiome_all) - 1))
+sn_cluster <- cluster_leiden(sn_vil, r = quantile(strength(sn_vil))[2] / (gorder(sn_vil) - 1))
   
   max_cluster <- max(max(membership(mbiome_cluster)), max(membership(sn_cluster)))
   
@@ -671,8 +671,8 @@ for(i in 1:length(village_names)){
        vertex.size =5,
        edge.width=E(mbiome_all)$weight/50,
        edge.color = "black",
-       layout = layout_with_fr#,
-      # main = paste(village_names[i], "Strain Clusters"))
+       layout = layout_with_fr,
+       main = paste(village_names[i], "Strain Clusters")
   )
   # table(membership(sn_cluster))
   # table(membership(mbiome_cluster))
@@ -700,8 +700,8 @@ for(i in 1:length(village_names)){
        mark.border=colors,
        col = sn_colors,
        edge.color = "black",
-       layout = layout_with_fr#,
-      # main = paste(village_names[i], "Social Network Clusters")
+       layout = layout_with_fr,
+      main = paste(village_names[i], "Social Network Clusters")
   )
 
   #Could Change these to match colors, hard would have to do manually
@@ -714,8 +714,8 @@ for(i in 1:length(village_names)){
        vertex.size =5,
        edge.color = "black",
        #vertex.color = new_cols,
-       layout = layout_with_fr#,
-      # main = paste(village_names[i], "Microbiome Clusters Overlay")
+       layout = layout_with_fr,
+       main = paste(village_names[i], "Microbiome Clusters Overlay")
   )
 
   
@@ -754,9 +754,8 @@ mbiome_all <-
   simplify(graph_from_adjacency_matrix(strain_vil, mode = "undirected", weighted = TRUE))
 
 #Cluster
-mbiome_cluster <-
-  cluster_louvain(mbiome_all, weights = E(mbiome_all)$weight)
-sn_cluster <- cluster_louvain(sn_vil)
+mbiome_cluster <-  cluster_leiden(mbiome_all, weights = E(mbiome_all)$weight, objective_function = 'modularity')#, r = quantile(strength(mbiome_all))[2] / (gorder(mbiome_all) - 1)
+sn_cluster <- cluster_leiden(sn_vil,objective_function = 'modularity') #r = quantile(strength(sn_vil))[2] / (gorder(sn_vil) - 1)
 
 max_cluster <-
   max(max(membership(mbiome_cluster)), max(membership(sn_cluster)))
