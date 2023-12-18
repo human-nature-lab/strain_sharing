@@ -182,7 +182,7 @@ all_sn_membership_df_leiden %>%
   ungroup() %>%
   distinct(cluster, .keep_all = TRUE) %>%
   pull(n) %>%
-  median()
+  mean()
 ```
 ```{r}
 all_mbiome_membership_df_leiden %>%
@@ -191,7 +191,7 @@ all_mbiome_membership_df_leiden %>%
   ungroup() %>%
   distinct(cluster, .keep_all = TRUE) %>%
   pull(n) %>%
-  median()
+  mean()
 ```
 ```{r}
 all_mbiome_membership_df_leiden %>%
@@ -543,78 +543,6 @@ ggarrange(cluster_pvals_fig_leiden, cluster_bucket_fig, nrow = 1, labels = c("",
 
 
 
-
-Statistics on which relationships are typically grouped together
-Probably just following the strain-sharing rate
-
-
-```{r}
-# #Get probability each relationship is grouped together
-# #Probably total accuracy
-# #Probability of looping in degree two
-# #Split up by relationship type
-# #Don't really need the SN Clusters
-# for(i in 1:length(village_names)) {
-#   mbiome_membership <- get(paste0("mbiome_member_", i))
-#   #Probability first-degree connections included
-#   sn_edges <- get(paste0("sn_vil_", i))
-#   for (j in 1:nrow(sn_edges)) {
-#     sn_edges$clustered[j] <-
-#       mbiome_membership[names(mbiome_membership) == sn_edges$ego[j]] ==
-#       mbiome_membership[names(mbiome_membership) == sn_edges$alter[j]]
-#   }
-#   assign(paste0("sn_vil_", i), sn_edges)
-# }
-# 
-# for(i in 1:length(village_names)) {
-#   sn_membership <- get(paste0("sn_member_", i))
-#   #Probability first-degree connections included
-#   sn_edges <- get(paste0("sn_vil_", i))
-#   for (j in 1:nrow(sn_edges)) {
-#     sn_edges$clustered_social[j] <-
-#       sn_membership[names(sn_membership) == sn_edges$ego[j]] ==
-#       sn_membership[names(sn_membership) == sn_edges$alter[j]]
-#   }
-#   assign(paste0("sn_vil_", i), sn_edges)
-# }
-# 
-# 
-# 
-# 
-# sn_cluster_stack <- rbind(sn_vil_1,
-#                           sn_vil_2,
-#                           sn_vil_3,
-#                           sn_vil_4,
-#                           sn_vil_5,
-#                           sn_vil_6,
-#                           sn_vil_7,
-#                           sn_vil_8,
-#                           sn_vil_9)
-# 
-# #Baseline it
-# 
-# sn_cluster_stack %>%
-#   distinct(pair_key,.keep_all = TRUE) %>% 
-#   summarize(prob_clustered = mean(clustered))
-# 
-# sn_cluster_stack %>%
-#   distinct(pair_key,.keep_all = TRUE) %>% 
-#   summarize(prob_mbiome_clustered = mean(clustered),
-#             prob_sn_clustered = mean(clustered_social),
-#             prob_overlap = mean(clustered == clustered_social) )
-# 
-# sn_cluster_stack %>%
-#   distinct(relationship, pair_key,.keep_all = TRUE) %>%
-#   group_by(relationship) %>% 
-#   summarize(prob_clustered = mean(clustered)) %>%
-#   arrange(desc(prob_clustered))
-
-```
-
-
-
-
-
 Village Plots
 ```{r}
 
@@ -650,8 +578,8 @@ for(i in 1:length(village_names)){
   #Cluster
   #sum(is.na(E(mbiome_all)$weight))
   mbiome_all <- mbiome_all - E(mbiome_all)[is.na(E(mbiome_all)$weight)]
-mbiome_cluster <-  cluster_leiden(mbiome_all, weights = E(mbiome_all)$weight, r = quantile(strength(mbiome_all))[2] / (gorder(mbiome_all) - 1))
-sn_cluster <- cluster_leiden(sn_vil, r = quantile(strength(sn_vil))[2] / (gorder(sn_vil) - 1))
+mbiome_cluster <-  cluster_leiden(mbiome_all, weights = E(mbiome_all)$weight, objective_function = 'modularity')
+sn_cluster <- cluster_leiden(sn_vil, , objective_function = 'modularity')
   
   max_cluster <- max(max(membership(mbiome_cluster)), max(membership(sn_cluster)))
   

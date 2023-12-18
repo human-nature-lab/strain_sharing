@@ -264,7 +264,7 @@ all_mbiome_membership_df %>%
   ungroup() %>%
   distinct(cluster, .keep_all = TRUE) %>%
   pull(n) %>%
-  mean()
+  median()
 ```
 
 ```{r}
@@ -290,7 +290,7 @@ for(i in 1:length(uniq_clusters)){
                            mean(unlist(as.list(cluster_sharing)), na.rm = TRUE))
   
 }
-mean(cluster_sharing_all, na.rm = TRUE)
+median(cluster_sharing_all, na.rm = TRUE)
 
 #Average number of ties
 uniq_clusters <- unique(all_sn_membership_df$cluster)
@@ -788,9 +788,6 @@ for(i in 1:length(village_names)){
        layout = layout_with_fr,
       main = paste(village_names[i], "Microbiome Clusters Overlay")
   )
-
-  
-  
 }
 #there's a couple good ones I say bring in the old strains for Mariposal
 ```
