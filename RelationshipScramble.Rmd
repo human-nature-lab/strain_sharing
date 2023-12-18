@@ -159,41 +159,41 @@ for(i in 1:length(relationships)){
 
 #add in same house scramble and non-kin different house scramble
 #Probably should mark this relationship as same building
-sn_vil_rel_1 <- sn_vil_1 %>% filter(same_building == 1) %>%
+sn_vil_rel_1 <- sn_vil_1 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_2 <- sn_vil_2 %>% filter(same_building == 1) %>%
+sn_vil_rel_2 <- sn_vil_2 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_3 <- sn_vil_3 %>% filter(same_building == 1) %>%
+sn_vil_rel_3 <- sn_vil_3 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_4 <- sn_vil_4 %>% filter(same_building == 1) %>%
+sn_vil_rel_4 <- sn_vil_4 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_5 <- sn_vil_5 %>% filter(same_building == 1) %>%
+sn_vil_rel_5 <- sn_vil_5 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_6 <- sn_vil_6 %>% filter(same_building == 1) %>%
+sn_vil_rel_6 <- sn_vil_6 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_7 <- sn_vil_7 %>% filter(same_building == 1) %>%
+sn_vil_rel_7 <- sn_vil_7 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_8 <- sn_vil_8 %>% filter(same_building == 1) %>%
+sn_vil_rel_8 <- sn_vil_8 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_9 <- sn_vil_9 %>% filter(same_building == 1) %>%
+sn_vil_rel_9 <- sn_vil_9 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_10 <- sn_vil_10 %>% filter(same_building == 1) %>%
+sn_vil_rel_10 <- sn_vil_10 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_11 <- sn_vil_11 %>% filter(same_building == 1) %>%
+sn_vil_rel_11 <- sn_vil_11 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_12 <- sn_vil_12 %>% filter(same_building == 1) %>%
+sn_vil_rel_12 <- sn_vil_12 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_13 <- sn_vil_13 %>% filter(same_building == 1) %>%
+sn_vil_rel_13 <- sn_vil_13 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_14 <- sn_vil_14 %>% filter(same_building == 1) %>%
+sn_vil_rel_14 <- sn_vil_14 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_15 <- sn_vil_15 %>% filter(same_building == 1) %>%
+sn_vil_rel_15 <- sn_vil_15 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_16 <- sn_vil_16 %>% filter(same_building == 1) %>%
+sn_vil_rel_16 <- sn_vil_16 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_17 <- sn_vil_17 %>% filter(same_building == 1) %>%
+sn_vil_rel_17 <- sn_vil_17 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
-sn_vil_rel_18 <- sn_vil_18 %>% filter(same_building == 1) %>%
+sn_vil_rel_18 <- sn_vil_18 %>% filter(building_id_alter == building_id_ego) %>%
   distinct(pair_key, .keep_all = TRUE)
 
 
@@ -589,11 +589,43 @@ rel_scramb_p <- ggboxplot(
 
 
 
-svglite("../FiguresNew/SFigure1/sfigure1_full.svg")
+svglite("Figures/sfigure1_full.svg")
 rel_scramb_p
 dev.off()
 ```
+```{r}
+null_ssr <- ggboxplot(
+  SN_Rels[SN_Rels$real=='Scrambled',],
+  y = "strain_sharing_rate",
+  x = "relationship",
+  color = "relationship",
+  outlier.shape = NA,
+  show.legend = FALSE
+) +
+  coord_cartesian(ylim = c(0, 20)) +
+  xlab("Relationship") +
+  ylab("Strain-Sharing Rate (%)") +
+  theme_pubr() +
+  labs_pubr() +
+  theme(
+    axis.text.x = element_text(
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 9),
+    legend.position = "none"
+  ) 
 
+```
+
+```{r}
+svglite("Figures/sfigure12_full.svg")
+null_ssr
+dev.off()
+```
 
 
 
