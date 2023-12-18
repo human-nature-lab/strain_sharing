@@ -136,7 +136,7 @@ for( i in 1:length(V(SN_Graph_all))){
 sim_deg_one_df <- data.frame(sim_deg_one = sim_deg_one,
                             respondent_master_id = name_vec)#,
                             #richness_deg_one = richness_deg_one)
-#centrality_sim_df <- centrality_df
+
 centrality_sim_df <- merge(centrality_df,sim_deg_one_df)
 centrality_sim_df <- merge(centrality_sim_df, diversity_df)
 centrality_sim_df_covars <- merge(centrality_sim_df, covariates)
@@ -145,12 +145,6 @@ centrality_sim_df_covars <- merge(centrality_sim_df, covariates)
 centrality_sim_df_covars_all <- inner_join(extraction_batch, sequencing_depth, by=join_by(SampleID)) |> 
   inner_join(shipping_batch, by=join_by(SampleID)) |> 
   inner_join(centrality_sim_df_covars, by=join_by(SampleID==mb_m05))
-  
-
-#We lose 240 people for not having covariates, look into this
-head(centrality_sim_df_covars_all)
-dim(centrality_sim_df_covars_all)
-dim(centrality_sim_df_covars)
 
 ```
 
@@ -610,6 +604,12 @@ set.seed(1)
 ```
 
 
+```{r}
+sub_covar_centrality <- centrality_sim_df_covars_all |> select(BMI, age_at_survey, household_wealth_index_w3, gender, DDS, starts_with('med_'), l0400, mb_m0300)
+sub_covar_centrality$gender <- ifelse(sub_covar_centrality$gender == 'man', 1, 0)
+```
+
+
 All covariates
 ```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ cluster_coef_all + age_at_survey +household_wealth_index_w3 +
@@ -631,10 +631,29 @@ summary(lm.1)
 ```
 ```{r}
 lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
-                         gender+  DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village),
+                         gender+  DNA_conc + BMI + l0400 + mb_m0300 + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village),
              data = centrality_sim_df_covars_all)
 summary(lm.1)
 ```
+
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + BMI + age_at_survey + household_wealth_index_w3 + gender+  DDS +med_painkillers +med_antibiotics+ med_antidiarrheal+ med_antiparasite+ med_vitamins+ med_zinc+ med_antifungal+ med_antihypertensives+ med_antidiabetics+ med_antiacids+ med_laxatives+ l0400+ mb_m0300 +
+                          DNA_conc + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = bind_cols(centrality_sim_df_covars_all, maha_social = mahalanobis(sub_covar_centrality, FALSE, var(sub_covar_centrality, na.rm=TRUE)))
+       )
+summary(lm.1)
+```
+
+
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + maha_social +
+                          DNA_conc + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = bind_cols(centrality_sim_df_covars_all, maha_social = mahalanobis(sub_covar_centrality, FALSE, var(sub_covar_centrality, na.rm=TRUE)))
+       )
+summary(lm.1)
+```
+
+
 
 ```{r}
 lm.1 <- lmerTest::lmer(strain_sim_all ~ between_c_all + age_at_survey +household_wealth_index_w3 +
