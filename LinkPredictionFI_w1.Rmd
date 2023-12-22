@@ -13,8 +13,10 @@ knitr::opts_chunk$set(echo = TRUE, dev = c('png','svglite'))
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 #Change format of covariates to merge onto edge list
 Covars_ego <- covariates %>% merge(household_wealth_data) %>%
+    unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
   dplyr::rename(ego = respondent_master_id, ego_age = age_at_survey, ego_gender = gender,
-         ego_household_wealth = household_wealth_index_w3, ego_education = b0100, ego_indigenous = b0200, 
+          ego_household = building_id,
+         ego_household_wealth = household_wealth_index_w3, ego_education = b0100, ego_indigenous = indigenous_status, 
          ego_religion = b0600, ego_length_in_village = b0800, ego_length_in_village_years = b0900,
          ego_DDS = DDS, 
          ego_latitude = building_latitude, ego_longitude = building_longitude) %>%
@@ -22,33 +24,24 @@ Covars_ego <- covariates %>% merge(household_wealth_data) %>%
                                 "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
                                 "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
                                 "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
-         ego_indigenous = recode(ego_indigenous, "No" = 0, "Dont_Know" = 0, "Yes, Lenca" = 1, "Yes, Maya Chorti"= 1)) %>% 
-  dplyr::select(-c("village_name", "marital_name", "building_id"))
+         ego_indigenous = recode(ego_indigenous, "None of the above" = 0, " " = 0, "Lenca" = 1, "Ch'orti'/Maya Chorti"= 1)) %>% 
+  dplyr::select(-c("village_name", "marital_name"))
 
 Covars_alter <- covariates %>% merge(household_wealth_data) %>%
+      unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
   dplyr::rename(alter = respondent_master_id, alter_age = age_at_survey, alter_gender = gender,
-         alter_household_wealth = household_wealth_index_w3, alter_education = b0100, alter_indigenous = b0200, 
+         alter_household = building_id,
+         alter_household_wealth = household_wealth_index_w3, alter_education = b0100, alter_indigenous = indigenous_status, 
          alter_religion = b0600, alter_length_in_village = b0800, alter_length_in_village_years = b0900,
          alter_latitude = building_latitude, alter_longitude = building_longitude) %>%
   mutate(alter_education = recode(alter_education, "Have not completed any type of school" = 0,
                                 "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
                                 "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
                                 "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
-         alter_indigenous = recode(alter_indigenous, "No" = 0, "Dont_Know" = 0, "Yes, Lenca" = 1, "Yes, Maya Chorti"= 1)) %>% 
-  dplyr::select(-c("village_name", "marital_name", "building_id"))
+         alter_indigenous = recode(alter_indigenous, "None of the above" = 0, " " = 0, "Lenca" = 1, "Ch'orti'/Maya Chorti"= 1)) %>% 
+  dplyr::select(-c("village_name", "marital_name"))
 
-SN_w1 <- read_csv("/WORKAREA/home/fb343/F_BEGHINI_G/WAVE1/v8/honduras_connections_WAVE1_v8_F_BEGHINI_2023-11-01.csv",show_col_types = FALSE) |> 
-              filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling')) |>  #Remove not get along
-              mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
-                     wave = 1)
 
-reduced_SN_w1 <- SN_w1 |> 
-  group_by(pair) |> 
-  summarize(ego, alter, relationship = paste(relationship, collapse = ','), across(starts_with('a2703'), ~ paste(unique(.x[!is.na(.x)]), collapse = ',')) , village_name_w1, village_code_w1) |> 
-  distinct(pair, .keep_all = TRUE) |> 
-  mutate(is_kin = grepl('mother|father|child|sibling', relationship)) |> 
-  dplyr::select(ego, alter, everything()) |> 
-  ungroup()
 
 #Merge covariate data onto edge list
 SN_All_Covars_stable_ties <- merge(SN, Covars_ego, by = "ego")
@@ -88,7 +81,8 @@ foreach(v = village_names, .combine = rbind) %do%
       wealth_difference_abs = abs(ego_household_wealth - alter_household_wealth),
       average_wealth = (ego_household_wealth + alter_household_wealth)/2,
       education_difference_abs = abs(ego_education - alter_education),
-      average_education = (ego_education + alter_education)/2
+      average_education = (ego_education + alter_education)/2,
+      household_same = ego_household == alter_household
     ) |> 
     rowwise() |> 
     mutate(strain_sharing_rate = strain_rate[ego, alter],
@@ -110,7 +104,8 @@ SN_All_Covars_for_Regression_stable_ties <- SN_All_Covars_stable_ties %>% distin
          wealth_difference_abs = abs(ego_household_wealth - alter_household_wealth),
          average_wealth = (ego_household_wealth + alter_household_wealth)/2,
          education_difference_abs = abs(ego_education - alter_education),
-         average_education = (ego_education + alter_education)/2)
+         average_education = (ego_education + alter_education)/2,
+         household_same = ego_household == alter_household)
 ```
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
@@ -124,14 +119,14 @@ SN_All_Covars_for_Regression_stable_ties <- SN_All_Covars_for_Regression_stable_
   mutate(related = 1) %>% 
   dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
          "age_difference_abs", "average_age", "wealth_difference_abs",
-         "average_wealth", "education_difference_abs","average_education",
+         "average_wealth", "education_difference_abs","average_education", "household_same",
          "related", "strain_sharing_rate", "village_code_w3", "bray_curtis_sim")
 
 SN_Non_Kin_Dif_House_Covars_for_Regression_stable_ties <- SN_Non_Kin_Dif_House_Covars_for_Regression_stable_ties %>%
   mutate(related = 1) %>% 
   dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
          "age_difference_abs", "average_age", "wealth_difference_abs",
-         "average_wealth", "education_difference_abs","average_education",
+         "average_wealth", "education_difference_abs","average_education", "household_same",
          "related", "strain_sharing_rate", "village_code_w3", "bray_curtis_sim")
 
 
@@ -140,7 +135,7 @@ All_NoRel_Covars_for_Regression_stable_ties<- All_NoRel_Covars_w3 %>%
   mutate(related = 0) %>%
   dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
                 "age_difference_abs", "average_age", "wealth_difference_abs",
-                "average_wealth", "education_difference_abs","average_education",
+                "average_wealth", "education_difference_abs","average_education", "household_same",
                 "related", "strain_sharing_rate", "village_code_w3", "bray_curtis_sim")
 
 
@@ -211,9 +206,9 @@ Downsamp_all_nkh <- Downsamp_all_nkh[complete.cases(Downsamp_all_nkh),]
 
 
 ```{r oos_5cv, message=FALSE, warning=FALSE, include=FALSE}
-#Test out of sample
-#Average over 5 CVs
-foreach(i = c(1:5)) %do% {
+cl <- parallel::makeCluster(5)
+doParallel::registerDoParallel(cl)
+foreach(i = c(1:5)) %dopar% {
   print(i)
   inds <- c(1:nrow(Downsamp_all))
   test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all)), replace = F)
@@ -276,7 +271,7 @@ foreach(i = c(1:5)) %do% {
   
   list(preds.round, preds.round.all)
 } -> preds
-
+parallel::stopCluster(cl)
 
 #Could make this without random effect don't have to deal with this stuff
 pred.all <- rowSums(sapply(preds, `[[`, 1))/5
@@ -360,7 +355,9 @@ dev.off()
 
 
 ```{r ood_5cv_nonkin, message=FALSE, warning=FALSE, include=FALSE}
-foreach(i = c(1:5)) %do% {
+cl <- parallel::makeCluster(5)
+doParallel::registerDoParallel(cl)
+foreach(i = c(1:5)) %dopar% {
   inds <- c(1:nrow(Downsamp_all_nkh))
   test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_nkh)), replace = F)
   train1_inds <- inds[!(inds %in% test1_inds)]
@@ -421,6 +418,7 @@ foreach(i = c(1:5)) %do% {
   
   list(preds.round, preds.round.all)
 } -> preds
+parallel::stopCluster(cl)
 
 pred.all <- rowSums(sapply(preds, `[[`, 1))/5
 pred.all.all <- rowSums(sapply(preds, `[[`, 2))/5
@@ -499,8 +497,10 @@ svglite('Figures/plot_roc_non_kin_different_house.svg')
 roc.plot.nkh
 dev.off()
 
-
-
+rocs_1 <-ggarrange(roc.plot, roc.plot.nkh, nrow = 2, labels = c("A", "B"), widths = 1)
+svglite('Figures/plot_allroc_stable_ties.svg')
+rocs_1
+dev.off()
 ```
 
 ```{r}

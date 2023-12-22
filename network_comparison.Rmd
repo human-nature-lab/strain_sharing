@@ -1,0 +1,32 @@
+---
+title: "Network Comparison"
+author: "Francesco Beghini"
+date: "2023-12-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(netdiffuseR)
+```
+
+```{r}
+strain_rate_vil_graph_1
+sn_vil_graph_1
+resample_graph <- function(g){
+  return(rewire(g, keeping_degseq(niter = ecount(g)*10)))
+}
+
+asd = boot::boot(strain_rate_vil_graph_1, R=1000, parallel = 'multicore', statistic = function(x, ...){ 
+  tmp = rewire(x, keeping_degseq(loops = FALSE, niter = ecount(x)*10)) 
+  centralization.betweenness(tmp)$centralization
+  })
+asd1 = boot::boot(sn_vil_graph_1, R=1000, parallel = 'multicore', statistic = function(x, ...){ 
+  tmp = rewire(x, keeping_degseq(loops = FALSE, niter = ecount(x)*10)) 
+  centralization.betweenness(tmp)$centralization
+  })
+
+sdiff <- asd$t - asd1$t
+diff_ci <- quantile(sdiff, probs = c(0.025, .975))
+```
+

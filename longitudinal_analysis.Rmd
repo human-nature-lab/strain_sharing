@@ -21,21 +21,39 @@ library(lme4)
 ```
 
 ```{r load_metadata_microbiome, message=FALSE, warning=FALSE}
-metadata_followup <- read_csv('/WORKAREA/home/fb343/F_BEGHINI_HM/COHORT1_FOLLOWUP/v2/hmb_respondents_cohort1_followup_v2_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
+metadata_followup <- read_csv('~/Documents/F_BEGHINI_HM/COHORT1_FOLLOWUP/v2/hmb_respondents_cohort1_followup_v2_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
   mutate(mb_m05 = str_replace(mb_m00, '-00$', '-15'),
   marital_name = if_else(!is.na(mb_c004),mb_c004, 'Married')) |> 
   filter(!is.na(mb_m05))
-metadata_baseline <- read_csv('/WORKAREA/home/fb343/F_BEGHINI_HM/COHORT1/v3/hmb_respondents_cohort1_baseline_v3_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
+metadata_baseline <- read_csv('~/Documents/F_BEGHINI_HM/COHORT1/v3/hmb_respondents_cohort1_baseline_v3_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
   filter(respondent_master_id %in% metadata_followup$respondent_master_id,
          !is.na(mb_m05))
 
-subset_samples <- c(metadata_followup$mb_m05, metadata_baseline$mb_m05)
+subset_samples_fw <- c(metadata_followup$mb_m05, metadata_baseline$mb_m05)
 
-master_key <- bind_rows(metadata_baseline,metadata_followup) |> dplyr::select(mb_m05, respondent_master_id, village_code) |> tibble::column_to_rownames('mb_m05')
+master_key_fw <- bind_rows(metadata_baseline,metadata_followup) |> dplyr::select(mb_m05, respondent_master_id, village_code) |> tibble::column_to_rownames('mb_m05')
 ```
 
 ```{r load_social_network_waves, message=FALSE, warning=FALSE}
-SN_w3 <- read_csv("/WORKAREA/home/fb343/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v3_F_BEGHINI_2021-09-27.csv", guess_max = 50000,show_col_types = FALSE) |> 
+SN_w1 <- read_csv("~/Documents/F_BEGHINI_G/WAVE1/v8/honduras_connections_WAVE1_v8_F_BEGHINI_2023-11-01.csv",show_col_types = FALSE) |> 
+              filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'), #Remove not get along
+                     ego %in% metadata_followup$respondent_master_id, 
+                     alter %in% metadata_followup$respondent_master_id,
+                     ego %in% metadata_baseline$respondent_master_id, 
+                     alter %in% metadata_baseline$respondent_master_id
+                     ) |>
+              mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
+                     wave = 1)
+
+reduced_SN_w1 <- SN_w1 |> 
+  group_by(pair) |> 
+  summarize(ego, alter, relationship = paste(relationship, collapse = ','), across(starts_with('a2703'), ~ paste(unique(.x[!is.na(.x)]), collapse = ',')) , village_name_w1, village_code_w1) |> 
+  distinct(pair, .keep_all = TRUE) |> 
+  mutate(is_kin = grepl('mother|father|child|sibling', relationship)) |> 
+  dplyr::select(ego, alter, everything()) |> 
+  ungroup()
+
+SN_w3 <- read_csv("~/Documents/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v3_F_BEGHINI_2021-09-27.csv", guess_max = 50000,show_col_types = FALSE) |> 
               filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'), #Remove not get along
                      ego %in% metadata_followup$respondent_master_id, 
                      alter %in% metadata_followup$respondent_master_id,
@@ -45,13 +63,13 @@ SN_w3 <- read_csv("/WORKAREA/home/fb343/F_BEGHINI_G/WAVE3/v3/honduras_connection
                 mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
                        wave = 3)
 
-SN_w4 <- read_csv("/WORKAREA/home/fb343/F_BEGHINI_G/WAVE4/v1/honduras_connections_WAVE4_v1_F_BEGHINI_2023-11-01.csv", guess_max = 50000,show_col_types = FALSE) |> 
+SN_w4 <- read_csv("~/Documents/F_BEGHINI_G/WAVE4/v1/honduras_connections_WAVE4_v1_F_BEGHINI_2023-11-01.csv", guess_max = 50000,show_col_types = FALSE) |> 
               filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'), #Remove not get along
                      ego %in% metadata_followup$respondent_master_id, 
                      alter %in% metadata_followup$respondent_master_id) |> 
                 mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
                        wave = 4)
-respondents_w4 <- read_csv('/WORKAREA/home/fb343/F_BEGHINI_G/WAVE4/v1/honduras_respondents_WAVE4_v1_F_BEGHINI_2023-11-01.csv', guess_max = 50000,show_col_types = FALSE) |> 
+respondents_w4 <- read_csv('~/Documents/F_BEGHINI_G/WAVE4/v1/honduras_respondents_WAVE4_v1_F_BEGHINI_2023-11-01.csv', guess_max = 50000,show_col_types = FALSE) |> 
               filter(respondent_master_id %in% metadata_followup$respondent_master_id)
 ```
 
@@ -98,9 +116,9 @@ SN_w1_graph <- graph_from_data_frame((reduced_SN_w1 |> select(-village_code_w1, 
 
 ```{r load_strainphlan_data, cache=FALSE}
 strain_shared <- readRDS('/SCRATCH/tmp/shared.RDS')  |> 
-    filter(s1 %in% subset_samples & s2 %in% subset_samples ) |> 
-    mutate(ego = master_key[s1, 'respondent_master_id' ],
-         alter = master_key[s2, 'respondent_master_id'],
+    filter(s1 %in% subset_samples_fw & s2 %in% subset_samples_fw ) |> 
+    mutate(ego = master_key_fw[s1, 'respondent_master_id' ],
+         alter = master_key_fw[s2, 'respondent_master_id'],
          pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
          timepoint = case_when( 
            str_sub(s1,10)=='05' & str_sub(s2,10) == '05' ~ 'T1',
@@ -113,13 +131,13 @@ strain_shared <- readRDS('/SCRATCH/tmp/shared.RDS')  |>
 
 sharing_rate <- readRDS('/SCRATCH/tmp/sharing_rate_with_zero_long_with_followup.RDS') |> 
   separate_wider_delim(pair, "=", names = c('s1','s2')) |> 
-  filter(s1 %in% subset_samples & s2 %in% subset_samples ) |> 
-  mutate(ego = master_key[s1, 'respondent_master_id' ],
-         alter = master_key[s2, 'respondent_master_id'],
+  filter(s1 %in% subset_samples_fw & s2 %in% subset_samples_fw ) |> 
+  mutate(ego = master_key_fw[s1, 'respondent_master_id' ],
+         alter = master_key_fw[s2, 'respondent_master_id'],
            pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
          same_subject = str_sub(s1,1,8) == str_sub(s2,1,8),
-         village_code_ego = master_key[s1, 'village_code'],
-         village_code_alter = master_key[s2, 'village_code']
+         village_code_ego = master_key_fw[s1, 'village_code'],
+         village_code_alter = master_key_fw[s2, 'village_code']
   )
 
 sharing_rate_T1_w3 <- sharing_rate |> 
@@ -266,7 +284,6 @@ species_bray_long <- species_bray |>
 
 
 ```{r}
-covariates <- readRDS('/SCRATCH/tmp/covariates')
 sub_covar <- covariates |> 
   filter(respondent_master_id %in% metadata_followup$respondent_master_id) |> 
   unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 

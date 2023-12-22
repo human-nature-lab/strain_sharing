@@ -18,7 +18,6 @@ library(mclust)
 #Get observed metric
 
 set.seed(1)
-#Could find better
 #Louvain clustering does not work with NA edge weights, set to zero
 E(strain_rate_vil_graph_1)$weight[is.na(E(strain_rate_vil_graph_1)$weight)] <- 0
 E(strain_rate_vil_graph_2)$weight[is.na(E(strain_rate_vil_graph_2)$weight)] <- 0
@@ -64,18 +63,8 @@ strain_rate_cluster_17 <- cluster_louvain(strain_rate_vil_graph_17, weights = E(
 strain_rate_cluster_18 <- cluster_louvain(strain_rate_vil_graph_18, weights = E(strain_rate_vil_graph_18)$weight)
 
 #Get microbiome clustering for each village based on count of shared strains
-# strain_cluster_1 <- cluster_louvain(strain_vil_graph_1, weights = E(strain_vil_graph_1)$weight)
-# strain_cluster_2 <- cluster_louvain(strain_vil_graph_2, weights = E(strain_vil_graph_2)$weight)
-# strain_cluster_3 <- cluster_louvain(strain_vil_graph_3, weights = E(strain_vil_graph_3)$weight)
-# strain_cluster_4 <- cluster_louvain(strain_vil_graph_4, weights = E(strain_vil_graph_4)$weight)
-# strain_cluster_5 <- cluster_louvain(strain_vil_graph_5, weights = E(strain_vil_graph_5)$weight)
-# strain_cluster_6 <- cluster_louvain(strain_vil_graph_6, weights = E(strain_vil_graph_6)$weight)
-# strain_cluster_7 <- cluster_louvain(strain_vil_graph_7, weights = E(strain_vil_graph_7)$weight)
-# strain_cluster_8 <- cluster_louvain(strain_vil_graph_8, weights = E(strain_vil_graph_8)$weight)
-# strain_cluster_9 <- cluster_louvain(strain_vil_graph_9, weights = E(strain_vil_graph_9)$weight)
 
 set.seed(1)
-#Make sure to change this back to non overall graph
 #Get social network clustering for each village
 sn_cluster_1 <- cluster_louvain(sn_vil_graph_1)
 sn_cluster_2 <- cluster_louvain(sn_vil_graph_2)
@@ -137,7 +126,6 @@ mbiome_member_18 <- membership(strain_rate_cluster_18)[match(names(membership(sn
 
 
 #adjust village cluster numbers so the are different across villages
-#never more than 100 clusters so this works
 mbiome_member_1 <- mbiome_member_1 + 100
 mbiome_member_2 <- mbiome_member_2 + 200
 mbiome_member_3 <- mbiome_member_3 + 300
@@ -156,16 +144,6 @@ mbiome_member_15 <- mbiome_member_15 + 1500
 mbiome_member_16 <- mbiome_member_16 + 1600
 mbiome_member_17 <- mbiome_member_17 + 1700
 mbiome_member_18 <- mbiome_member_18 + 1800
-
-# mbiome_member_1_strain <- mbiome_member_1_strain + 100
-# mbiome_member_2_strain <- mbiome_member_2_strain + 200
-# mbiome_member_3_strain <- mbiome_member_3_strain + 300
-# mbiome_member_4_strain <- mbiome_member_4_strain + 400
-# mbiome_member_5_strain <- mbiome_member_5_strain + 500
-# mbiome_member_6_strain <- mbiome_member_6_strain + 600
-# mbiome_member_7_strain <- mbiome_member_7_strain + 700
-# mbiome_member_8_strain <- mbiome_member_8_strain + 800
-# mbiome_member_9_strain <- mbiome_member_9_strain + 900
 
 
 #Create social network membership vectors, shifted by village
@@ -209,16 +187,6 @@ all_mbiome_membership <-c(mbiome_member_1,
                           mbiome_member_17,
                           mbiome_member_18)
 
-# all_mbiome_membership_strain <-c(mbiome_member_1_strain,
-#                           mbiome_member_2_strain,
-#                           mbiome_member_3_strain,
-#                           mbiome_member_4_strain,
-#                           mbiome_member_5_strain,
-#                           mbiome_member_6_strain,
-#                           mbiome_member_7_strain,
-#                           mbiome_member_8_strain,
-#                           mbiome_member_9_strain)
-
 all_sn_membership <- c(sn_member_1,
                        sn_member_2,
                        sn_member_3,
@@ -247,24 +215,21 @@ all_sn_membership_df <- data.frame(name = names(all_sn_membership),
 all_mbiome_membership_df <- data.frame(name = names(all_mbiome_membership),
                                    cluster = unname(all_mbiome_membership))
 ```
+
+#Average number of people in social network clusters
 ```{r}
-#Average number of people
 all_sn_membership_df %>%
   group_by(cluster) %>%
   summarize(n = n()) %>%
-  ungroup() %>%
-  distinct(cluster, .keep_all = TRUE) %>%
-  pull(n) %>%
-  mean()
+  summarise(mean(n), median(n), sd(n))
 ```
+
+#Average number of people in strain-sharing network clusters
 ```{r}
 all_mbiome_membership_df %>%
   group_by(cluster) %>%
   summarize(n = n()) %>%
-  ungroup() %>%
-  distinct(cluster, .keep_all = TRUE) %>%
-  pull(n) %>%
-  median()
+  summarise(mean(n), median(n), sd(n))
 ```
 
 ```{r}
@@ -275,7 +240,6 @@ all_mbiome_membership_df %>%
 ```
 
 #Average strain-sharing rate within cluster
-#Some of these probably only have one
 ```{r}
 uniq_clusters <- unique(all_mbiome_membership_df$cluster)
 cluster_sharing_all <- c()
@@ -291,8 +255,10 @@ for(i in 1:length(uniq_clusters)){
   
 }
 median(cluster_sharing_all, na.rm = TRUE)
+```
 
 #Average number of ties
+```{r}
 uniq_clusters <- unique(all_sn_membership_df$cluster)
 cluster_ties_all <- c()
 
@@ -310,18 +276,12 @@ for(i in 1:length(uniq_clusters)){
   
 }
 mean(cluster_ties_all)
-
-#names align
-sum(names(all_sn_membership) != names(all_mbiome_membership))
-#names(all_sn_membership) == names(all_mbiome_membership_strain)
 ```
 
 ```{r}
 rand_stat_strain_rate <- mclust::adjustedRandIndex(all_mbiome_membership, all_sn_membership)
-#rand_stat_strain <- adjustedRandIndex(all_mbiome_membership_strain, all_sn_membership)
 
 null_rands_strain_rate <- numeric(10000)
-#null_rands_strain <- numeric(1000)
 
 #Create null distribution metrics
 cl <- parallel::makeCluster(10)
@@ -569,10 +529,7 @@ for(i in 1:nrow(p_vals)){
   }
 }
 
-
-
 null_clusters$dummy = null_clusters$rand_inds
-#null_clusters <- null_clusters |> inner_join(village_map, by=join_by('vils' == 'village_code'))
 ```
 
 ```{r}
