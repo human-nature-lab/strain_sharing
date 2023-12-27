@@ -21,13 +21,18 @@ library(lme4)
 ```
 
 ```{r load_metadata_microbiome, message=FALSE, warning=FALSE}
-metadata_followup <- read_csv('~/Documents/F_BEGHINI_HM/COHORT1_FOLLOWUP/v2/hmb_respondents_cohort1_followup_v2_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
+metadata_followup <- read_csv('~/F_BEGHINI_HM/COHORT1_FOLLOWUP/v2/hmb_respondents_cohort1_followup_v2_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
   mutate(mb_m05 = str_replace(mb_m00, '-00$', '-15'),
   marital_name = if_else(!is.na(mb_c004),mb_c004, 'Married')) |> 
-  filter(!is.na(mb_m05))
-metadata_baseline <- read_csv('~/Documents/F_BEGHINI_HM/COHORT1/v3/hmb_respondents_cohort1_baseline_v3_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
+  filter(!is.na(mb_m05)) |> 
+  mutate(BMI = (mb_d0100 / mb_d0200 **2) * 10000)
+
+metadata_baseline <- read_csv('~/F_BEGHINI_HM/COHORT1/v3/hmb_respondents_cohort1_baseline_v3_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
   filter(respondent_master_id %in% metadata_followup$respondent_master_id,
-         !is.na(mb_m05))
+         !is.na(mb_m05)) |> 
+    mutate(BMI = (mb_d0100 / mb_d0200 **2) * 10000)
+
+
 
 subset_samples_fw <- c(metadata_followup$mb_m05, metadata_baseline$mb_m05)
 
@@ -35,7 +40,7 @@ master_key_fw <- bind_rows(metadata_baseline,metadata_followup) |> dplyr::select
 ```
 
 ```{r load_social_network_waves, message=FALSE, warning=FALSE}
-SN_w1 <- read_csv("~/Documents/F_BEGHINI_G/WAVE1/v8/honduras_connections_WAVE1_v8_F_BEGHINI_2023-11-01.csv",show_col_types = FALSE) |> 
+SN_w1 <- read_csv("~/F_BEGHINI_G/WAVE1/v8/honduras_connections_WAVE1_v8_F_BEGHINI_2023-11-01.csv",show_col_types = FALSE) |> 
               filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'), #Remove not get along
                      ego %in% metadata_followup$respondent_master_id, 
                      alter %in% metadata_followup$respondent_master_id,
@@ -53,7 +58,7 @@ reduced_SN_w1 <- SN_w1 |>
   dplyr::select(ego, alter, everything()) |> 
   ungroup()
 
-SN_w3 <- read_csv("~/Documents/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v3_F_BEGHINI_2021-09-27.csv", guess_max = 50000,show_col_types = FALSE) |> 
+SN_w3 <- read_csv("~/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v3_F_BEGHINI_2021-09-27.csv", guess_max = 50000,show_col_types = FALSE) |> 
               filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'), #Remove not get along
                      ego %in% metadata_followup$respondent_master_id, 
                      alter %in% metadata_followup$respondent_master_id,
@@ -63,13 +68,13 @@ SN_w3 <- read_csv("~/Documents/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v
                 mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
                        wave = 3)
 
-SN_w4 <- read_csv("~/Documents/F_BEGHINI_G/WAVE4/v1/honduras_connections_WAVE4_v1_F_BEGHINI_2023-11-01.csv", guess_max = 50000,show_col_types = FALSE) |> 
+SN_w4 <- read_csv("~/F_BEGHINI_G/WAVE4/v1/honduras_connections_WAVE4_v1_F_BEGHINI_2023-11-01.csv", guess_max = 50000,show_col_types = FALSE) |> 
               filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'), #Remove not get along
                      ego %in% metadata_followup$respondent_master_id, 
                      alter %in% metadata_followup$respondent_master_id) |> 
                 mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
                        wave = 4)
-respondents_w4 <- read_csv('~/Documents/F_BEGHINI_G/WAVE4/v1/honduras_respondents_WAVE4_v1_F_BEGHINI_2023-11-01.csv', guess_max = 50000,show_col_types = FALSE) |> 
+respondents_w4 <- read_csv('~/F_BEGHINI_G/WAVE4/v1/honduras_respondents_WAVE4_v1_F_BEGHINI_2023-11-01.csv', guess_max = 50000,show_col_types = FALSE) |> 
               filter(respondent_master_id %in% metadata_followup$respondent_master_id)
 ```
 
@@ -151,8 +156,7 @@ sharing_rate_T2_w3 <- sharing_rate |>
 sharing_rate_inter <- sharing_rate |> 
   filter(timepoint=='T1/T2')
 
-sharing_w3 <- strain_shared |> 
-  left_join(SN_w3, by = join_by(pair), multiple = "all")
+sharing_w3 <- strain_shared 
 
 ```
 
@@ -178,14 +182,12 @@ status_sharing_w3 <- sharing_w3 |>
 sharing_w3 |> 
   filter(same_subject==TRUE) |> 
   mutate(trans = dist <= threshold) |> 
-  group_by(pair, timepoint) |>  
-  #mutate(shared_sgbs=n()) |>
-  #ungroup() |>
-  #distinct(pair, n, timepoint, .keep_all = TRUE) |>
-  #left_join(data.frame(pair=names(shared_sgbs), shared_sgbs=as.numeric(shared_sgbs))) |> 
+  mutate(timepoint = 'Intra-timepoint') |>
+  group_by(pair, timepoint, village_code_w3) |>  
   summarize(ssr=sum(trans==TRUE)/n()) |> 
   ggplot() + 
-    ggbeeswarm::geom_quasirandom(aes(timepoint, ssr))
+    geom_boxplot(aes(village_code_w3, ssr))
+    #ggbeeswarm::geom_quasirandom(aes(timepoint, ssr))
 ```
 
 
@@ -284,10 +286,54 @@ species_bray_long <- species_bray |>
 
 
 ```{r}
+demographics <- read_csv("/WORKAREA/work/HONDURAS_MICROBIOME/J_PULLMAN/DATA/COHORT_1/v2/honduras_respondents_demographics_J_PULLMAN_2022-11-07.csv")
+
+
+
+household_wealth_data2 <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_households_WAVE2_v5_F_BEGHINI_2022-11-01.csv") |> 
+  dplyr::select(building_id, l0400, household_wealth_index_w2)
+
+household_wealth_data1 <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_households_WAVE1_v8_F_BEGHINI_2022-11-01.csv") |> 
+  dplyr::select(building_id, l0400)
+
+household_wealth_data <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_households_WAVE3_v3_F_BEGHINI_2023_10-23.csv") |> 
+              dplyr::select(building_id, l0400, household_wealth_index_w3)
+
+covariates <- inner_join(metadata_baseline, demographics, by="respondent_master_id") |> 
+  inner_join(household_wealth_data) |> 
+  mutate(across(starts_with('mb_ca'), ~ case_when(as.integer(factor(.x)) / 3 == 1 ~ 1, .default = 0  ))) |>
+  mutate(dds_Cereals = as.integer(mb_ca0200|mb_ca0300|mb_ca0400),
+         dds_Vegetables = mb_ca1000,
+         dds_Fruits = as.integer(mb_ca1100|mb_ca1200),
+         dds_Meat_poultry_offal = as.integer(mb_ca1300 |mb_ca1400),
+         dds_Eggs = mb_ca0900,
+         dds_Fish_seafood = mb_ca1600,
+         dds_Legumes = mb_ca0100,
+         dds_Dairy = as.integer(mb_ca0500 | mb_ca0600 | mb_ca0700 | mb_ca0800),
+         dds_Fats = as.integer(mb_ca1500 | mb_ca1900),
+         dds_Sugar = as.integer(mb_ca1700 | mb_ca1800),
+         DDS = rowSums(across(starts_with('dds_')))
+  )
 sub_covar <- covariates |> 
   filter(respondent_master_id %in% metadata_followup$respondent_master_id) |> 
   unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
-  dplyr::select(respondent_master_id,BMI, gender,indigenous_status, age_at_survey, DDS, household_wealth_index_w3) 
+  dplyr::select(respondent_master_id,
+                BMI, 
+                gender = gender.x,
+                indigenous_status, 
+                age_at_survey = age_at_survey.x, 
+                DDS, 
+                household_wealth_index_w3,
+                religion = b0600,
+                education = b0100,
+                ) |> 
+    mutate(education = recode(education, "Have not completed any type of school" = 0,
+                                "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
+                                "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
+                                "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
+           religion = recode(religion, "Catholic" = 1, "No Religion" = 0, "Protestant" =2 )
+    )
+
 sub_covar[sub_covar$respondent_master_id=='145q-7f4867c7-a4e1-47e8-9b7c-2d98a4294cdb','household_wealth_index_w3'] <- 5
 sub_covar[sub_covar$respondent_master_id=='nZno-6b2d0c05-ebeb-464b-836e-31493a161740','household_wealth_index_w3'] <- 4
 sub_covar[sub_covar$respondent_master_id=='cPP0-b47b9cbf-eeaf-430a-87bf-d6322e65108b','household_wealth_index_w3'] <- 2
@@ -297,9 +343,11 @@ sub_covar[sub_covar$respondent_master_id=='enz0-54c4a166-642d-4707-9dd9-eac58c34
 sub_covar[sub_covar$respondent_master_id=='cPP0-e7a61fe3-ea87-4f76-b992-bbfbde75393c','household_wealth_index_w3'] <- 4
 sub_covar[sub_covar$respondent_master_id=='h4Ru-14c55d32-c61c-44da-9088-6559224a1ae9','household_wealth_index_w3'] <- 3
 sub_covar[sub_covar$respondent_master_id=='nZno-66d3906b-0036-4943-bfbb-f5aabaa16123','household_wealth_index_w3'] <- 4
+sub_covar[sub_covar$respondent_master_id=='cPP0-00ea6c4f-769a-4670-b7af-cc82af90a235','household_wealth_index_w3'] <- 4
 sub_covar[sub_covar$indigenous_status == '','indigenous_status'] = 'None of the above'
 sub_covar$indigenous_status <- ifelse(sub_covar$indigenous_status=='None of the above', 0, 1)
 sub_covar$genderm <- ifelse(sub_covar$gender == 'man', 1, 0)
+
 sub_covar_mat <- sub_covar |> 
   select(-gender) |> 
   tibble::column_to_rownames('respondent_master_id')
@@ -311,8 +359,6 @@ pairwise_mahalanomis |>
   rowwise() |> 
   mutate(pair = stri_c(stri_sort(stri_split_boundaries(str_c(s1, s2), type='character')[[1]]), collapse = '')) |> 
   distinct(pair, .keep_all = TRUE)-> pairwise_mahalanomis_long
-
-
 ```
 
 
@@ -324,7 +370,7 @@ strain_shared_only_relation$tanh_r <- tanh(strain_shared_only_relation$threshold
 ```{r}
 x <- sharing_w3 |> 
   filter(same_subject == FALSE) |> 
-  dplyr::select(ego = ego.x, alter = alter.x, pair, relationship = relationship.x, timepoint, species, threshold, dist) |> 
+  dplyr::select(ego = ego.x, alter = alter.x, pair, relationship = relationship, timepoint, species, threshold, dist) |> 
   distinct(pair, relationship, timepoint, species, .keep_all = TRUE) |> 
   mutate(#tanh_r = tanh(threshold/dist),
          relationship = replace_na(relationship, 'none')) |> 
@@ -350,15 +396,17 @@ xcov$intra_ego[is.na(xcov$intra_ego)] <- 0
 xcov$gender.mm <- xcov$gender_ego == "man" & xcov$gender_alter == "man"
 xcov$gender.mf <- xcov$gender_ego == "man" & xcov$gender_alter == "woman" | xcov$gender_ego == "woman" & xcov$gender_alter == "man"
 xcov$gender.ff <- xcov$gender_ego == "woman" & xcov$gender_alter == "woman"
-xcov$indigenous.both <- xcov$indigenous_status_ego != 'None of the above' & xcov$indigenous_status_alter != 'None of the above'
-xcov$indigenous.one <- xcov$indigenous_status_ego == 'None of the above' & xcov$indigenous_status_alter != 'None of the above' | xcov$indigenous_status_ego != 'None of the above' & xcov$indigenous_status_alter == 'None of the above'
-xcov$indigenous.none <- xcov$indigenous_status_ego == 'None of the above' & xcov$indigenous_status_alter == 'None of the above'
+xcov$indigenous.both <- xcov$indigenous_status_ego != 0 & xcov$indigenous_status_alter != 0
+xcov$indigenous.one <- xcov$indigenous_status_ego == 0 & xcov$indigenous_status_alter != 0 | xcov$indigenous_status_ego != 0 & xcov$indigenous_status_alter == 0
+xcov$indigenous.none <- xcov$indigenous_status_ego == 0 & xcov$indigenous_status_alter == 0
 xcov$age_difference_abs <- abs(xcov$age_at_survey_ego - xcov$age_at_survey_alter)
 xcov$average_age <- (xcov$age_at_survey_ego + xcov$age_at_survey_alter)/2
 xcov$wealth_difference_abs <- abs(xcov$household_wealth_index_w3_ego - xcov$household_wealth_index_w3_alter)
 xcov$average_wealth <- (xcov$household_wealth_index_w3_ego + xcov$household_wealth_index_w3_alter)/2
 xcov$DDS_difference_abs <- abs(xcov$DDS_ego - xcov$DDS_alter)
 xcov$DDS_average <- (xcov$DDS_ego + xcov$DDS_alter)/2
+xcov$education_difference_abs <- abs(education_ego - education_alter)
+xcov$average_education <- (education_ego + education_alter)/2
 
 colnames(xcov)[8] <- 'T2T1'
 colnames(xcov)[9] <- 'T1T2'
@@ -396,6 +444,54 @@ glmer(data = xcov, T2_t ~ T1_t*T2T1_t*T1T2_t*intra_ego_t*intra_alter_t + maha_di
 ```{r}
 summary(lmer_species_rand)
 ```
+
+
+```{r}
+library(caret)
+
+cl <- parallel::makeCluster(5)
+doParallel::registerDoParallel(cl)
+foreach(i = c(1:5)) %dopar% {
+set.seed(1993)
+xcov_inds <- c(1:nrow(xcov))
+test_xcov1_inds <- sample(xcov_inds, size = floor(.33*nrow(xcov)), replace = F)
+train_xcov1_inds <- xcov_inds[!(xcov_inds %in% test_xcov1_inds)]
+test_xcov2_inds <- sample(train_xcov1_inds, size = floor(.5*length(train_xcov1_inds)), replace = F)
+train_xcov2_inds <- xcov_inds[!(xcov_inds %in% test_xcov2_inds)]
+test_xcov3_inds <- train_xcov2_inds[!(train_xcov2_inds %in% test_xcov1_inds)]
+train_xcov3_inds <- xcov_inds[!(xcov_inds %in% test_xcov3_inds)]
+
+test1_xcov <- xcov[test_xcov1_inds,]
+train1_xcov <- xcov[train_xcov1_inds,]
+test2_xcov <- xcov[test_xcov2_inds,]
+train2_xcov <- xcov[train_xcov2_inds,]
+test3_xcov <- xcov[test_xcov3_inds,]
+train3_xcov <- xcov[train_xcov3_inds,]
+  
+
+test1 <- glmer(data = train1_xcov, T2_t ~ T1_t*T2T1_t*T1T2_t*intra_ego_t*intra_alter_t + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS + relationship + (1|species), family = binomial, nAGQ=0)
+test2 <- glmer(data = train2_xcov, T2_t ~ T1_t*T2T1_t*T1T2_t*intra_ego_t*intra_alter_t + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS + relationship + (1|species), family = binomial, nAGQ=0)
+test3 <- glmer(data = train3_xcov, T2_t ~ T1_t*T2T1_t*T1T2_t*intra_ego_t*intra_alter_t + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS + relationship + (1|species), family = binomial, nAGQ=0)
+
+preds1 <- predict(test1, newdata = test1_xcov, type = "response", allow.new.levels = TRUE)
+preds2 <- predict(test1, newdata = test2_xcov, type = "response", allow.new.levels = TRUE)
+preds3 <- predict(test3, newdata = test3_xcov, type = "response", allow.new.levels = TRUE)
+
+names(preds1) <- test_xcov1_inds
+names(preds2) <- test_xcov2_inds
+names(preds3) <- test_xcov3_inds
+preds.round <- c(preds1, preds2, preds3)
+preds.round <- preds.round[order(as.numeric(names(preds.round)))]
+
+preds.round
+} -> preds
+
+
+pROC::roc(xcov$T2_t, preds, ci=TRUE, plot=FALSE, levels=c(TRUE, FALSE), direction = "<", na.rm=TRUE)
+
+```
+
+
 
 
 # Linear model 
