@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE, dev = c('png','svglite'))
 #Change format of covariates to merge onto edge list
 Covars_ego <- covariates %>% merge(household_wealth_data) %>%
     unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
-  dplyr::rename(ego = respondent_master_id, ego_age = age_at_survey, ego_gender = gender,
+  dplyr::rename(ego = respondent_master_id, ego_age = age_at_survey.x, ego_gender = gender.x,
           ego_household = building_id,
          ego_household_wealth = household_wealth_index_w3, ego_education = b0100, ego_indigenous = indigenous_status, 
          ego_religion = b0600, ego_length_in_village = b0800, ego_length_in_village_years = b0900,
@@ -25,11 +25,11 @@ Covars_ego <- covariates %>% merge(household_wealth_data) %>%
                                 "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
                                 "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
          ego_indigenous = recode(ego_indigenous, "None of the above" = 0, " " = 0, "Lenca" = 1, "Ch'orti'/Maya Chorti"= 1)) %>% 
-  dplyr::select(-c("village_name", "marital_name"))
+  dplyr::select(-c("village_name"))
 
 Covars_alter <- covariates %>% merge(household_wealth_data) %>%
       unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
-  dplyr::rename(alter = respondent_master_id, alter_age = age_at_survey, alter_gender = gender,
+  dplyr::rename(alter = respondent_master_id, alter_age = age_at_survey.x, alter_gender = gender.x,
          alter_household = building_id,
          alter_household_wealth = household_wealth_index_w3, alter_education = b0100, alter_indigenous = indigenous_status, 
          alter_religion = b0600, alter_length_in_village = b0800, alter_length_in_village_years = b0900,
@@ -39,7 +39,7 @@ Covars_alter <- covariates %>% merge(household_wealth_data) %>%
                                 "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
                                 "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
          alter_indigenous = recode(alter_indigenous, "None of the above" = 0, " " = 0, "Lenca" = 1, "Ch'orti'/Maya Chorti"= 1)) %>% 
-  dplyr::select(-c("village_name", "marital_name"))
+  dplyr::select(-c("village_name"))
 
 
 
@@ -53,7 +53,7 @@ SN_All_Covars_stable_ties <- SN_All_Covars_stable_ties[SN_All_Covars_stable_ties
 
 ```{r get_covariate_matrix_no_relationship, message=FALSE, warning=FALSE, include=FALSE}
 #Get covariate matrix for people without a relationship
-village_names <- unique(SN$village_code_w3)
+village_names <- unique(SN_All_Covars_stable_ties$village_code_w3)
 foreach(v = village_names, .combine = rbind) %do%
 {
   #Split up matrix into villages
@@ -241,23 +241,74 @@ foreach(i = c(1:5)) %dopar% {
   preds.round <- preds.round[order(as.numeric(names(preds.round)))]
   
   
+  logit.test.1 <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                        indigenous.one + religion.same + age_difference_abs +
+                        average_age + wealth_difference_abs + average_wealth +
+                        education_difference_abs + average_education +
+                        strain_sharing_rate + household_same +(1|village_code_w3),
+                              data = train1, family = binomial)
+  logit.test.2 <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                        indigenous.one + religion.same + age_difference_abs +
+                        average_age + wealth_difference_abs + average_wealth +
+                        education_difference_abs + average_education +
+                        strain_sharing_rate + household_same + (1|village_code_w3),
+                              data = train2, family = binomial)
+  logit.test.3 <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                        indigenous.one + religion.same + age_difference_abs +
+                        average_age + wealth_difference_abs + average_wealth +
+                        education_difference_abs + average_education +
+                        strain_sharing_rate + household_same + (1|village_code_w3),
+                              data = train3, family = binomial)
+  preds.1 <- predict(logit.test.1, newdata = test1, type = "response")
+  preds.2 <- predict(logit.test.2, newdata = test2, type = "response")
+  preds.3 <- predict(logit.test.3, newdata = test3, type = "response")
+  names(preds.3) <- test3_inds
+  names(preds.2) <- test2_inds
+  names(preds.1) <- test1_inds
+  preds.onlycovars <- c(preds.1, preds.2, preds.3)
+  preds.onlycovars <- preds.onlycovars[order(as.numeric(names(preds.onlycovars)))]
+  
+
+  logit.test.1.covars <- lme4::glmer(related ~ gender.mm + gender.mf + 
+                                     age_difference_abs + average_age  +
+                                    strain_sharing_rate + household_same + (0+strain_sharing_rate|village_code_w3),
+                              data = train1, family = binomial)
+  logit.test.2.covars <- lme4::glmer(related ~ gender.mm + gender.mf +
+                                       age_difference_abs + average_age +
+                                       strain_sharing_rate + household_same + (0+strain_sharing_rate|village_code_w3),
+                              data = train2, family = binomial)
+  logit.test.3.covars <- lme4::glmer(related ~ gender.mm + gender.mf + 
+                                       age_difference_abs + average_age +
+                                       strain_sharing_rate + household_same + (0+strain_sharing_rate|village_code_w3),
+                              data = train3, family = binomial)
+  
+  preds.1.covar <- predict(logit.test.1.covars, newdata = test1, type = "response")
+  preds.2.covar <- predict(logit.test.2.covars, newdata = test2, type = "response")
+  preds.3.covar <- predict(logit.test.3.covars, newdata = test3, type = "response")
+  names(preds.3.covars) <- test3_inds
+  names(preds.2.covars) <- test2_inds
+  names(preds.1.covars) <- test1_inds
+  preds.round.covars <- c(preds.1.covar, preds.2.covars, preds.3.covars)
+  preds.round.covars <- preds.round.covars[order(as.numeric(names(preds.round.covars)))]
+  
+  
   logit.test.1.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
                         education_difference_abs + average_education +
-                        strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
+                        strain_sharing_rate + household_same + (0+strain_sharing_rate|village_code_w3),
                               data = train1, family = binomial)
   logit.test.2.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
                         education_difference_abs + average_education +
-                        strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
+                        strain_sharing_rate + household_same + (0+strain_sharing_rate|village_code_w3),
                               data = train2, family = binomial)
   logit.test.3.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
                         education_difference_abs + average_education +
-                        strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
+                        strain_sharing_rate + household_same + (0+strain_sharing_rate|village_code_w3),
                               data = train3, family = binomial)
   
   preds.1.all <- predict(logit.test.1.all, newdata = test1, type = "response")
@@ -269,7 +320,7 @@ foreach(i = c(1:5)) %dopar% {
   preds.round.all <- c(preds.1.all, preds.2.all, preds.3.all)
   preds.round.all <- preds.round.all[order(as.numeric(names(preds.round.all)))]
   
-  list(preds.round, preds.round.all)
+  list(preds.round, preds.onlycovars, preds.covars, preds.round.all)
 } -> preds
 parallel::stopCluster(cl)
 
