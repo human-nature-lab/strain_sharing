@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-load("~/git/strain_sharing/RData.RData")
+
 ```
 
 ```{r}
@@ -34,9 +34,6 @@ diversity_df <- data.frame(respondent_master_id = names(richness),
 Calculate Centrality and Similarity
 ```{r}
 count <- 0
-#Where are we losing the people from?
-length(unique(c(SN$ego, SN$alter)))
-#From the few villages we dropped?
 for(i in 1:length(village_names)){
   sn_vil <- SN %>% filter(village_code_w3 == village_names[i])
   sn_vil_all <- all_edges %>% filter(village_code_w3 == village_names[i])
