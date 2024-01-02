@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(pROC)
 ```
 
 # Link Prediction Methods
@@ -20,11 +21,11 @@ Covars_ego <- covariates %>% merge(household_wealth_data) %>%
          ego_religion = b0600, ego_length_in_village = b0800, ego_length_in_village_years = b0900,
          ego_DDS = DDS, 
          ego_latitude = building_latitude, ego_longitude = building_longitude) %>%
-  mutate(ego_education = recode(ego_education, "Have not completed any type of school" = 0,
+  mutate(ego_education = dplyr::recode(ego_education, "Have not completed any type of school" = 0,
                                 "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
                                 "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
                                 "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
-         ego_indigenous = recode(ego_indigenous, "None of the above" = 0, " " = 0, "Lenca" = 1, "Ch'orti'/Maya Chorti"= 1)) %>% 
+         ego_indigenous = dplyr::recode(ego_indigenous, "None of the above" = 0, " " = 0, "Lenca" = 1, "Ch'orti'/Maya Chorti"= 1)) %>% 
   dplyr::select(-c("village_name", "marital_name"))
 
 Covars_alter <- covariates %>% merge(household_wealth_data) %>%
@@ -99,7 +100,7 @@ foreach(v = village_names, .combine = rbind) %dopar% {
   #Check progress
   print(v)
   Village_NoRels
-} -> All_NoRel_Covars.     #Get covariated for people without relationship ties
+} -> All_NoRel_Covars     #Get covariated for people without relationship ties
 
 parallel::stopCluster(cl)
 
@@ -328,11 +329,36 @@ foreach(i = c(1:5)) %dopar% {
   train3 <- Downsamp_all[train3_inds,]
   test3 <- Downsamp_all[test3_inds,]
   
-  logit.test.1 <- lme4::glmer(related ~ strain_sharing_rate + household_same + (0+strain_sharing_rate|village_code_w3),
+  logit.test.1.onlycovars <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                                              indigenous.one + religion.same + age_difference_abs +
+                                              average_age + wealth_difference_abs + average_wealth +
+                                              education_difference_abs + average_education + household_same + (1|village_code_w3),
+                                              data = train1, family = binomial, control=lme4::glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+  logit.test.2.onlycovars <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                                              indigenous.one + religion.same + age_difference_abs +
+                                              average_age + wealth_difference_abs + average_wealth +
+                                              education_difference_abs + average_education + household_same + (1|village_code_w3),
+                                              data = train2, family = binomial, control=lme4::glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+  logit.test.3.onlycovars <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
+                                              indigenous.one + religion.same + age_difference_abs +
+                                              average_age + wealth_difference_abs + average_wealth +
+                                              education_difference_abs + average_education + household_same + (1|village_code_w3),
+                                              data = train3, family = binomial, control=lme4::glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+  preds.1.onlycovars <- predict(logit.test.1.onlycovars, newdata = test1, type = "response")
+  preds.2.onlycovars <- predict(logit.test.2.onlycovars, newdata = test2, type = "response")
+  preds.3.onlycovars <- predict(logit.test.3.onlycovars, newdata = test3, type = "response")
+  names(preds.3.onlycovars) <- test3_inds
+  names(preds.2.onlycovars) <- test2_inds
+  names(preds.1.onlycovars) <- test1_inds
+  preds.round.onlycovars <- c(preds.1.onlycovars, preds.2.onlycovars, preds.3.onlycovars)
+  preds.round.onlycovars <- preds.round.onlycovars[order(as.numeric(names(preds.round.onlycovars)))]
+  
+  
+  logit.test.1 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
                               data = train1, family = binomial)
-  logit.test.2 <- lme4::glmer(related ~ strain_sharing_rate + household_same + (0+strain_sharing_rate|village_code_w3),
+  logit.test.2 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
                               data = train2, family = binomial)
-  logit.test.3 <- lme4::glmer(related ~ strain_sharing_rate + household_same + (0+strain_sharing_rate|village_code_w3),
+  logit.test.3 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
                               data = train3, family = binomial)
   preds.1 <- predict(logit.test.1, newdata = test1, type = "response")
   preds.2 <- predict(logit.test.2, newdata = test2, type = "response")
@@ -390,13 +416,14 @@ foreach(i = c(1:5)) %dopar% {
   preds.round.all <- c(preds.1.all, preds.2.all, preds.3.all)
   preds.round.all <- preds.round.all[order(as.numeric(names(preds.round.all)))]
   
-  list(preds.round, preds.round.covars, preds.round.all)
+  list(preds.round, preds.round.onlycovars, preds.round.covars, preds.round.all)
 } -> preds
 parallel::stopCluster(cl)
 
 pred.all <- rowSums(sapply(preds, `[[`, 1))/5
-pred.all.covars <- rowSums(sapply(preds, `[[`, 2))/5
-pred.all.all <- rowSums(sapply(preds, `[[`, 3))/5
+pred.all.onlycovars <- rowSums(sapply(preds, `[[`, 2))/5
+pred.all.covars <- rowSums(sapply(preds, `[[`, 3))/5
+pred.all.all <- rowSums(sapply(preds, `[[`, 4))/5
 
 #add on predictions from strain-sharing only model
 pred.all.acc <- pred.all
@@ -410,19 +437,19 @@ Downsamp_all$predicted <- pred.all.acc
 logit.base.roc <- pROC::roc(Downsamp_all$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
+logit.onlycovars.roc <- pROC::roc(Downsamp_all$related, pred.all.onlycovars, ci=TRUE, plot=FALSE,
+                levels=c("0","1"), direction = "<")
+
 logit.covars.roc <- pROC::roc(Downsamp_all$related, pred.all.covars, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
 logit.all.roc <- pROC::roc(Downsamp_all$related, pred.all.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
-pROC::auc(logit.base.roc)[1]
-pROC::auc(logit.covars.roc)[1]
-pROC::auc(logit.all.roc)[1]
-
 
 roc.list <- list("Strain-Sharing Rate" = logit.base.roc,
-                 "SSR + Age + Gender" = logit.covars.roc,
+                 "Only Socio-Dem Covars" = logit.onlycovars.roc,
+                 "SSR + Age + Gender + Household Sharing" = logit.covars.roc,
                  "SSR + All Socio-Dem Covars" = logit.all.roc)
 
 ci.list <- lapply(roc.list, ci.se, specificities = seq(0, 1, l = 25))
@@ -437,7 +464,7 @@ roc.plot <- ggroc(roc.list) +
   geom_abline(slope=1, intercept = 1, linetype = "dashed", alpha=1, color = "grey") +
   coord_equal()
 
-for(i in 1:3) {
+for(i in 1:4) {
   roc.plot <- roc.plot + geom_ribbon(
     data = dat.ci.list[[i]],
     aes(x = x, ymin = lower, ymax = upper),
@@ -452,13 +479,15 @@ theme(plot.title = element_text(size=10, hjust = .5),
       legend.text = element_text(size=10),
       text = element_text(size = 10)) + 
       scale_color_manual(name = "AUCs:",
-                         values=c("Red", "Green", "Blue"), 
+                         values=c("Red", 'Orange', "Green", "Blue"), 
                        labels=c(paste("Strain-Sharing Rate: ", round(logit.base.roc$auc,2),
-                                      " ± ",round(sqrt(var(logit.base.roc)),3), sep=""), 
+                                      " ± ",round(sqrt(pROC::var(logit.base.roc)),3), sep=""), 
+                                paste("Only Socio-Dem Covars:", round(logit.onlycovars.roc$auc,2 ),
+                                      " ± ",round(sqrt(pROC::var(logit.onlycovars.roc)),3), sep=""), 
                                 paste("SSR + Age + Gender: ", round(logit.covars.roc$auc, 2),
-                                      " ± ",round(sqrt(var(logit.covars.roc)),3), sep=""),
+                                      " ± ",round(sqrt(pROC::var(logit.covars.roc)),3), sep=""),
                                 paste("SSR + All Socio-Dem Covars: ", round(logit.all.roc$auc, 2),
-                                      " ± ",round(sqrt(var(logit.all.roc)),3), sep="")
+                                      " ± ",round(sqrt(pROC::var(logit.all.roc)),3), sep="")
                                 )
                        ) +
   ggtitle("All Social or Familial Relationships")
