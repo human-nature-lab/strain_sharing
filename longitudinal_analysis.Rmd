@@ -41,11 +41,7 @@ master_key_fw <- bind_rows(metadata_baseline,metadata_followup) |> dplyr::select
 
 ```{r load_social_network_waves, message=FALSE, warning=FALSE}
 SN_w1 <- read_csv("~/F_BEGHINI_G/WAVE1/v8/honduras_connections_WAVE1_v8_F_BEGHINI_2023-11-01.csv",show_col_types = FALSE) |> 
-              filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'), #Remove not get along
-                     ego %in% metadata_followup$respondent_master_id, 
-                     alter %in% metadata_followup$respondent_master_id,
-                     ego %in% metadata_baseline$respondent_master_id, 
-                     alter %in% metadata_baseline$respondent_master_id
+              filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling') #Remove not get along
                      ) |>
               mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
                      wave = 1)
@@ -318,6 +314,8 @@ sub_covar <- covariates |>
   filter(respondent_master_id %in% metadata_followup$respondent_master_id) |> 
   unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
   dplyr::select(respondent_master_id,
+                village_code_w3, 
+                building_id,
                 BMI, 
                 gender = gender.x,
                 indigenous_status, 
@@ -349,7 +347,7 @@ sub_covar$indigenous_status <- ifelse(sub_covar$indigenous_status=='None of the 
 sub_covar$genderm <- ifelse(sub_covar$gender == 'man', 1, 0)
 
 sub_covar_mat <- sub_covar |> 
-  select(-gender) |> 
+  select(-gender,-building_id) |> 
   tibble::column_to_rownames('respondent_master_id')
 pairwise_mahalanomis <- biotools::D2.dist(sub_covar_mat, cov = cov(sub_covar_mat, use='complete'))
 pairwise_mahalanomis |> 
@@ -405,8 +403,10 @@ xcov$wealth_difference_abs <- abs(xcov$household_wealth_index_w3_ego - xcov$hous
 xcov$average_wealth <- (xcov$household_wealth_index_w3_ego + xcov$household_wealth_index_w3_alter)/2
 xcov$DDS_difference_abs <- abs(xcov$DDS_ego - xcov$DDS_alter)
 xcov$DDS_average <- (xcov$DDS_ego + xcov$DDS_alter)/2
-xcov$education_difference_abs <- abs(education_ego - education_alter)
-xcov$average_education <- (education_ego + education_alter)/2
+xcov$education_difference_abs <- abs(xcov$education_ego - xcov$education_alter)
+xcov$average_education <- (xcov$education_ego + xcov$education_alter)/2
+xcov$religion_same <- xcov$religion_ego==xcov$religion_alter
+xcov$building_same <- xcov$building_id_ego == xcov$building_id_alter
 
 colnames(xcov)[8] <- 'T2T1'
 colnames(xcov)[9] <- 'T1T2'
@@ -420,6 +420,8 @@ xcov$intra_alter_t <- xcov$intra_alter < xcov$threshold
 
 xcov$relationship <- ifelse(xcov$relationship == 'none', FALSE, TRUE)
 xcov <- merge(xcov, pairwise_mahalanomis_long, by = 'pair')
+
+xcov <- xcov[xcov$village_code_w3_alter==xcov$village_code_w3_ego, ]
 ```
 
 
@@ -447,11 +449,30 @@ summary(lmer_species_rand)
 
 
 ```{r}
-library(caret)
-
-cl <- parallel::makeCluster(5)
+cl <- parallel::makeForkCluster(24)
 doParallel::registerDoParallel(cl)
-foreach(i = c(1:5)) %dopar% {
+foreach(s = unique(xcov$species)) %dopar% {
+  tmpdata = xcov[xcov$species==s,]
+  villages_to_keep = tmpdata |> group_by(village_code_w3_ego, species) |> count() |> filter(n>1) |> pull(village_code_w3_ego)
+  tmpdata = tmpdata[tmpdata$village_code_w3_ego %in% villages_to_keep,]
+lme4::glmer(data = tmpdata, 
+                 T2_t ~ T1_t*intra_ego_t*intra_alter_t + gender.mm + gender.ff + 
+                   religion_same + education_difference_abs + average_education + 
+                   indigenous.both + indigenous.one + 
+                   age_difference_abs + average_age + 
+                   wealth_difference_abs + average_wealth + 
+                   DDS_difference_abs + building_same + 
+                   relationship + (0+T1_t|village_code_w3_ego), 
+                 family = binomial
+                 )
+} -> long_glmm
+parallel::stopCluster(cl)
+```
+
+
+```{r}
+
+foreach(i = c(1:5)) %do% {
 set.seed(1993)
 xcov_inds <- c(1:nrow(xcov))
 test_xcov1_inds <- sample(xcov_inds, size = floor(.33*nrow(xcov)), replace = F)
@@ -467,28 +488,98 @@ test2_xcov <- xcov[test_xcov2_inds,]
 train2_xcov <- xcov[train_xcov2_inds,]
 test3_xcov <- xcov[test_xcov3_inds,]
 train3_xcov <- xcov[train_xcov3_inds,]
-  
 
-test1 <- glmer(data = train1_xcov, T2_t ~ T1_t*T2T1_t*T1T2_t*intra_ego_t*intra_alter_t + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS + relationship + (1|species), family = binomial, nAGQ=0)
-test2 <- glmer(data = train2_xcov, T2_t ~ T1_t*T2T1_t*T1T2_t*intra_ego_t*intra_alter_t + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS + relationship + (1|species), family = binomial, nAGQ=0)
-test3 <- glmer(data = train3_xcov, T2_t ~ T1_t*T2T1_t*T1T2_t*intra_ego_t*intra_alter_t + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS + relationship + (1|species), family = binomial, nAGQ=0)
+cl2 <- parallel::makeCluster(3)
 
-preds1 <- predict(test1, newdata = test1_xcov, type = "response", allow.new.levels = TRUE)
-preds2 <- predict(test1, newdata = test2_xcov, type = "response", allow.new.levels = TRUE)
-preds3 <- predict(test3, newdata = test3_xcov, type = "response", allow.new.levels = TRUE)
+test_simple <- parLapply(cl=cl2,
+                         list(train1_xcov, train2_xcov, train3_xcov), 
+                        function(x) {glmmTMB::glmmTMB(data = x, T2_t ~ T1_t + (1|species) + (0+T1_t|village_code_w3_ego), family = binomial)}
+)
 
-names(preds1) <- test_xcov1_inds
-names(preds2) <- test_xcov2_inds
-names(preds3) <- test_xcov3_inds
-preds.round <- c(preds1, preds2, preds3)
+preds_simple <- parLapply(cl2,
+                          mapply(list, test_simple, list(test1_xcov, test2_xcov, test3_xcov),  SIMPLIFY=FALSE),
+                          function(x) { 
+                            m <- x[[1]]
+                            test_set <- x[[2]] 
+                            predict(m, test_set, type = "response", allow.new.levels = TRUE) 
+                          }
+)
+
+names(preds_simple[[1]]) <- test_xcov1_inds
+names(preds_simple[[2]]) <- test_xcov2_inds
+names(preds_simple[[3]]) <- test_xcov3_inds
+preds.simple <- unlist(preds_simple)
+preds.simple <- preds.simple[order(as.numeric(names(preds.simple)))]
+
+
+test_onlycovars <- parLapply(cl=cl2,
+                         list(train1_xcov, train2_xcov, train3_xcov), 
+                        function(x) {glmmTMB::glmmTMB(data = x, T2_t ~ T1_t + (1|species) + (0+T1_t|village_code_w3_ego), family = binomial)}
+)
+
+preds_onlycovars <- parLapply(cl2,
+                          mapply(list, test_simple, list(test1_xcov, test2_xcov, test3_xcov),  SIMPLIFY=FALSE),
+                          function(x) { 
+                            m <- x[[1]]
+                            test_set <- x[[2]] 
+                            predict(m, test_set, type = "response", allow.new.levels = TRUE) 
+                          }
+)
+
+names(preds_onlycovars[[1]]) <- test_xcov1_inds
+names(preds_onlycovars[[2]]) <- test_xcov2_inds
+names(preds_onlycovars[[3]]) <- test_xcov3_inds
+preds.onlycovars <- unlist(preds_onlycovars)
+preds.onlycovars <- preds.onlycovars[order(as.numeric(names(preds.simple)))]
+
+
+
+test <- parLapply(cl2,
+                  list(train1_xcov, train2_xcov, train3_xcov), 
+                  function(x) {
+                    glmmTMB::glmmTMB(data = x, 
+                                     T2_t ~ T1_t*intra_ego_t*intra_alter_t + gender.mm + gender.ff + 
+                                       religion_same + education_difference_abs + average_education + 
+                                       indigenous.both + indigenous.one + 
+                                       age_difference_abs + average_age + 
+                                       wealth_difference_abs + average_wealth + 
+                                       DDS_difference_abs + building_same + 
+                                       relationship + (1|species) + (0+T1_t|village_code_w3_ego), 
+                                     family = binomial
+                                     )
+                    }
+                  )
+
+preds <- parLapply(cl2,  
+                          mapply(list, test, list(test1_xcov, test2_xcov, test3_xcov),  SIMPLIFY=FALSE),
+                          function(x) { 
+                            m <- x[[1]]
+                            test_set <- x[[2]] 
+                            predict(m, test_set, type = "response", allow.new.levels = TRUE) 
+                          }
+)
+
+parallel::stopCluster(cl2)
+
+names(preds[[1]]) <- test_xcov1_inds
+names(preds[[2]]) <- test_xcov2_inds
+names(preds[[3]]) <- test_xcov3_inds
+preds.round <- unlist(preds)
 preds.round <- preds.round[order(as.numeric(names(preds.round)))]
 
-preds.round
+list(preds.simple, preds.round)
 } -> preds
 
 
-pROC::roc(xcov$T2_t, preds, ci=TRUE, plot=FALSE, levels=c(TRUE, FALSE), direction = "<", na.rm=TRUE)
+pred.all <- rowSums(sapply(preds, `[[`, 1))/5
+pred.all.covars <- rowSums(sapply(preds, `[[`, 2))/5
 
+#pred.all <- Reduce(`+`, preds)/5
+
+roc_pred_simple <- pROC::roc(xcov$T2_t, pred.all, ci=TRUE, plot=TRUE, levels=c(FALSE, TRUE), direction = "<", na.rm=TRUE)
+roc_pred <- pROC::roc(xcov$T2_t, pred.all.covars, ci=TRUE, plot=TRUE, levels=c(FALSE, TRUE), direction = "<", na.rm=TRUE)
+
+ggroc(roc_pred)
 ```
 
 
