@@ -1,0 +1,39 @@
+---
+title: "Longitudinal Analysis"
+author: "Francesco Beghini"
+date: "2023-10-26"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+library(lmerTest)
+```
+
+
+```{r, echo=FALSE}
+sharing_rate_only_followup <- readRDS('sharing_rate_only_followup.Rds')
+```
+```{r}
+lmer_zero_model <- lmer(T2 ~ T1 + relationship + (1|village_code_ego) + (1|ego), 
+                          sharing_rate_only_followup)
+summary(lmer_zero_model)
+```
+\newpage
+```{r}
+lmer_first_model <- lmer(T2 ~ T1 + relationship + maha_dist + (1|village_code_ego) + (1|ego), 
+                          sharing_rate_only_followup)
+summary(lmer_first_model)
+```
+\newpage
+```{r}
+lmer_second_model <- lmer(T2 ~ T1*relationship + maha_dist + (1|village_code_ego) + (1|ego), 
+                          sharing_rate_only_followup)
+summary(lmer_second_model)
+```
+\newpage
+```{r}
+lmer_third_model <- lmer(T2 ~ T1 + relationship + relationship*maha_dist + maha_dist + (ego|village_code_ego) + (1|ego),
+                          sharing_rate_only_followup)
+summary(lmer_third_model)
+```
