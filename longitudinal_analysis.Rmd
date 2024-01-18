@@ -112,7 +112,7 @@ SN_w3_graph <- graph_from_data_frame((reduced_SN_w3 |> select(-village_name_w3, 
 SN_w1_graph <- graph_from_data_frame((reduced_SN_w1 |> select(-village_code_w1, -village_name_w1)),
                                      directed = FALSE,
                                      vertices = (reduced_SN_w1 |> 
-                                                   select(ego, alter, starts_with('village')) |> 
+      select(ego, alter, starts_with('village')) |> 
                                                    pivot_longer(cols = c(-village_name_w1, -village_code_w1), names_to = 'a', values_to = 'vertex') |> 
                                                    select(vertex, starts_with('village')) |> 
                                                    distinct()
@@ -123,9 +123,29 @@ SN_w1_graph <- graph_from_data_frame((reduced_SN_w1 |> select(-village_code_w1, 
 
 
 ```{r load_strainphlan_data, cache=FALSE}
+species_per_sample <- readRDS('~/species_per_sample_acc') |>
+inner_join(subset_samples_fw, by=join_by('sample' == 'sample_id')) |>
+distinct(species, village, subject, .keep_all = TRUE) |>
+count(species) |>
+filter(n > 10)
+
+kk <- combn(as.list(readRDS('~/species_per_sample_acc') |> mutate(present=TRUE) %>%
+     pivot_wider(names_from=sample, values_from=present, values_fill=list(present=FALSE)) |> select(-species)),2, simplify = FALSE)
+
+comb_names <- readRDS('~/species_per_sample_acc') |> 
+  mutate(present=TRUE) |> 
+  pivot_wider(names_from=sample, values_from=present, values_fill=list(present=FALSE)) |> 
+  select(-species) |> 
+  colnames() |> 
+  combn(2, simplify = FALSE, FUN=function(x) paste0(sort(x), collapse='='))
+
+shared_sgbs <- lapply(kk, function(x) sum(x[[1]]&x[[2]]))
+shared_sgbs <- setNames(shared_sgbs, comb_names)
+
 strain_shared_raw <- readRDS('/SCRATCH/tmp/shared.RDS')
 strain_shared <- strain_shared_raw |> 
-    filter(s1 %in% subset_samples_fw$sample_id & s2 %in% subset_samples_fw$sample_id ) |> 
+    filter(s1 %in% subset_samples_fw$sample_id & s2 %in% subset_samples_fw$sample_id ,
+    species %in% species_per_sample$species) |> 
     mutate(ego = master_key_fw[s1, 'respondent_master_id' ],
          alter = master_key_fw[s2, 'respondent_master_id'],
          pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
@@ -147,10 +167,27 @@ strain_shared <- strain_shared_raw |>
   mutate(tie = replace_na(tie, 'none'),
          relationship = replace_na(relationship, 'none'))
 
-sharing_rate_raw <- readRDS('/SCRATCH/tmp/sharing_rate_with_zero_long_with_followup.RDS') |> 
-  separate_wider_delim(pair, "=", names = c('s1','s2'))
+sharing_rate <- strain_shared_raw |>
+  mutate(timepoint = case_when( 
+           str_sub(s1,10)=='05' & str_sub(s2,10) == '05' ~ 'T1',
+           str_sub(s1,10)=='15' & str_sub(s2,10) == '15' ~ 'T2',
+           str_sub(s1,10)=='05' & str_sub(s2,10) == '15' ~ 'T1/T2',
+           str_sub(s1,10)=='15' & str_sub(s2,10) == '05' ~ 'T2/T1',
+           )) |>
+  filter(timepoint %in% c('T1','T2')) |>
+  group_by(pair, timepoint) |>  
+  mutate(n=sum(shared)) |>
+  ungroup() |>
+  distinct(pair, n, timepoint) |>
+  left_join(data.frame(pair=names(shared_sgbs), shared_sgbs=as.numeric(shared_sgbs))) |> 
+  mutate( n1 = n/shared_sgbs) |> 
+  mutate( n1 = case_when(shared_sgbs < 10 ~ NA, .default = n1))
 
-sharing_rate <- sharing_rate_raw |> 
+# readRDS('/SCRATCH/tmp/sharing_rate_with_zero_long_with_followup.RDS') |> 
+  # separate_wider_delim(pair, "=", names = c('s1','s2'))
+
+sharing_rate <- sharing_rate |> 
+    separate_wider_delim(pair, "=", names = c('s1','s2')) |>
   filter(s1 %in% subset_samples_fw$sample_id & s2 %in% subset_samples_fw$sample_id) |> 
   mutate(ego = master_key_fw[s1, 'respondent_master_id' ],
          alter = master_key_fw[s2, 'respondent_master_id'],
@@ -481,6 +518,10 @@ glmer(data = xcov, T2_t ~ T1_t*relationship + maha_dist + (1|species) + (1|villa
 ```
 
 ```{r}
+summary(lmer_species_rand)
+```
+
+```{r}
  # relationship + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS_difference_abs 
 #glmer(data = xcov, T2_t ~ T1_t*relationship + maha_dist  + (1|village_code_w3_ego), family = binomial, nAGQ=0) -> lmer_species_rand
 sharing_rate_only_followup <- sharing_rate |> 
@@ -490,7 +531,8 @@ sharing_rate_only_followup <- sharing_rate |>
   group_by(pair) |> 
   filter(n()==2) |> 
   ungroup() |> 
-  select(pair, relationship=tie, timepoint, n1, village_code_ego, ego, alter) |> 
+  mutate(is_kin = grepl('mother|father|child|sibling', relationship)) |>
+  select(pair, relationship=tie, timepoint, n1, is_kin, village_code_ego, ego, alter) |> 
   pivot_wider(names_from = timepoint, values_from = n1, values_fill = list(n1=0)) |> 
   left_join((pairwise_mahalanomis_long |> select(pair, maha_dist)), by = 'pair') |> 
   mutate(village_code_ego = as.factor(village_code_ego))
@@ -515,7 +557,6 @@ summary(lmer_zero_model)
 summary(lmer_first_model)
 ```
 
-
 ```{r}
 summary(lmer_second_model)
 ```
@@ -528,7 +569,26 @@ summary(lmer_thirdplus_model)
 ```
 
 ```{r}
+dotplot_compare_models <- bind_rows(data.frame(summary(lmer_first_model)$coef[2:4,1:2], class = 'no_interact'), data.frame(class = 'interact', summary(lmer_second_model)$coef[2:4,1:2])) |>
+  tibble::rownames_to_column('term') |>
+  mutate(term = str_remove(term, '...[0-9]')) |>
+  rename(SE = `Std..Error`) |>
+  bind_rows(list(term='T1:relationshipyes', class='interact', Estimate = fixef(lmer_second_model)[[5]], SE = summary(lmer_second_model)$coef[5,2])) |>
+  mutate(term = factor(term, levels = unique(term))) |>
+  ggplot(aes(reorder(term, desc(term)), Estimate, group=class)) +
+  geom_errorbar(aes(ymin=Estimate-SE, ymax=Estimate+SE, color = class),size = 1.5, width=.2, position = position_dodge(width = 0.4)) +
+  geom_point(aes(color = class), size = 4, position = position_dodge(width = 0.4)) +
+  coord_flip() +
+  cowplot::theme_cowplot() + xlab('Terms') +
+  scale_color_manual( values = c('orange', '#440154'))
 
+dotplot_compare_models
+```
+
+```{r}
+svglite('Figures/dotplot_compare_models.svg', fix_text_size = FALSE, bg='transparent')
+dotplot_compare_models
+dev.off()
 ```
 ```{r}
 
@@ -642,8 +702,92 @@ roc_pred <- pROC::roc(xcov$T2_t, pred.all.covars, ci=TRUE, plot=TRUE, levels=c(F
 ggroc(roc_pred)
 ```
 
+```{r}
+foreach(i = 1:4) %do% {
+  v = unique(metadata_followup$village_code)[i]
+  g <- get(paste0('sn_vil_graph_',match(v, village_names)))
+  sg <- igraph::subgraph(g, match(intersect(unique(master_key_fw[subset_samples_fw |> filter(village == str_pad(v, 3, pad = 0)) |> pull(sample_id),'respondent_master_id']), V(g)$name), V(g)$name))
+  
+  sharing_rate |> 
+    select(ego, alter, pair, tie, timepoint, n1) |>
+    filter(ego %in% V(sg)$name & alter %in% V(sg)$name) |>
+    pivot_wider(names_from = timepoint, values_from = n1) -> wide_ssr
 
+    wide_ssr |>
+    group_by(tie) |> summarize(median(T1), median(T2), mean(T1), mean(T2))
+    
+    ratio_plot <- wide_ssr |>
+    #pivot_longer(cols = c(T1,T2), names_to = 'timepoint', values_to = 'ssr') |>
+    mutate(delta_ssr = abs(T2-T1),
+           tie = factor(wide_ssr$tie, labels = c('No','Yes'))) |>
+    ggplot() + 
+    geom_boxplot(aes(tie, delta_ssr, fill=tie)) + 
+    coord_flip() +
+    cowplot::theme_cowplot() + 
+    xlab('Is tie present?') + ylab(bquote('Δ Strain-sharing' ~ rate[T])) +
+    ylim(c(0,0.5)) + 
+    guides(fill='none') +
+    scale_fill_manual(values = c('white', '#027fffff'))
 
+    wide_ssr |>
+    filter(tie == 'yes') |>
+    mutate(c = T1 > median(T1, na.rm = TRUE)) |> 
+    graph_from_data_frame(directed=FALSE) -> sg_t1
+  
+    wide_ssr |>
+    filter(tie == 'yes') |>
+    mutate(c = T2 > median(T1, na.rm = TRUE)) |>
+    graph_from_data_frame(directed=FALSE) -> sg_t2
+  
+  pred_colors <- edge_attr(sg_t1, "c")
+  E(sg_t1)$size <- 2
+  pred_colors[pred_colors == TRUE] <- "#027fffff"
+  pred_colors[pred_colors == FALSE] <- "grey"  
+  E(sg_t1)$color <- pred_colors
+
+  pred_colors <- edge_attr(sg_t2, "c")
+  E(sg_t2)$size <- 2
+  pred_colors[pred_colors == TRUE] <- "#027fffff"
+  pred_colors[pred_colors == FALSE] <- "grey"  
+  E(sg_t2)$color <- pred_colors
+
+  # par(mar=c(0,0,0,0)+.1)
+  set.seed(1993)
+  layout <- layout.fruchterman.reingold(sg_t1)
+  v_t1 <- as.ggplot(expression(par(mar=c(0,0,0,0)+.1),plot(sg_t1,
+       vertex.label = NA,
+       vertex.size = 3,
+       layout = layout,
+       edge.width = E(sg_t1)$size,
+       main = paste('T1', village_map[village_map$village_code == v,'village_name_deid', TRUE]))
+      ))
+  v_t2 <- as.ggplot(expression(par(mar=c(0,0,0,0)+.1), plot(sg_t2,
+       vertex.label = NA,
+       vertex.size = 3,
+       layout = layout,
+       edge.width = E(sg_t2)$size, 
+       main = paste('T2', village_map[village_map$village_code == v,'village_name_deid', TRUE])),
+  legend("topleft",
+         legend=c(">median", "<median"),
+         col=c("#027fffff", "grey"),
+         lty = c(1,1),
+         lwd = 2,
+         bty = "n")))
+  ggarrange(v_t1, v_t2, ratio_plot, nrow =3, heights = c(1,1,0.35))
+} -> plots_t1t2
+```
+
+```{r}
+png('/tmp/RtmpDF3hA7/vscode-R/plot1.png', width = 1500, height = 1100)
+ggarrange(plotlist = plots_t1t2, nrow = 1)
+dev.off()
+```
+
+```{r}
+svglite(filename = 'Figures/timepoint_ssr_difference1.svg', width = 17, height = 10, bg='transparent', pointsize = 10, fix_text_size = FALSE)
+ggarrange(plotlist = plots_t1t2, nrow = 1)
+dev.off()
+```
 
 
 # Stability w1 w3
