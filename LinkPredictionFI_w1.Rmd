@@ -12,9 +12,9 @@ knitr::opts_chunk$set(echo = TRUE, dev = c('png','svglite'))
 # Link Prediction Methods
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 #Change format of covariates to merge onto edge list
-Covars_ego <- covariates %>% merge(household_wealth_data) %>%
+Covars_ego <- covariates %>%
     unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
-  dplyr::rename(ego = respondent_master_id, ego_age = age_at_survey.x, ego_gender = gender.x,
+  dplyr::rename(ego = respondent_master_id, ego_age = age_at_survey, ego_gender = gender,
           ego_household = building_id,
          ego_household_wealth = household_wealth_index_w3, ego_education = b0100, ego_indigenous = indigenous_status, 
          ego_religion = b0600, ego_length_in_village = b0800, ego_length_in_village_years = b0900,
@@ -24,12 +24,12 @@ Covars_ego <- covariates %>% merge(household_wealth_data) %>%
                                 "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
                                 "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
                                 "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
-         ego_indigenous = recode(ego_indigenous, "None of the above" = 0, " " = 0, "Lenca" = 1, "Ch'orti'/Maya Chorti"= 1)) %>% 
+         ego_indigenous = recode(ego_indigenous, "Lenca" = 1, "Ch'orti'/Maya Chorti" = 1, .default = 0)) %>% 
   dplyr::select(-c("village_name"))
 
-Covars_alter <- covariates %>% merge(household_wealth_data) %>%
+Covars_alter <- covariates %>% 
       unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
-  dplyr::rename(alter = respondent_master_id, alter_age = age_at_survey.x, alter_gender = gender.x,
+  dplyr::rename(alter = respondent_master_id, alter_age = age_at_survey, alter_gender = gender,
          alter_household = building_id,
          alter_household_wealth = household_wealth_index_w3, alter_education = b0100, alter_indigenous = indigenous_status, 
          alter_religion = b0600, alter_length_in_village = b0800, alter_length_in_village_years = b0900,
@@ -38,17 +38,15 @@ Covars_alter <- covariates %>% merge(household_wealth_data) %>%
                                 "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
                                 "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
                                 "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
-         alter_indigenous = recode(alter_indigenous, "None of the above" = 0, " " = 0, "Lenca" = 1, "Ch'orti'/Maya Chorti"= 1)) %>% 
+         alter_indigenous = recode(alter_indigenous, "Lenca" = 1, "Ch'orti'/Maya Chorti" = 1, .default = 0)) %>% 
   dplyr::select(-c("village_name"))
 
 
 
 #Merge covariate data onto edge list
-SN_All_Covars_stable_ties <- merge(SN, Covars_ego, by = "ego")
-SN_All_Covars_stable_ties <- merge(SN_All_Covars_stable_ties, Covars_alter, by = "alter")
-SN_All_Covars_stable_ties <- SN_All_Covars_stable_ties[SN_All_Covars_stable_ties$pair_key %in% intersect(SN_All_Covars_stable_ties$pair_key, SN_w1$pair), ] 
-  # left_join(Covars_ego, by = join_by(ego)) |> 
-  # left_join(Covars_alter, by = join_by(alter)) 
+SN_All_Covars_stable_ties <- inner_join(SN, Covars_ego, by = join_by("ego"=="ego"))
+SN_All_Covars_stable_ties <- inner_join(SN_All_Covars_stable_ties, Covars_alter, by = join_by("alter"=="alter"))
+SN_All_Covars_stable_ties <- SN_All_Covars_stable_ties[SN_All_Covars_stable_ties$pair_key %in% intersect(SN_All_Covars_stable_ties$pair_key, SN_w1$pair), ]
 ```
 
 ```{r get_covariate_matrix_no_relationship, message=FALSE, warning=FALSE, include=FALSE}
@@ -86,7 +84,8 @@ foreach(v = village_names, .combine = rbind) %do%
     ) |> 
     rowwise() |> 
     mutate(strain_sharing_rate = strain_rate[ego, alter],
-           bray_curtis_sim = species_bray[ego, alter])
+           bray_curtis_sim = species_bray[ego, alter]) |>
+    ungroup()
 } -> All_NoRel_Covars_w3
 
 
@@ -109,9 +108,13 @@ SN_All_Covars_for_Regression_stable_ties <- SN_All_Covars_stable_ties %>% distin
 ```
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
+family_house_pairs_stable <- SN_All_Covars_stable_ties |>
+                                filter(building_id_ego == building_id_alter | relationship %in% c("father", "mother", "sibling", "child_over12_other_house")) |>
+                                pull(pair_key)
+
 #Make dataframe with only non-kin in different house
 SN_Non_Kin_Dif_House_Covars_for_Regression_stable_ties<- SN_All_Covars_for_Regression_stable_ties %>%
-  filter(!(pair_key %in% family_house_pairs))
+  filter(!(pair_key %in% family_house_pairs_stable))
 
 
 #select predictors
@@ -151,18 +154,18 @@ Non_Kin_House_for_Regression_stable_ties <- rbind(All_NoRel_Covars_for_Regressio
 
 #May want to check if this is missing completely at random or input columns
 #filter to complete cases
-All_for_Regression_complete_stable_ties <- All_for_Regression_stable_ties[complete.cases(All_for_Regression_stable_ties),]
+All_for_Regression_complete_stable_ties <- All_for_Regression_stable_ties[complete.cases(All_for_Regression_stable_ties), ]
 
-All_NoRel_Covars_for_Regression_complete_stable_ties <- All_NoRel_Covars_for_Regression_stable_ties[complete.cases(All_NoRel_Covars_for_Regression_stable_ties),]
+All_NoRel_Covars_for_Regression_complete_stable_ties <- All_NoRel_Covars_for_Regression_stable_ties[complete.cases(All_NoRel_Covars_for_Regression_stable_ties), ]
 
 Non_Kin_House_for_Regression_complete_stable_ties <-
-  Non_Kin_House_for_Regression_stable_ties[complete.cases(Non_Kin_House_for_Regression_stable_ties),]
+  Non_Kin_House_for_Regression_stable_ties[complete.cases(Non_Kin_House_for_Regression_stable_ties), ]
 
 edge_counts <- SN_All_Covars_for_Regression_complete_stable_ties %>%
   group_by(village_code_w3) %>%
-  summarize(edge_count = sum(related)) 
+  summarize(edge_count = sum(related))
 
-edge_counts <- edge_counts[match(village_names, edge_counts$village_code_w3),] %>%
+edge_counts <- edge_counts[match(village_names, edge_counts$village_code_w3), ] %>%
   filter(!is.na(village_code_w3)) |> 
   pull(edge_count, village_code_w3)
 
@@ -170,7 +173,7 @@ edge_counts_nkh <- SN_Non_Kin_Dif_House_Covars_for_Regression_complete_stable_ti
   group_by(village_code_w3) %>%
   summarize(edge_count = sum(related))
 
-edge_counts_nkh <- edge_counts_nkh[match(village_names, edge_counts_nkh$village_code_w3),] %>%
+edge_counts_nkh <- edge_counts_nkh[match(village_names, edge_counts_nkh$village_code_w3), ] %>%
   filter(!is.na(village_code_w3)) |> 
   pull(edge_count, village_code_w3)
 
@@ -183,24 +186,27 @@ edge_counts_nkh <- edge_counts_nkh[match(village_names, edge_counts_nkh$village_
 #Downsample
 
 foreach(v = names(edge_counts), .combine = rbind) %do% {
-  All_NoRel_Covars_for_Regression_complete_stable_ties %>%
-  filter(village_code_w3 == as.integer(v)) %>% slice_sample(n = edge_counts[v])
-} -> Downsamp_all
+  All_NoRel_Covars_for_Regression_complete_stable_ties |>
+  filter(village_code_w3 == as.integer(v)) |>
+  slice_sample(n = edge_counts[[v]])
+} -> Downsamp_all_stable_ties
+Downsamp_all_stable_ties <- as.data.frame(Downsamp_all_stable_ties)
 
-Downsamp_all <- rbind(Downsamp_all, SN_All_Covars_for_Regression_complete_stable_ties)
+Downsamp_all_stable_ties <- rbind(Downsamp_all_stable_ties, SN_All_Covars_for_Regression_complete_stable_ties)
 
-Downsamp_all <- Downsamp_all[complete.cases(Downsamp_all),]
+Downsamp_all_stable_ties <- Downsamp_all_stable_ties[complete.cases(Downsamp_all_stable_ties),]
 
 #Non-kin different house
 
 foreach(v = names(edge_counts_nkh), .combine = rbind) %do% {
   All_NoRel_Covars_for_Regression_complete_stable_ties %>%
   filter(village_code_w3 == as.integer(v)) %>% slice_sample(n = edge_counts_nkh[v])
-} -> Downsamp_all_nkh
+} -> Downsamp_all_stable_ties_nkh
 
-Downsamp_all_nkh <- rbind(Downsamp_all_nkh, SN_Non_Kin_Dif_House_Covars_for_Regression_complete_stable_ties)
+Downsamp_all_stable_ties_nkh <- as.data.frame(Downsamp_all_stable_ties_nkh)
+Downsamp_all_stable_ties_nkh <- rbind(Downsamp_all_stable_ties_nkh, SN_Non_Kin_Dif_House_Covars_for_Regression_complete_stable_ties)
 
-Downsamp_all_nkh <- Downsamp_all_nkh[complete.cases(Downsamp_all_nkh),]
+Downsamp_all_stable_ties_nkh <- Downsamp_all_stable_ties_nkh[complete.cases(Downsamp_all_stable_ties_nkh),]
 ```
 
 
@@ -210,20 +216,20 @@ cl <- parallel::makeCluster(5)
 doParallel::registerDoParallel(cl)
 foreach(i = c(1:5)) %dopar% {
   print(i)
-  inds <- c(1:nrow(Downsamp_all))
-  test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all)), replace = F)
+  inds <- c(1:nrow(Downsamp_all_stable_ties))
+  test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_stable_ties)), replace = F)
   train1_inds <- inds[!(inds %in% test1_inds)]
   test2_inds <- sample(train1_inds, size = floor(.5*length(train1_inds)), replace = F)
   train2_inds <- inds[!(inds %in% test2_inds)]
   test3_inds <- train2_inds[!(train2_inds %in% test1_inds)]
   train3_inds <- inds[!(inds %in% test3_inds)]
 
-  train1 <- Downsamp_all[train1_inds,]
-  test1 <- Downsamp_all[test1_inds,]
-  train2 <- Downsamp_all[train2_inds,]
-  test2 <- Downsamp_all[test2_inds,]
-  train3 <- Downsamp_all[train3_inds,]
-  test3 <- Downsamp_all[test3_inds,]
+  train1 <- Downsamp_all_stable_ties[train1_inds,]
+  test1 <- Downsamp_all_stable_ties[test1_inds,]
+  train2 <- Downsamp_all_stable_ties[train2_inds,]
+  test2 <- Downsamp_all_stable_ties[test2_inds,]
+  train3 <- Downsamp_all_stable_ties[train3_inds,]
+  test3 <- Downsamp_all_stable_ties[test3_inds,]
 
   logit.test.1 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
                               data = train1, family = binomial)
@@ -321,28 +327,28 @@ foreach(i = c(1:5)) %dopar% {
   preds.round.all <- preds.round.all[order(as.numeric(names(preds.round.all)))]
   
   list(preds.round, preds.onlycovars, preds.round.covars, preds.round.all)
-} -> preds
+} -> preds_all
 parallel::stopCluster(cl)
 
-pred.all <- rowSums(sapply(preds, `[[`, 1))/5
-pred.all.onlycovars <- rowSums(sapply(preds, `[[`, 2))/5
-pred.all.covars <- rowSums(sapply(preds, `[[`, 3))/5
-pred.all.all <- rowSums(sapply(preds, `[[`, 4))/5
+pred.all <- rowSums(sapply(preds_all, `[[`, 1))/5
+pred.all.onlycovars <- rowSums(sapply(preds_all, `[[`, 2))/5
+pred.all.covars <- rowSums(sapply(preds_all, `[[`, 3))/5
+pred.all.all <- rowSums(sapply(preds_all, `[[`, 4))/5
 
 #add on predictions from strain-sharing only model
-pred.all.acc <- pred.all
+pred.all.acc <- pred.all.all
 pred.all.acc[pred.all.acc >=.5] <- 1
 pred.all.acc[pred.all.acc <.5] <- 0
 
-Downsamp_all$predicted <- pred.all.acc
+Downsamp_all_stable_ties$predicted <- pred.all.acc
 
-logit.base.roc <- pROC::roc(Downsamp_all$related, pred.all, ci=TRUE, plot=FALSE,
+logit.base.roc <- pROC::roc(Downsamp_all_stable_ties$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.onlycovars.roc <- pROC::roc(Downsamp_all$related, pred.all.onlycovars, ci=TRUE, plot=FALSE,
+logit.onlycovars.roc <- pROC::roc(Downsamp_all_stable_ties$related, pred.all.onlycovars, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.covars.roc <- pROC::roc(Downsamp_all$related, pred.all.covars, ci=TRUE, plot=FALSE,
+logit.covars.roc <- pROC::roc(Downsamp_all_stable_ties$related, pred.all.covars, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.all.roc <- pROC::roc(Downsamp_all$related, pred.all.all, ci=TRUE, plot=FALSE,
+logit.all.roc <- pROC::roc(Downsamp_all_stable_ties$related, pred.all.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
 
@@ -407,6 +413,10 @@ roc.plot.stable <- roc.plot.stable + theme(
 svglite('Figures/plot_roc_all_famililar_social_stable_ties.svg')
 roc.plot.stable
 dev.off()
+
+png('Figures/plot_roc_all_famililar_social_stable_ties.png', width = 900, height = 900)
+roc.plot.stable
+dev.off()
 ```
 
 
@@ -414,20 +424,20 @@ dev.off()
 cl <- parallel::makeCluster(5)
 doParallel::registerDoParallel(cl)
 foreach(i = c(1:5)) %dopar% {
-  inds <- c(1:nrow(Downsamp_all_nkh))
-  test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_nkh)), replace = F)
+  inds <- c(1:nrow(Downsamp_all_stable_ties_nkh))
+  test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_stable_ties_nkh)), replace = F)
   train1_inds <- inds[!(inds %in% test1_inds)]
   test2_inds <- sample(train1_inds, size = floor(.5*length(train1_inds)), replace = F)
   train2_inds <- inds[!(inds %in% test2_inds)]
   test3_inds <- train2_inds[!(train2_inds %in% test1_inds)]
   train3_inds <- inds[!(inds %in% test3_inds)]
   
-  train1 <- Downsamp_all_nkh[train1_inds,]
-  test1 <- Downsamp_all_nkh[test1_inds,]
-  train2 <- Downsamp_all_nkh[train2_inds,]
-  test2 <- Downsamp_all_nkh[test2_inds,]
-  train3 <- Downsamp_all_nkh[train3_inds,]
-  test3 <- Downsamp_all_nkh[test3_inds,]
+  train1 <- Downsamp_all_stable_ties_nkh[train1_inds,]
+  test1 <- Downsamp_all_stable_ties_nkh[test1_inds,]
+  train2 <- Downsamp_all_stable_ties_nkh[train2_inds,]
+  test2 <- Downsamp_all_stable_ties_nkh[test2_inds,]
+  train3 <- Downsamp_all_stable_ties_nkh[train3_inds,]
+  test3 <- Downsamp_all_stable_ties_nkh[test3_inds,]
   
   logit.test.1 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
                               data = train1, family = binomial)
@@ -524,27 +534,27 @@ foreach(i = c(1:5)) %dopar% {
   preds.round.all <- preds.round.all[order(as.numeric(names(preds.round.all)))]
   
   list(preds.round, preds.onlycovars, preds.round.covars, preds.round.all)
-} -> preds
+} -> preds_nkh
 parallel::stopCluster(cl)
 
-pred.all <- rowSums(sapply(preds, `[[`, 1))/5
-pred.all.onlycovars <- rowSums(sapply(preds, `[[`, 2))/5
-pred.all.covars <- rowSums(sapply(preds, `[[`, 3))/5
-pred.all.all <- rowSums(sapply(preds, `[[`, 4))/5
+pred.all <- rowSums(sapply(preds_nkh, `[[`, 1))/5
+pred.all.onlycovars <- rowSums(sapply(preds_nkh, `[[`, 2))/5
+pred.all.covars <- rowSums(sapply(preds_nkh, `[[`, 3))/5
+pred.all.all <- rowSums(sapply(preds_nkh, `[[`, 4))/5
 
-pred.all.acc <- pred.all
+pred.all.acc <- pred.all.all
 pred.all.acc[pred.all.acc >=.5] <- 1
 pred.all.acc[pred.all.acc <.5] <- 0
 
-Downsamp_all_nkh$predicted <- pred.all.acc
+Downsamp_all_stable_ties_nkh$predicted <- pred.all.acc
 
-logit.base.roc <- pROC::roc(Downsamp_all_nkh$related, pred.all, ci=TRUE, plot=FALSE,
+logit.base.roc <- pROC::roc(Downsamp_all_stable_ties_nkh$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.onlycovars.roc <- pROC::roc(Downsamp_all_nkh$related, pred.all.onlycovars, ci=TRUE, plot=FALSE,
+logit.onlycovars.roc <- pROC::roc(Downsamp_all_stable_ties_nkh$related, pred.all.onlycovars, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.covars.roc <- pROC::roc(Downsamp_all_nkh$related, pred.all.covars, ci=TRUE, plot=FALSE,
+logit.covars.roc <- pROC::roc(Downsamp_all_stable_ties_nkh$related, pred.all.covars, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.all.roc <- pROC::roc(Downsamp_all_nkh$related, pred.all.all, ci=TRUE, plot=FALSE,
+logit.all.roc <- pROC::roc(Downsamp_all_stable_ties_nkh$related, pred.all.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
 
@@ -611,25 +621,63 @@ svglite('Figures/plot_roc_non_kin_different_house.svg')
 roc.plot.nkh.stable
 dev.off()
 
-rocs_1 <-ggarrange(roc.plot, roc.plot.nkh.stable, nrow = 2, labels = c("A", "B"), widths = 1)
-svglite('Figures/plot_allroc_stable_ties.svg')
-rocs_1
-dev.off()
+# rocs_1 <-ggarrange(roc.plot, roc.plot.nkh.stable, nrow = 2, labels = c("A", "B"), widths = 1)
+# svglite('Figures/plot_allroc_stable_ties.svg')
+# rocs_1
+# dev.off()
+```
+
+
+#Predicted network of all social or familial relationships
+```{r}
+metrics_all_predictions_stable_ties <- Downsamp_all_stable_ties |> 
+  inner_join(village_map, by = join_by(village_code_w3==village_code)) |> 
+  group_by(village_name_deid) |>  
+  summarize( `Percent predicted` = mean(predicted),
+             `Percent real` = mean(related),
+             TP = sum(predicted == 1 & related == 1 ),
+             TN = sum(predicted == 0 & related == 0 ),
+             FP = sum(predicted == 1 & related == 0 ),
+             FN = sum(predicted == 0 & related == 1 ),
+             TPR = TP/(TP+FN),
+             FNR = FN/(TP+FN),
+             TNR = TN/(TN+FP),
+             Precision = TP/(TP+FP),
+             Accuracy = (TP+TN)/(TP+TN+FP+FN),
+             F1 = 2*TP / (2*TP + FP + FN)
+          ) |> 
+  rename(`Village name` = village_name_deid)
+metrics_all_predictions_stable_ties
+```
+```{r}
+write_tsv(metrics_all_predictions_stable_ties, 'tables/metrics_all_relationships_network_villages_prediction_stable_ties.tsv')
+writexl::write_xlsx(metrics_all_predictions_stable_ties, 'tables/metrics_all_relationships_network_villages_prediction_stable_ties.xlsx')
+```
+
+#Predicted network of non-kin relationships
+```{r}
+metrics_non_kin_prediction_stable_ties <- Downsamp_all_stable_ties_nkh |> 
+  inner_join(village_map, by = join_by(village_code_w3==village_code)) |> 
+  group_by(village_name_deid) |>  
+  summarize( `Percent predicted` = mean(predicted),
+             `Percent real` = mean(related),
+             TP = sum(predicted == 1 & related == 1 ),
+             TN = sum(predicted == 0 & related == 0 ),
+             FP = sum(predicted == 1 & related == 0 ),
+             FN = sum(predicted == 0 & related == 1 ),
+             TPR = TP/(TP+FN),
+             FNR = FN/(TP+FN),
+             TNR = TN/(TN+FP),
+             Precision = TP/(TP+FP),
+             Accuracy = (TP+TN)/(TP+TN+FP+FN),
+             F1 = 2*TP / (2*TP + FP + FN)
+          ) |> 
+      rename(`Village name` = village_name_deid)
+
+metrics_non_kin_prediction_stable_ties
 ```
 
 ```{r}
-#Ah that's it
-#See which villages have the best accuracy
-Downsamp_all %>% group_by(village_code_w3) %>% summarize(acc = mean(predicted == related),
-                                                         perc_pred = mean(predicted),
-                                                         perc_real = mean(related),
-                                                         tp = mean(predicted == 1 & related ==1))
-
-Downsamp_all %>% filter(related == 1)%>% group_by(village_code_w3) %>%
-  summarize(acc = mean(predicted == related))
-
-Downsamp_all_nkh %>% group_by(village_code_w3) %>% summarize(acc = mean(predicted == related),
-                                                         perc_pred = mean(predicted),
-                                                         perc_real = mean(related),
-                                                         tp = mean(predicted == 1 & related ==1))
+write_tsv(metrics_non_kin_prediction_stable_ties, 'tables/metrics_non_kin_network_villages_prediction_stable_ties.tsv')
+writexl::write_xlsx(metrics_non_kin_prediction_stable_ties, 'tables/metrics_non_kin_network_villages_prediction_stable_ties.xlsx')
 ```
