@@ -37,6 +37,17 @@ shared_summary <- SN %>%
             n = n()) %>%
   arrange(desc(Proportion_With_Shared_Strains))
 
+shared_summary_reciprocated_ties <- SN %>% 
+  filter(pair_key %in% E(SN_mutual_conns)$pair_key) |> 
+  distinct(pair_key, relationship, .keep_all = TRUE) %>%
+  group_by(relationship) %>%
+  summarise(Proportion_With_Shared_Strains = round(mean(strain_sharing_rate>0,
+                                                        na.rm = TRUE),2),
+            Median_Strain_Sharing_Rate = round(median(strain_sharing_rate,
+                                                        na.rm = TRUE),2),
+            n = n()) %>%
+  arrange(desc(Proportion_With_Shared_Strains))
+
 #Get shared strain rates for unnominated individuals in the same village
 count <- 0
 for(i in 1:length(village_names)){
@@ -152,11 +163,79 @@ names(shared_summary) <- c("Relationship",
                            "Median_Strain_Sharing_Rate",
                            "Count")
 
+
+names(shared_summary_reciprocated_ties) <- c("Relationship",
+                           "Proportion_With_Shared_Strains",
+                           "Median_Strain_Sharing_Rate",
+                           "Count")
+
 shared_summary <- shared_summary %>% arrange(desc(Median_Strain_Sharing_Rate))
+```
 
-shared_summary
+```{r}
+comp_reciprocated <- SN %>% 
+  filter(pair_key %in% E(SN_mutual_conns)$pair_key) |> 
+  distinct(pair_key, relationship, .keep_all = TRUE) |> 
+  select(relationship, pair_key, strain_sharing_rate) |> 
+  mutate(status = 'Reciprocated') |> 
+  bind_rows(
+    ( SN |> 
+      filter(!(pair_key %in% E(SN_mutual_conns)$pair_key)) |> 
+      distinct(pair_key, relationship, .keep_all = TRUE) |> 
+      select(relationship, pair_key, strain_sharing_rate) |> 
+      mutate(status = 'Not Reciprocated')
+  )) %>%
+  filter(!relationship %in% c('Child','Father','Mother', 'Sibling')) |> 
+  mutate(status_collapsed = paste(relationship, status))
+
+comp_reciprocated_pvals <- comp_reciprocated %>%
+  group_by(relationship) %>%
+  do(w = wilcox.test(strain_sharing_rate ~ status, data = ., paired = FALSE)) |>
+  summarize(relationship, w$p.value)
+
+  # compare_means(strain_sharing_rate ~ status,
+  #                  data = .,
+  #                  method = "wilcox.test",
+  #                  p.adjust.method = "BH")
+  # filter(str_sub(group1, 1, 5)==str_sub(group2, 1, 5))
+
+comp_reciprocated_plot <- comp_reciprocated |> 
+ggplot() +
+  geom_boxplot(aes(status, strain_sharing_rate, fill = status)) +
+  facet_wrap(~relationship, strip.position = 'bottom', nrow = 1) +
+  # stat_pvalue_manual(comp_reciprocated_pvals, label = "p.signif", tip.length = 0)   +
+  coord_cartesian(ylim = c(0, 55)) +
+  xlab("Relationship") +
+  ylab("Strain-Sharing Rate (%)") +
+  theme_pubr() +
+  labs_pubr() +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(size = 10),
+    axis.text.x = element_text(
+      vjust = 1,
+      hjust = .5,
+      size = 10
+    ),
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    #axis.title.x = element_text(size = 10),
+    legend.position = "none"
+  ) +
+  scale_fill_brewer(palette = 'Set1')
 
 
+```
+
+```{r}
+svglite('Figures/comp_reciprocated_ties_ssr.svg')
+comp_reciprocated_plot
+dev.off()
+```
+
+
+```{r}
+left_join(shared_summary_reciprocated_ties, shared_summary, by = join_by('Relationship'), suffix = c('_reciprocated',''))
 ```
 
 
