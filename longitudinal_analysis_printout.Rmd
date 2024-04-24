@@ -1,7 +1,6 @@
 ---
 title: "Longitudinal Analysis"
 author: "Francesco Beghini"
-date: "2023-10-26"
 output: pdf_document
 ---
 
@@ -13,27 +12,33 @@ library(lmerTest)
 
 ```{r, echo=FALSE}
 sharing_rate_only_followup <- readRDS('sharing_rate_only_followup.Rds')
+xcov <- readRDS('xcov.RDS')
 ```
-```{r}
+
+<!--
+```{r, echo=FALSE}
 lmer_zero_model <- lmer(T2 ~ T1 + relationship + (1|village_code_ego) + (1|ego), 
                           sharing_rate_only_followup)
 summary(lmer_zero_model)
 ```
 \newpage
+-->
+
 ```{r}
 lmer_first_model <- lmer(T2 ~ T1 + relationship + maha_dist + (1|village_code_ego) + (1|ego), 
                           sharing_rate_only_followup)
 summary(lmer_first_model)
 ```
 \newpage
-```{r}
+<!--
+```{r, echo=FALSE}
 lmer_second_model <- lmer(T2 ~ T1*relationship + maha_dist + (1|village_code_ego) + (1|ego), 
                           sharing_rate_only_followup)
 summary(lmer_second_model)
 ```
-\newpage
+-->
 ```{r}
-lmer_third_model <- lmer(T2 ~ T1 + relationship + relationship*maha_dist + maha_dist + (ego|village_code_ego) + (1|ego),
-                          sharing_rate_only_followup)
-summary(lmer_third_model)
+lmer_species_rand <- glmer(data = xcov, T2_t ~ T1_t + relationship + maha_dist + (1|species) + (1|village_code_ego) + (1|ego), family = binomial, nAGQ=0)
+summary(lmer_species_rand)
 ```
+

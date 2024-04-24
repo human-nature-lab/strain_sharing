@@ -654,7 +654,7 @@ add.alpha <- function(col, alpha = 1) {
           rgb(x[1], x[2], x[3], alpha = alpha))
 }
 
-
+pdf('test.pdf')
 par(mar=c(0,0,0,0))
 for(i in 1:length(village_names)){
   #i<- 1
@@ -688,7 +688,7 @@ for(i in 1:length(village_names)){
 
   mbiome_cols <- colors[membership(mbiome_cluster)]
   #Want colors here to best visually map to social network
-
+  par(mfrow=c(1,3))
   plot(mbiome_cluster,
        mbiome_all,
        col = mbiome_cols,
@@ -746,6 +746,7 @@ for(i in 1:length(village_names)){
       main = paste(village_names[i], "Microbiome Clusters Overlay")
   )
 }
+dev.off()
 #there's a couple good ones I say bring in the old strains for Mariposal
 ```
 

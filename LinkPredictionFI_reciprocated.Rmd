@@ -44,18 +44,19 @@ Covars_alter <- covariates %>%
 
 
 #Merge covariate data onto edge list
-SN_All_Covars_stable_ties <- inner_join(SN, Covars_ego, by = join_by("ego"=="ego"))
-SN_All_Covars_stable_ties <- inner_join(SN_All_Covars_stable_ties, Covars_alter, by = join_by("alter"=="alter"))
-SN_All_Covars_stable_ties <- SN_All_Covars_stable_ties[SN_All_Covars_stable_ties$pair_key %in% intersect(SN_All_Covars_stable_ties$pair_key, SN_w1$pair), ]
+SN_All_Covars_reciprocated_ties <- SN |>
+                                    filter(pair_key %in% E(SN_mutual_conns)$pair_key) |>
+                                    inner_join(Covars_ego, by = join_by("ego"=="ego")) |>
+                                    inner_join(Covars_alter, by = join_by("alter"=="alter"))
 ```
 
 ```{r get_covariate_matrix_no_relationship, message=FALSE, warning=FALSE, include=FALSE}
 #Get covariate matrix for people without a relationship
-village_names <- unique(SN_All_Covars_stable_ties$village_code_w3)
+village_names <- unique(SN_All_Covars_reciprocated_ties$village_code_w3)
 foreach(v = village_names, .combine = rbind) %do%
 {
   #Split up matrix into villages
-  SN_Village_w3 <- SN_All_Covars_stable_ties %>% filter(village_code_w3 == v)
+  SN_Village_w3 <- SN_All_Covars_reciprocated_ties %>% filter(village_code_w3 == v)
   #IDs of everyone in village
   Village_IDs_w3 <- unique(c(as.character(SN_Village_w3$ego), as.character(SN_Village_w3$alter)))
   data.frame(t(combn(Village_IDs_w3, 2, simplify = TRUE))) |> 
@@ -86,11 +87,11 @@ foreach(v = village_names, .combine = rbind) %do%
     mutate(strain_sharing_rate = strain_rate[ego, alter],
            bray_curtis_sim = species_bray[ego, alter]) |>
     ungroup()
-} -> All_NoRel_Covars_w3
+} -> All_NoRel_Covars_reciprocated
 
 
 #Get dataframe of relationships into format for regression
-SN_All_Covars_for_Regression_stable_ties <- SN_All_Covars_stable_ties %>% distinct(pair_key, .keep_all = TRUE) %>%
+SN_All_Covars_for_Regression_reciprocated_ties <- SN_All_Covars_reciprocated_ties %>% distinct(pair_key, .keep_all = TRUE) %>%
   mutate(gender.mm = ego_gender == "man" & alter_gender == "man",
          gender.mf = ego_gender == "woman" & alter_gender == "man" | ego_gender == "man" & alter_gender == "woman",
          gender.ff = ego_gender == "woman" & alter_gender == "woman",
@@ -108,24 +109,24 @@ SN_All_Covars_for_Regression_stable_ties <- SN_All_Covars_stable_ties %>% distin
 ```
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-family_house_pairs_stable <- SN_All_Covars_stable_ties |>
+family_house_pairs_reciprocated <- SN_All_Covars_reciprocated_ties |>
                                 filter(building_id_ego == building_id_alter | relationship %in% c("father", "mother", "sibling", "child_over12_other_house")) |>
                                 pull(pair_key)
 
 #Make dataframe with only non-kin in different house
-SN_Non_Kin_Dif_House_Covars_for_Regression_stable_ties<- SN_All_Covars_for_Regression_stable_ties %>%
-  filter(!(pair_key %in% family_house_pairs_stable))
+SN_Non_Kin_Dif_House_Covars_for_Regression_reciprocated_ties<- SN_All_Covars_for_Regression_reciprocated_ties %>%
+  filter(!(pair_key %in% family_house_pairs_reciprocated))
 
 
 #select predictors
-SN_All_Covars_for_Regression_stable_ties <- SN_All_Covars_for_Regression_stable_ties %>%
+SN_All_Covars_for_Regression_reciprocated_ties <- SN_All_Covars_for_Regression_reciprocated_ties %>%
   mutate(related = 1) %>% 
   dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
          "age_difference_abs", "average_age", "wealth_difference_abs",
          "average_wealth", "education_difference_abs","average_education", "household_same",
          "related", "strain_sharing_rate", "village_code_w3", "bray_curtis_sim")
 
-SN_Non_Kin_Dif_House_Covars_for_Regression_stable_ties <- SN_Non_Kin_Dif_House_Covars_for_Regression_stable_ties %>%
+SN_Non_Kin_Dif_House_Covars_for_Regression_reciprocated_ties <- SN_Non_Kin_Dif_House_Covars_for_Regression_reciprocated_ties %>%
   mutate(related = 1) %>% 
   dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
          "age_difference_abs", "average_age", "wealth_difference_abs",
@@ -134,7 +135,7 @@ SN_Non_Kin_Dif_House_Covars_for_Regression_stable_ties <- SN_Non_Kin_Dif_House_C
 
 
 
-All_NoRel_Covars_for_Regression_stable_ties<- All_NoRel_Covars_w3 %>%
+All_NoRel_Covars_for_Regression_reciprocated_ties<- All_NoRel_Covars_reciprocated %>%
   mutate(related = 0) %>%
   dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
                 "age_difference_abs", "average_age", "wealth_difference_abs",
@@ -143,25 +144,25 @@ All_NoRel_Covars_for_Regression_stable_ties<- All_NoRel_Covars_w3 %>%
 
 
 #Combine relationships and non relationship dataframe
-SN_All_Covars_for_Regression_complete_stable_ties <- SN_All_Covars_for_Regression_stable_ties[complete.cases(SN_All_Covars_for_Regression_stable_ties),]
+SN_All_Covars_for_Regression_complete_reciprocated_ties <- SN_All_Covars_for_Regression_reciprocated_ties[complete.cases(SN_All_Covars_for_Regression_reciprocated_ties),]
 
-SN_Non_Kin_Dif_House_Covars_for_Regression_complete_stable_ties <- SN_Non_Kin_Dif_House_Covars_for_Regression_stable_ties[complete.cases(SN_Non_Kin_Dif_House_Covars_for_Regression_stable_ties),]
+SN_Non_Kin_Dif_House_Covars_for_Regression_complete_reciprocated_ties <- SN_Non_Kin_Dif_House_Covars_for_Regression_reciprocated_ties[complete.cases(SN_Non_Kin_Dif_House_Covars_for_Regression_reciprocated_ties),]
 
-All_for_Regression_stable_ties <- rbind(All_NoRel_Covars_for_Regression_stable_ties, SN_All_Covars_for_Regression_stable_ties)
+All_for_Regression_reciprocated_ties <- rbind(All_NoRel_Covars_for_Regression_reciprocated_ties, SN_All_Covars_for_Regression_reciprocated_ties)
 
-Non_Kin_House_for_Regression_stable_ties <- rbind(All_NoRel_Covars_for_Regression_stable_ties,
-                                      SN_Non_Kin_Dif_House_Covars_for_Regression_complete_stable_ties)
+Non_Kin_House_for_Regression_reciprocated_ties <- rbind(All_NoRel_Covars_for_Regression_reciprocated_ties,
+                                      SN_Non_Kin_Dif_House_Covars_for_Regression_complete_reciprocated_ties)
 
 #May want to check if this is missing completely at random or input columns
 #filter to complete cases
-All_for_Regression_complete_stable_ties <- All_for_Regression_stable_ties[complete.cases(All_for_Regression_stable_ties), ]
+All_for_Regression_complete_reciprocated_ties <- All_for_Regression_reciprocated_ties[complete.cases(All_for_Regression_reciprocated_ties), ]
 
-All_NoRel_Covars_for_Regression_complete_stable_ties <- All_NoRel_Covars_for_Regression_stable_ties[complete.cases(All_NoRel_Covars_for_Regression_stable_ties), ]
+All_NoRel_Covars_for_Regression_complete_reciprocated_ties <- All_NoRel_Covars_for_Regression_reciprocated_ties[complete.cases(All_NoRel_Covars_for_Regression_reciprocated_ties), ]
 
-Non_Kin_House_for_Regression_complete_stable_ties <-
-  Non_Kin_House_for_Regression_stable_ties[complete.cases(Non_Kin_House_for_Regression_stable_ties), ]
+Non_Kin_House_for_Regression_complete_reciprocated_ties <-
+  Non_Kin_House_for_Regression_reciprocated_ties[complete.cases(Non_Kin_House_for_Regression_reciprocated_ties), ]
 
-edge_counts <- SN_All_Covars_for_Regression_complete_stable_ties %>%
+edge_counts <- SN_All_Covars_for_Regression_complete_reciprocated_ties %>%
   group_by(village_code_w3) %>%
   summarize(edge_count = sum(related))
 
@@ -169,7 +170,7 @@ edge_counts <- edge_counts[match(village_names, edge_counts$village_code_w3), ] 
   filter(!is.na(village_code_w3)) |> 
   pull(edge_count, village_code_w3)
 
-edge_counts_nkh <- SN_Non_Kin_Dif_House_Covars_for_Regression_complete_stable_ties %>%
+edge_counts_nkh <- SN_Non_Kin_Dif_House_Covars_for_Regression_complete_reciprocated_ties %>%
   group_by(village_code_w3) %>%
   summarize(edge_count = sum(related))
 
@@ -186,27 +187,27 @@ edge_counts_nkh <- edge_counts_nkh[match(village_names, edge_counts_nkh$village_
 #Downsample
 
 foreach(v = names(edge_counts), .combine = rbind) %do% {
-  All_NoRel_Covars_for_Regression_complete_stable_ties |>
+  All_NoRel_Covars_for_Regression_complete_reciprocated_ties |>
   filter(village_code_w3 == as.integer(v)) |>
   slice_sample(n = edge_counts[[v]])
-} -> Downsamp_all_stable_ties
-Downsamp_all_stable_ties <- as.data.frame(Downsamp_all_stable_ties)
+} -> Downsamp_all_reciprocated_ties
+Downsamp_all_reciprocated_ties <- as.data.frame(Downsamp_all_reciprocated_ties)
 
-Downsamp_all_stable_ties <- rbind(Downsamp_all_stable_ties, SN_All_Covars_for_Regression_complete_stable_ties)
+Downsamp_all_reciprocated_ties <- rbind(Downsamp_all_reciprocated_ties, SN_All_Covars_for_Regression_complete_reciprocated_ties)
 
-Downsamp_all_stable_ties <- Downsamp_all_stable_ties[complete.cases(Downsamp_all_stable_ties),]
+Downsamp_all_reciprocated_ties <- Downsamp_all_reciprocated_ties[complete.cases(Downsamp_all_reciprocated_ties),]
 
 #Non-kin different house
 
 foreach(v = names(edge_counts_nkh), .combine = rbind) %do% {
-  All_NoRel_Covars_for_Regression_complete_stable_ties %>%
+  All_NoRel_Covars_for_Regression_complete_reciprocated_ties %>%
   filter(village_code_w3 == as.integer(v)) %>% slice_sample(n = edge_counts_nkh[[v]])
-} -> Downsamp_all_stable_ties_nkh
+} -> Downsamp_all_reciprocated_ties_nkh
 
-Downsamp_all_stable_ties_nkh <- as.data.frame(Downsamp_all_stable_ties_nkh)
-Downsamp_all_stable_ties_nkh <- rbind(Downsamp_all_stable_ties_nkh, SN_Non_Kin_Dif_House_Covars_for_Regression_complete_stable_ties)
+Downsamp_all_reciprocated_ties_nkh <- as.data.frame(Downsamp_all_reciprocated_ties_nkh)
+Downsamp_all_reciprocated_ties_nkh <- rbind(Downsamp_all_reciprocated_ties_nkh, SN_Non_Kin_Dif_House_Covars_for_Regression_complete_reciprocated_ties)
 
-Downsamp_all_stable_ties_nkh <- Downsamp_all_stable_ties_nkh[complete.cases(Downsamp_all_stable_ties_nkh),]
+Downsamp_all_reciprocated_ties_nkh <- Downsamp_all_reciprocated_ties_nkh[complete.cases(Downsamp_all_reciprocated_ties_nkh),]
 ```
 
 
@@ -216,20 +217,20 @@ cl <- parallel::makeCluster(5)
 doParallel::registerDoParallel(cl)
 foreach(i = c(1:5)) %dopar% {
   print(i)
-  inds <- c(1:nrow(Downsamp_all_stable_ties))
-  test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_stable_ties)), replace = F)
+  inds <- c(1:nrow(Downsamp_all_reciprocated_ties))
+  test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_reciprocated_ties)), replace = F)
   train1_inds <- inds[!(inds %in% test1_inds)]
   test2_inds <- sample(train1_inds, size = floor(.5*length(train1_inds)), replace = F)
   train2_inds <- inds[!(inds %in% test2_inds)]
   test3_inds <- train2_inds[!(train2_inds %in% test1_inds)]
   train3_inds <- inds[!(inds %in% test3_inds)]
 
-  train1 <- Downsamp_all_stable_ties[train1_inds,]
-  test1 <- Downsamp_all_stable_ties[test1_inds,]
-  train2 <- Downsamp_all_stable_ties[train2_inds,]
-  test2 <- Downsamp_all_stable_ties[test2_inds,]
-  train3 <- Downsamp_all_stable_ties[train3_inds,]
-  test3 <- Downsamp_all_stable_ties[test3_inds,]
+  train1 <- Downsamp_all_reciprocated_ties[train1_inds,]
+  test1 <- Downsamp_all_reciprocated_ties[test1_inds,]
+  train2 <- Downsamp_all_reciprocated_ties[train2_inds,]
+  test2 <- Downsamp_all_reciprocated_ties[test2_inds,]
+  train3 <- Downsamp_all_reciprocated_ties[train3_inds,]
+  test3 <- Downsamp_all_reciprocated_ties[test3_inds,]
 
   logit.test.1 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
                               data = train1, family = binomial)
@@ -340,15 +341,15 @@ pred.all.acc <- pred.all.all
 pred.all.acc[pred.all.acc >=.5] <- 1
 pred.all.acc[pred.all.acc <.5] <- 0
 
-Downsamp_all_stable_ties$predicted <- pred.all.acc
+Downsamp_all_reciprocated_ties$predicted <- pred.all.acc
 
-logit.base.roc <- pROC::roc(Downsamp_all_stable_ties$related, pred.all, ci=TRUE, plot=FALSE,
+logit.base.roc <- pROC::roc(Downsamp_all_reciprocated_ties$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.onlycovars.roc <- pROC::roc(Downsamp_all_stable_ties$related, pred.all.onlycovars, ci=TRUE, plot=FALSE,
+logit.onlycovars.roc <- pROC::roc(Downsamp_all_reciprocated_ties$related, pred.all.onlycovars, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.covars.roc <- pROC::roc(Downsamp_all_stable_ties$related, pred.all.covars, ci=TRUE, plot=FALSE,
+logit.covars.roc <- pROC::roc(Downsamp_all_reciprocated_ties$related, pred.all.covars, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.all.roc <- pROC::roc(Downsamp_all_stable_ties$related, pred.all.all, ci=TRUE, plot=FALSE,
+logit.all.roc <- pROC::roc(Downsamp_all_reciprocated_ties$related, pred.all.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
 
@@ -364,15 +365,15 @@ dat.ci.list <- lapply(ci.list, function(ciobj)
              lower = ciobj[, 1],
              upper = ciobj[, 3]))
 ```
-## All Social or Familial Relationship (on Stable ties W1-W3)
-```{r plot_roc_all_famililar_social_stable_ties, echo=FALSE, message=FALSE, warning=FALSE}
-roc.plot.stable <- ggroc(roc.list) +
+## All Social or Familial Relationship (on reciprocated ties W3)
+```{r plot_roc_all_famililar_social_reciprocated_ties, echo=FALSE, message=FALSE, warning=FALSE}
+roc.plot.reciprocated <- ggroc(roc.list) +
   theme_minimal() +
   geom_abline(slope=1, intercept = 1, linetype = "dashed", alpha=1, color = "grey") +
   coord_equal()
 
 for(i in 1:4) {
-  roc.plot.stable <- roc.plot.stable + geom_ribbon(
+  roc.plot.reciprocated <- roc.plot.reciprocated + geom_ribbon(
     data = dat.ci.list[[i]],
     aes(x = x, ymin = lower, ymax = upper),
     fill = i + 1,
@@ -380,7 +381,7 @@ for(i in 1:4) {
     inherit.aes = F) 
   } 
 
-roc.plot.stable <- roc.plot.stable + 
+roc.plot.reciprocated <- roc.plot.reciprocated + 
 theme(plot.title = element_text(size=10, hjust = .5),
       legend.position = c(0.6, 0.2),
       legend.text = element_text(size=10),
@@ -397,25 +398,25 @@ theme(plot.title = element_text(size=10, hjust = .5),
                                       " ± ",round(sqrt(pROC::var(logit.all.roc)),3), sep="")
                                 )
                        ) +
-  ggtitle("All Social or Familial Relationships (Stable ties)")
+  ggtitle("All Social or Familial Relationships (reciprocated ties)")
 
-roc.plot.stable <- roc.plot.stable +
+roc.plot.reciprocated <- roc.plot.reciprocated +
   theme_pubr(legend =  c(0.6, 0.2)) +
   theme(plot.title = element_text(size = 10, hjust = .5)) +
   labs_pubr()
 
-roc.plot.stable <- roc.plot.stable + theme(
+roc.plot.reciprocated <- roc.plot.reciprocated + theme(
   plot.title = element_text(size = 10, hjust = .5),
   legend.title = element_text(size = 8),
   legend.text = element_text(size = 8)
 )
 
-svglite('Figures/plot_roc_all_famililar_social_stable_ties.svg')
-roc.plot.stable
+svglite('Figures/plot_roc_all_famililar_social_reciprocated_ties.svg')
+roc.plot.reciprocated
 dev.off()
 
-png('Figures/plot_roc_all_famililar_social_stable_ties.png', width = 900, height = 900)
-roc.plot.stable
+png('Figures/plot_roc_all_famililar_social_reciprocated_ties.png', width = 900, height = 900)
+roc.plot.reciprocated
 dev.off()
 ```
 
@@ -424,20 +425,20 @@ dev.off()
 cl <- parallel::makeCluster(5)
 doParallel::registerDoParallel(cl)
 foreach(i = c(1:5)) %dopar% {
-  inds <- c(1:nrow(Downsamp_all_stable_ties_nkh))
-  test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_stable_ties_nkh)), replace = F)
+  inds <- c(1:nrow(Downsamp_all_reciprocated_ties_nkh))
+  test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_reciprocated_ties_nkh)), replace = F)
   train1_inds <- inds[!(inds %in% test1_inds)]
   test2_inds <- sample(train1_inds, size = floor(.5*length(train1_inds)), replace = F)
   train2_inds <- inds[!(inds %in% test2_inds)]
   test3_inds <- train2_inds[!(train2_inds %in% test1_inds)]
   train3_inds <- inds[!(inds %in% test3_inds)]
   
-  train1 <- Downsamp_all_stable_ties_nkh[train1_inds,]
-  test1 <- Downsamp_all_stable_ties_nkh[test1_inds,]
-  train2 <- Downsamp_all_stable_ties_nkh[train2_inds,]
-  test2 <- Downsamp_all_stable_ties_nkh[test2_inds,]
-  train3 <- Downsamp_all_stable_ties_nkh[train3_inds,]
-  test3 <- Downsamp_all_stable_ties_nkh[test3_inds,]
+  train1 <- Downsamp_all_reciprocated_ties_nkh[train1_inds,]
+  test1 <- Downsamp_all_reciprocated_ties_nkh[test1_inds,]
+  train2 <- Downsamp_all_reciprocated_ties_nkh[train2_inds,]
+  test2 <- Downsamp_all_reciprocated_ties_nkh[test2_inds,]
+  train3 <- Downsamp_all_reciprocated_ties_nkh[train3_inds,]
+  test3 <- Downsamp_all_reciprocated_ties_nkh[test3_inds,]
   
   logit.test.1 <- lme4::glmer(related ~ strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
                               data = train1, family = binomial)
@@ -546,22 +547,22 @@ pred.all.acc <- pred.all.all
 pred.all.acc[pred.all.acc >=.5] <- 1
 pred.all.acc[pred.all.acc <.5] <- 0
 
-Downsamp_all_stable_ties_nkh$predicted <- pred.all.acc
+Downsamp_all_reciprocated_ties_nkh$predicted <- pred.all.acc
 
-logit.base.roc <- pROC::roc(Downsamp_all_stable_ties_nkh$related, pred.all, ci=TRUE, plot=FALSE,
+logit.base.roc <- pROC::roc(Downsamp_all_reciprocated_ties_nkh$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.onlycovars.roc <- pROC::roc(Downsamp_all_stable_ties_nkh$related, pred.all.onlycovars, ci=TRUE, plot=FALSE,
+logit.onlycovars.roc <- pROC::roc(Downsamp_all_reciprocated_ties_nkh$related, pred.all.onlycovars, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.covars.roc <- pROC::roc(Downsamp_all_stable_ties_nkh$related, pred.all.covars, ci=TRUE, plot=FALSE,
+logit.covars.roc <- pROC::roc(Downsamp_all_reciprocated_ties_nkh$related, pred.all.covars, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
-logit.all.roc <- pROC::roc(Downsamp_all_stable_ties_nkh$related, pred.all.all, ci=TRUE, plot=FALSE,
+logit.all.roc <- pROC::roc(Downsamp_all_reciprocated_ties_nkh$related, pred.all.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
 
-roc.list <- list("Strain-Sharing Rate (Stable ties)" = logit.base.roc,
+roc.list <- list("Strain-Sharing Rate (reciprocated ties)" = logit.base.roc,
                   "Only Socio-Dem Covars" = logit.onlycovars.roc,
                   "SSR + Age + Gender + Household Sharing" = logit.covars.roc,
-                  "SSR + All Socio-Dem Covars (Stable ties)" = logit.all.roc)
+                  "SSR + All Socio-Dem Covars (reciprocated ties)" = logit.all.roc)
 
 ci.list <- lapply(roc.list, ci.se, specificities = seq(0, 1, l = 25))
 
@@ -571,15 +572,15 @@ dat.ci.list <- lapply(ci.list, function(ciobj)
              upper = ciobj[, 3]))
 ```
 
-## Non-Kin different house Relationships (on Stable ties W1-W3) model
+## Non-Kin different house Relationships (on reciprocated ties W3) model
 ```{r plot_roc_non_kin_different_house, echo=FALSE, message=FALSE, warning=FALSE}
-roc.plot.nkh.stable <- ggroc(roc.list) +
+roc.plot.nkh.reciprocated <- ggroc(roc.list) +
   theme_minimal() +
   geom_abline(slope=1, intercept = 1, linetype = "dashed", alpha=1, color = "grey") +
   coord_equal()
 
 for(i in 1:4) {
-  roc.plot.nkh.stable <- roc.plot.nkh.stable + geom_ribbon(
+  roc.plot.nkh.reciprocated <- roc.plot.nkh.reciprocated + geom_ribbon(
     data = dat.ci.list[[i]],
     aes(x = x, ymin = lower, ymax = upper),
     fill = i + 1,
@@ -587,7 +588,7 @@ for(i in 1:4) {
     inherit.aes = F) 
   } 
 
-roc.plot.nkh.stable <- roc.plot.nkh.stable + 
+roc.plot.nkh.reciprocated <- roc.plot.nkh.reciprocated + 
 theme(plot.title = element_text(size=10, hjust = .5),
       legend.position = c(0.6, 0.2),
       legend.text = element_text(size=10),
@@ -604,25 +605,25 @@ theme(plot.title = element_text(size=10, hjust = .5),
                                       " ± ",round(sqrt(pROC::var(logit.all.roc)),3), sep="")
                                 )
                        ) +
-  ggtitle("Non-Kin Different House Relationships (Stable ties)")
+  ggtitle("Non-Kin Different House Relationships (reciprocated ties)")
 
-roc.plot.nkh.stable <- roc.plot.nkh.stable +
+roc.plot.nkh.reciprocated <- roc.plot.nkh.reciprocated +
   theme_pubr(legend =  c(0.6, 0.2)) +
   theme(plot.title = element_text(size = 10, hjust = .5)) +
   labs_pubr()
 
-roc.plot.nkh.stable <- roc.plot.nkh.stable + theme(
+roc.plot.nkh.reciprocated <- roc.plot.nkh.reciprocated + theme(
   plot.title = element_text(size = 10, hjust = .5),
   legend.title = element_text(size = 8),
   legend.text = element_text(size = 8)
 )
 
 svglite('Figures/plot_roc_non_kin_different_house.svg')
-roc.plot.nkh.stable
+roc.plot.nkh.reciprocated
 dev.off()
 
-rocs_1 <-ggarrange(roc.plot.stable, roc.plot.nkh.stable, nrow = 2, labels = c("A", "B"), widths = 1)
-svglite('Figures/plot_allroc_stable_ties.svg', fix_text_size = FALSE)
+rocs_1 <-ggarrange(roc.plot.reciprocated, roc.plot.nkh.reciprocated, nrow = 2, labels = c("A", "B"), widths = 1)
+svglite('Figures/plot_allroc_reciprocated_ties.svg', fix_text_size = FALSE)
 rocs_1
 dev.off()
 ```
@@ -630,7 +631,7 @@ dev.off()
 
 #Predicted network of all social or familial relationships
 ```{r}
-metrics_all_predictions_stable_ties <- Downsamp_all_stable_ties |> 
+metrics_all_predictions_reciprocated_ties <- Downsamp_all_reciprocated_ties |> 
   inner_join(village_map, by = join_by(village_code_w3==village_code)) |> 
   group_by(village_name_deid) |>  
   summarize( `Percent predicted` = mean(predicted),
@@ -647,16 +648,16 @@ metrics_all_predictions_stable_ties <- Downsamp_all_stable_ties |>
              F1 = 2*TP / (2*TP + FP + FN)
           ) |> 
   rename(`Village name` = village_name_deid)
-metrics_all_predictions_stable_ties
+metrics_all_predictions_reciprocated_ties
 ```
 ```{r}
-write_tsv(metrics_all_predictions_stable_ties, 'tables/metrics_all_relationships_network_villages_prediction_stable_ties.tsv')
-writexl::write_xlsx(metrics_all_predictions_stable_ties, 'tables/metrics_all_relationships_network_villages_prediction_stable_ties.xlsx')
+write_tsv(metrics_all_predictions_reciprocated_ties, 'tables/metrics_all_relationships_network_villages_prediction_reciprocated_ties.tsv')
+writexl::write_xlsx(metrics_all_predictions_reciprocated_ties, 'tables/metrics_all_relationships_network_villages_prediction_reciprocated_ties.xlsx')
 ```
 
 #Predicted network of non-kin relationships
 ```{r}
-metrics_non_kin_prediction_stable_ties <- Downsamp_all_stable_ties_nkh |> 
+metrics_non_kin_prediction_reciprocated_ties <- Downsamp_all_reciprocated_ties_nkh |> 
   inner_join(village_map, by = join_by(village_code_w3==village_code)) |> 
   group_by(village_name_deid) |>  
   summarize( `Percent predicted` = mean(predicted),
@@ -674,10 +675,10 @@ metrics_non_kin_prediction_stable_ties <- Downsamp_all_stable_ties_nkh |>
           ) |> 
       rename(`Village name` = village_name_deid)
 
-metrics_non_kin_prediction_stable_ties
+metrics_non_kin_prediction_reciprocated_ties
 ```
 
 ```{r}
-write_tsv(metrics_non_kin_prediction_stable_ties, 'tables/metrics_non_kin_network_villages_prediction_stable_ties.tsv')
-writexl::write_xlsx(metrics_non_kin_prediction_stable_ties, 'tables/metrics_non_kin_network_villages_prediction_stable_ties.xlsx')
+write_tsv(metrics_non_kin_prediction_reciprocated_ties, 'tables/metrics_non_kin_network_villages_prediction_reciprocated_ties.tsv')
+writexl::write_xlsx(metrics_non_kin_prediction_reciprocated_ties, 'tables/metrics_non_kin_network_villages_prediction_reciprocated_ties.xlsx')
 ```

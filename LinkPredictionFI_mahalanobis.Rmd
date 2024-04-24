@@ -45,6 +45,34 @@ Covars_alter <- covariates %>% merge(household_wealth_data) %>%
 #Merge covariate data onto edge list
 SN_All_Covars <- merge(SN, Covars_ego, by = "ego")
 SN_All_Covars <- merge(SN_All_Covars, Covars_alter, by = "alter")
+SN_All_Covars$household_same <- SN_All_Covars$ego_household == SN_All_Covars$alter_household
+
+sub_covar <- covariates |> 
+  merge(household_wealth_data) |>
+  unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |>
+  select(respondent_master_id, BMI, age_at_survey, household_wealth_index_w3, gender, DDS, starts_with('med_'), l0400, b0600, b0100, indigenous_status) |>
+  mutate(b0600 = as.numeric(factor(b0600)),
+    b0100 = dplyr::recode(b0100, "Have not completed any type of school" = 0,
+                                "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
+                                "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
+                                "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
+    indigenous_status = recode(indigenous_status, "Lenca" = 1, "Ch'orti'/Maya Chorti" = 1, .default = 0))
+sub_covar$gender <- ifelse(sub_covar$gender == 'man', 1, 0)
+sub_covar$l0400 <- as.integer(sub_covar$l0400)
+
+sub_covar <- sub_covar[complete.cases(sub_covar),]
+
+rownames(sub_covar) <- sub_covar$respondent_master_id
+sub_covar <- sub_covar[,-1]
+sub_covar_maha_m <- biotools::D2.dist(sub_covar, cov = cov(sub_covar, use = 'complete'))
+sub_covar_maha_m <- as.matrix(sub_covar_maha_m)
+sub_covar_maha_m |> 
+  as.matrix() |> as.data.frame() |>
+  tibble::rownames_to_column('ego') |>
+  pivot_longer(-s1, names_to = 'alter', values_to = 'maha_dist') |> 
+  rowwise() |> 
+  mutate(pair = stri_c(stri_sort(stri_split_boundaries(str_c(s1, s2), type='character')[[1]]), collapse = '')) |> 
+  distinct(pair, .keep_all = TRUE)-> sub_covar_maha_l
 
 #Get covariate matrix for people without a relationship
 cl <- parallel::makeCluster(10)
@@ -58,12 +86,7 @@ foreach(v = village_names, .combine = rbind) %dopar% {
   Village_Pairs <- unique(SN_Village$pair_key)
   
   Village_NoRels <- data.frame(matrix(NA,
-                                      nrow = length(Village_IDs) * (length(Village_IDs)-1)/2 - length(Village_Pairs),
-                                      ncol = 17))
-  colnames(Village_NoRels) <- c("ego","alter","gender.mm","gender.ff", "gender.mf", "indigenous.both", "indigenous.one", "indigenous.none",
-                                "religion.same", "age_difference_abs","average_age",
-                                "wealth_difference_abs", "average_weatlh", "education_difference_abs",
-                                "average_education", "village_code_w3", "household.same")
+                                      nrow = length(Village_IDs) * (length(Village_IDs)-1)/2 - length(Village_Pairs)))
   
   k <- 1
   for(i in 1:length(Village_IDs)){
@@ -73,23 +96,9 @@ foreach(v = village_names, .combine = rbind) %dopar% {
       if(!pair %in% Village_Pairs){
         p1 <- Covars_ego[Covars_ego$ego == Village_IDs[i],]
         p2 <- Covars_alter[Covars_alter$alter == Village_IDs[j],]
+        Village_NoRels$pair[k] <- pair
         Village_NoRels$ego[k] <- p1$ego
         Village_NoRels$alter[k] <- p2$alter
-        Village_NoRels$gender.mm[k] <- p1$ego_gender == "man" & p2$alter_gender == "man"
-        Village_NoRels$gender.mf[k] <- 
-          p1$ego_gender == "man" & p2$alter_gender == "woman" | p1$ego_gender == "woman" & p2$alter_gender == "man"
-        Village_NoRels$gender.ff[k] <- p1$ego_gender == "woman" & p2$alter_gender == "woman"
-        Village_NoRels$indigenous.both[k] <- p1$ego_indigenous == 1 & p2$alter_indigenous == 1
-        Village_NoRels$indigenous.one[k] <- 
-          p1$ego_indigenous == 1 & p2$alter_indigenous == 0 | p1$ego_indigenous == 0 & p2$alter_indigenous == 1
-        Village_NoRels$indigenous.none[k] <- p1$ego_indigenous == 0 & p2$alter_indigenous == 0
-        Village_NoRels$religion.same[k] <- p1$ego_religion == p2$alter_religion
-        Village_NoRels$age_difference_abs[k] <- abs(p1$ego_age - p2$alter_age)
-        Village_NoRels$average_age[k] <- (p1$ego_age + p2$alter_age)/2
-        Village_NoRels$wealth_difference_abs[k] <- abs(p1$ego_household_wealth - p2$alter_household_wealth)
-        Village_NoRels$average_wealth[k] <- (p1$ego_household_wealth + p2$alter_household_wealth)/2
-        Village_NoRels$education_difference_abs[k] <- abs(p1$ego_education - p2$alter_education)
-        Village_NoRels$average_education[k] <- (p1$ego_education + p2$alter_education)/2
         Village_NoRels$village_code_w3[k] <- v
         Village_NoRels$household_same[k] <- p1$ego_household == p2$alter_household
         k <- k+1
@@ -119,6 +128,8 @@ for(i in 1:nrow(All_NoRel_Covars)){
                                                          colnames(species_bray) == All_NoRel_Covars$alter[i]]
 }
 
+All_NoRel_Covars <- merge(All_NoRel_Covars,sub_covar_maha_l)
+
 # for(i in 1:nrow(All_NoRel_Covars)){
 #   All_NoRel_Covars$jaccard_sim[i] <- species_jaccard_sim[rownames(species_jaccard_sim) == All_NoRel_Covars$ego[i],
 #                                                          colnames(species_jaccard_sim) == All_NoRel_Covars$alter[i]]
@@ -128,21 +139,7 @@ for(i in 1:nrow(All_NoRel_Covars)){
 #Get dataframe of all known relationships into format for regression
 SN_All_Covars_for_Regression <- SN_All_Covars |> 
   distinct(pair_key, .keep_all = TRUE) |> 
-  mutate(gender.mm = ego_gender == "man" & alter_gender == "man",
-         gender.mf = ego_gender == "woman" & alter_gender == "man" | ego_gender == "man" & alter_gender == "woman",
-         gender.ff = ego_gender == "woman" & alter_gender == "woman",
-         indigenous.both = ego_indigenous == 1 & alter_indigenous == 1,
-         indigenous.one = ego_indigenous == 1 & alter_indigenous == 0 | ego_indigenous == 0 & alter_indigenous == 1,
-         indigenous.none = ego_indigenous == 0 & alter_indigenous == 0,
-         religion.same = ego_religion == alter_religion,
-         age_difference_abs = abs(ego_age - alter_age),
-         average_age = (ego_age + alter_age)/2,
-         wealth_difference_abs = abs(ego_household_wealth - alter_household_wealth),
-         average_wealth = (ego_household_wealth + alter_household_wealth)/2,
-         education_difference_abs = abs(ego_education - alter_education),
-         average_education = (ego_education + alter_education)/2,
-         household_same = ego_household == alter_household)
-
+  inner_join(sub_covar_maha_l)
 #Make dataframe with only non-kin in different house
 SN_Non_Kin_Dif_House_Covars_for_Regression <- SN_All_Covars_for_Regression %>%
   filter(!(pair_key %in% family_house_pairs))
@@ -151,24 +148,18 @@ SN_Non_Kin_Dif_House_Covars_for_Regression <- SN_All_Covars_for_Regression %>%
 #select predictors
 SN_All_Covars_for_Regression <- SN_All_Covars_for_Regression %>%
   mutate(related = 1) %>% 
-  dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
-         "age_difference_abs", "average_age", "wealth_difference_abs",
-         "average_wealth", "education_difference_abs","average_education", "household_same",
+  dplyr::select("ego","alter","household_same", 'maha_dist',
          "related", "strain_sharing_rate", "village_code_w3", "bray_curtis_sim")#, "jaccard_sim")
 
 SN_Non_Kin_Dif_House_Covars_for_Regression <- SN_Non_Kin_Dif_House_Covars_for_Regression %>%
   mutate(related = 1) %>% 
-  dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
-         "age_difference_abs", "average_age", "wealth_difference_abs",
-         "average_wealth", "education_difference_abs","average_education","household_same",
+  dplyr::select("ego","alter",'maha_dist',"household_same",
          "related", "strain_sharing_rate", "village_code_w3", "bray_curtis_sim")#, "jaccard_sim")
 
 
 All_NoRel_Covars_for_Regression <- All_NoRel_Covars %>%
   mutate(related = 0) %>%
-  dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
-                "age_difference_abs", "average_age", "wealth_difference_abs",
-                "average_wealth", "education_difference_abs","average_education","household_same",
+  dplyr::select("ego","alter","household_same", 'maha_dist',
                 "related", "strain_sharing_rate", "village_code_w3", "bray_curtis_sim")#, "jaccard_sim")
 
 

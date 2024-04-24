@@ -39,11 +39,12 @@ if (!require("mclust")) install.packages("mclust")
 library(mclust)
 library(tidyr)
 library(forcats)
+library(doParallel)
 ```
 
 Load batch data
 ```{r message=TRUE, warning=FALSE, include=FALSE}
-extraction_batch <- bind_rows(read_csv('~/F_BEGHINI_HM/Rn338 gDNA 032822.csv') |> select(SampleID = `Sample ID`, WIKI = `WIKI ID`, Plate, DNA_conc = `gDNA, ng/uL(Nanodrop)`), 
+extraction_batch <- bind_rows(read_csv('~/F_BEGHINI_HM/Rn338 gDNA 032822.csv') |> select(SampleID = `Sample ID`, WIKI = `WIKI ID`, Plate, DNA_conc = `gDNA, ng/uL(Nanodrop)`),
           read_csv('~/F_BEGHINI_HM/Honduras_gDNA_11052020.csv') |> select(SampleID, WIKI, Plate = `gDNA Plate`, DNA_conc = `NanoDrop,ng/uL`),
           read_csv('~/F_BEGHINI_HM/Ejl54 stool WGS 010523.csv') |> select(SampleID, WIKI, Plate = `gDNA Plate`, DNA_conc = `NanoDrop, ng/uL`)) |> 
   mutate( Plate = factor(str_extract(Plate, '[0-9]{6}')),
@@ -79,6 +80,22 @@ extraction_batch |>
   group_by(a) |> 
   summarize(broom::tidy(cor.test(Reads, DNA_conc)))
 ```
+
+```{r}
+king_coeff <- read_tsv('/WORKAREA/work/GENETIC_DATA/HMB/HUMAN/saliva/all_king') |> 
+  mutate(
+    IID2 = str_remove(IID2, '_*') ,
+    `#IID1` = str_remove(`#IID1`, '_*'),
+    KINSHIP_RANGE = case_when(
+                              KINSHIP > 0.354 ~ 'MZ/duplicate',
+                              between(KINSHIP, 0.177, 0.354) ~ '1st deg',
+                              between(KINSHIP, 0.0884, 0.177) ~ '2nd deg',
+                              between(KINSHIP, 0.0442, 0.0884) ~ '3rd deg'
+                              )
+) |> arrange(KINSHIP)
+
+```
+
 
 Download Microbiome census Data
 ```{r}
@@ -131,8 +148,9 @@ village_map <- tribble(~village_code, ~village_name_deid,
 hmb_census <- full_join(hmb_census, village_map)
 
 #RCT Data
-demographics <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_respondents_WAVE3_v3_F_BEGHINI_2023-10-23.csv")
-
+#demographics <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_respondents_WAVE3_v3_F_BEGHINI_2023-10-23.csv")
+demographics <- read_csv("/WORKAREA/work/HONDURAS_MICROBIOME/J_PULLMAN/DATA/COHORT_1/v2/honduras_respondents_demographics_J_PULLMAN_2022-11-07.csv", guess_max = 100000) |> 
+  select('respondent_master_id','village_code_w3','village_name_w3','building_id_w3', 'household_id_w3', "b0100", "b0200","b0600","b0800","b0900")
 ```
 Compute Diet Diversity Score
 ```{r}
@@ -170,6 +188,7 @@ colnames(test_ssr_num) <- master_key$respondent_master_id[match(colnames(test_ss
 
 strain_rate <- test_ssr_num*100
 diag(strain_rate) <- 0
+strain_rate[is.na(strain_rate)] <- 0
 ```
 
 
@@ -193,14 +212,14 @@ species_bray <- vegdist(t(species_data), method = "bray")
 species_bray <- as.matrix(species_bray)
 
 #Calculate jaccard index manually
-species_jaccard_sim <- vegdist(t(species_data), method = 'jaccard')
-species_jaccard_sim <- as.data.frame(species_jaccard_sim)
+species_jaccard_sim <- vegdist(t(species_data), method = 'jaccard', binary=TRUE)
+species_jaccard_sim <- as.matrix(species_jaccard_sim)
 ```
 
 Calculate coverage rates and update social network to match hmb census
 ```{r}
 #Full edge dataframe
-all_edges <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v3_F_BEGHINI_2021-09-27.csv", as.is = TRUE) |> 
+all_edges <- read.csv("/WORKAREA/work/HONDURAS_MICROBIOME/J_PULLMAN/DATA/COHORT_1/v2/honduras_connections_WAVE3_v3_J_PULLMAN_2022-11-07.csv", as.is = TRUE) |> 
               filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling')) #Remove not get along
 #Filter to villages for people we have microbiome information from
 all_vils <- hmb_census %>%
@@ -234,13 +253,6 @@ all_network_ids <- c(all_edges$ego, all_edges$alter)
 
 #Filter edgelist to study participants who we have microbiome data for
 SN <- all_edges %>% filter(ego %in% rownames(strain_rate) , alter %in% rownames(strain_rate))
-
-
-hmb_census <- hmb_census |> 
-  filter(respondent_master_id %in% colnames(species_data))
-
-hmb_census <- hmb_census %>%
-  filter(village_code %in% village_names)
 
 #Check if people moved villages or houses for whom we have study data for
 hmb_census_ego <- hmb_census
@@ -299,6 +311,7 @@ print(paste("Total Sample Size:",nrow(hmb_census)))
 covariates <- inner_join(hmb_census, demographics, by = join_by(respondent_master_id)) %>%
   dplyr::select(-c("building_id_w3", "village_name_w3"))
 
+covariates$mb_m0300 <- as.factor(str_sub(covariates$mb_m0300, 6, 6))
 
 #Merge on household wealth index data
 household_wealth_data4 <- read.csv("~/F_BEGHINI_G/WAVE4/v1/honduras_households_WAVE4_v1_F_BEGHINI_2023-11-01.csv")
@@ -306,12 +319,61 @@ household_wealth_data <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_households_WA
 household_wealth_data2 <- read.csv("~/F_BEGHINI_G/WAVE3/v3/honduras_households_WAVE2_v5_F_BEGHINI_2022-11-01.csv")
 
 household_wealth_data <- household_wealth_data %>% dplyr::select(building_id, l0400, household_wealth_index_w3)
+household_wealth_data$l0400 <- as.factor(c('Well with tube' = 1,
+'Dug well (proctected)' = 2 ,
+'Dug well (unprotected)' = 3 ,
+'Water from spring (protected)' = 4 ,
+'Water from spring (unproctected)' = 5 ,
+'Rainwater' = 6 ,
+'Tanker truck' = 7 ,
+'Cart with small tank' = 8 ,
+'Surface water (river/dam/lake/pond/stream/canal/irrigation channel)'= 9 ,
+'bottle water' = 10 ,
+'Other' = 11 
+)[household_wealth_data$l0400])
 
 #Merge covariates with household wealth data
-covariates <- inner_join(covariates, household_wealth_data)
+covariates <- left_join(covariates, household_wealth_data)
 
-#Calculate distance between villages
-names(covariates)
+covariates[covariates$respondent_master_id=='145q-7f4867c7-a4e1-47e8-9b7c-2d98a4294cdb','household_wealth_index_w3'] <- 5
+covariates[covariates$respondent_master_id=='nZno-6b2d0c05-ebeb-464b-836e-31493a161740','household_wealth_index_w3'] <- 4
+covariates[covariates$respondent_master_id=='cPP0-b47b9cbf-eeaf-430a-87bf-d6322e65108b','household_wealth_index_w3'] <- 2
+covariates[covariates$respondent_master_id=='nZno-b1e42724-5fd4-4aad-8835-80e8a7f430bf','household_wealth_index_w3'] <- 2
+covariates[covariates$respondent_master_id=='enz0-ce7dad59-da03-48d6-9649-40202eba50aa','household_wealth_index_w3'] <- 4
+covariates[covariates$respondent_master_id=='enz0-54c4a166-642d-4707-9dd9-eac58c3452b0','household_wealth_index_w3'] <- 4
+covariates[covariates$respondent_master_id=='cPP0-e7a61fe3-ea87-4f76-b992-bbfbde75393c','household_wealth_index_w3'] <- 4
+covariates[covariates$respondent_master_id=='h4Ru-14c55d32-c61c-44da-9088-6559224a1ae9','household_wealth_index_w3'] <- 3
+covariates[covariates$respondent_master_id=='nZno-66d3906b-0036-4943-bfbb-f5aabaa16123','household_wealth_index_w3'] <- 4
+covariates[covariates$respondent_master_id=='cPP0-00ea6c4f-769a-4670-b7af-cc82af90a235','household_wealth_index_w3'] <- 4
+covariates[covariates$respondent_master_id=='nZno-50e96e07-ae0e-4be2-a0f3-d45a3308204f','household_wealth_index_w3'] <- 2
+covariates[covariates$respondent_master_id=='Obit-d4607866-a62f-4c9a-90b0-0b11db77f970','household_wealth_index_w3'] <- 3
+covariates[covariates$respondent_master_id=='/BKO-5f5c3998-40ad-45fa-8430-244a6863c01d','household_wealth_index_w3'] <- 3
+covariates[covariates$respondent_master_id=='Ers1-ae8fb0f9-6d87-476c-a9aa-b3c648e35c6a','household_wealth_index_w3'] <- 5
+covariates[covariates$respondent_master_id=='enz0-0d3f9285-2398-47e6-aca2-ada2c6a8fc09','household_wealth_index_w3'] <- 3
+covariates[covariates$respondent_master_id=='CfVZ-39bb93a1-bbc7-4dad-a261-c3eb047bfe12','household_wealth_index_w3'] <- 1
+
+covariates[covariates$building_id == '8193e681-4079-4b59-a53c-661edb4ebade', 'household_wealth_index_w3']  <-  3
+covariates[covariates$building_id == 'f64acdfd-b9ad-472a-b665-da8e4bd99a7d', 'household_wealth_index_w3']  <-  1
+covariates[covariates$building_id == '90991c9e-45f1-48ee-b65f-926d5110e77b', 'household_wealth_index_w3']  <-  5
+covariates[covariates$building_id == 'b509255f-9b80-498d-a1d8-aa00f57bb874', 'household_wealth_index_w3']  <-  3
+covariates[covariates$building_id == '0b74b5c8-5ffa-44fd-b822-fb5bdfbc9947', 'household_wealth_index_w3']  <-  4
+covariates[covariates$building_id == '804984d4-2c13-4b43-836e-d8f0b623ea02', 'household_wealth_index_w3']  <-  4
+covariates[covariates$building_id == 'aae91e23-5260-4871-944d-c080872d4901', 'household_wealth_index_w3']  <-  4
+covariates[covariates$building_id == 'b007fa42-731c-4b11-b990-7bac1e9aed02', 'household_wealth_index_w3']  <-  5
+covariates[covariates$building_id == 'd7b66ef7-664d-48cc-b25d-3c5af12d0146', 'household_wealth_index_w3']  <-  5
+covariates[covariates$building_id == '6f49f077-e8c0-461e-87cb-b5bd69159ff1', 'household_wealth_index_w3']  <-  1
+covariates[covariates$building_id == '705b1011-f548-47ac-a791-6a35eb2c55af', 'household_wealth_index_w3']  <-  5
+covariates[covariates$building_id == '45a8a64d-9108-4d35-bc38-345082f1f734', 'household_wealth_index_w3']  <-  4
+covariates[covariates$building_id == '4ed14ee9-4d47-498a-9163-b7c79178017a', 'household_wealth_index_w3']  <-  5
+covariates[covariates$building_id == '7da57d60-8887-4a26-83bd-97c72c18fa45', 'household_wealth_index_w3']  <-  2
+covariates[covariates$building_id == 'de834381-1898-4542-8937-8e87cbf83075', 'household_wealth_index_w3']  <-  3
+covariates[covariates$building_id == '7f22eea8-daae-4369-9c5f-9d2a25c11a54', 'household_wealth_index_w3']  <-  3
+covariates[covariates$building_id == '2264316c-2a06-4e54-a3aa-c54d71aeb561', 'household_wealth_index_w3']  <-  4
+covariates[covariates$building_id == '36a9f122-722f-4a7e-bf9c-ccc1746273e2', 'household_wealth_index_w3']  <-  5
+covariates[covariates$building_id == '4d2e4248-76da-4407-bf7c-ccdefbe27b2e', 'household_wealth_index_w3']  <-  5
+covariates[covariates$building_id == '5eff7ec4-e03d-4407-bed6-7a80ff4dffd9', 'household_wealth_index_w3']  <-  3
+covariates[covariates$building_id == '9a74edee-2779-4bd9-8da4-3c1a327f9cee', 'household_wealth_index_w3']  <-  3
+covariates[covariates$building_id == 'cd55f742-ddf9-43ba-98ab-a94ef2ead588', 'household_wealth_index_w3']  <-  5
 
 village_centroids <- covariates %>%
   group_by(village_name) %>%
@@ -330,7 +392,28 @@ diag(village_distances) <- NA
 mean(apply(village_distances, MARGIN = 1, FUN = min, na.rm = TRUE))
 mean(apply(village_distances, MARGIN = 1, FUN = max, na.rm = TRUE))
 
-
+covariates <- inner_join(covariates, (hmb_c1 |> select(respondent_master_id, 
+med_painkillers = mb_b1100a,
+med_antibiotics = mb_b1100b,
+med_antidiarrheal = mb_b1100c,
+med_antiparasite = mb_b1100d,
+med_vitamins = mb_b1100e,
+med_zinc = mb_b1100f,
+med_antifungal = mb_b1100k) |> bind_rows(
+  hmb_c2 |> select(respondent_master_id,
+  med_painkillers = mb_b1100a,
+  med_antibiotics= mb_b1100b,
+  med_antidiarrheal = mb_b1100c,
+  med_antiparasite = mb_b1100d,
+  med_antifungal = mb_b1100e,
+  med_vitamins = mb_b1100f,
+  med_antihypertensives = mb_b1100g,
+  med_antidiabetics = mb_b1100h,
+  med_antiacids = mb_b1100i,
+  med_laxatives = mb_b1100j,
+  med_zinc = mb_b1100k,
+)) |> 
+  mutate(across(-respondent_master_id, ~if_else(is.na(.x), 0, 1)))))
 ```
 
 
@@ -370,7 +453,7 @@ for(i in 1:nrow(SN)){
   
 }
 
-
+SN$strain_sharing_rate[is.na(SN$strain_sharing_rate)] <- 0
 
 #Filter social network data data to who we also have microbiome data for
 SN <- SN[SN$ego %in% rownames(strain_rate) & SN$alter %in% rownames(strain_rate),]
@@ -380,10 +463,10 @@ for(i in 1:nrow(SN)){
                                            colnames(species_bray) == SN$alter[i]]
 }
 
-# for(i in 1:nrow(SN)){
-#   SN$jaccard_sim[i] <- species_jaccard_sim[rownames(species_jaccard_sim) == SN$ego[i],
-#                                            colnames(species_jaccard_sim) == SN$alter[i]]
-# }
+for(i in 1:nrow(SN)){
+  SN$jaccard_sim[i] <- species_jaccard_sim[rownames(species_jaccard_sim) == SN$ego[i],
+                                           colnames(species_jaccard_sim) == SN$alter[i]]
+}
 
 #Filter Microbiome data to who we also have social network data for
 strain_rate <- strain_rate[rownames(strain_rate) %in% unique(c(SN$ego, SN$alter)),
@@ -432,9 +515,23 @@ SN %>%
 family_house_pairs <- unique(SN$pair_key[SN$building_id_alter == SN$building_id_ego |
                                            SN$relationship %in% c("father", "mother", "sibling", "child_over12_other_house")])
 
-
+SN_full_directed_graph <- graph_from_data_frame(SN)
+mutual_conns <- which_mutual(SN_full_directed_graph)
+SN_mutual_conns <- subgraph.edges(SN_full_directed_graph, E(SN_full_directed_graph)[mutual_conns])
 ```
 
+```{r}
+# hmb_census |>
+#   dplyr::select(mb_m05,village_name_deid, dplyr::contains('mb_b1900')) %>% 
+#   pivot_longer(c(-mb_m05,-village_name_deid), names_to='disease', values_drop_na = TRUE) %>% 
+#   dplyr::select(-disease) %>% 
+#   mutate(value = if_else(value=='None of the above', 'Healthy',value)) %>% 
+#   group_by(village_name_deid)  |>
+#   count(value) |>
+#   pivot_wider(names_from = value, values_from = n) 
+#   mutate_at(vars(!matches('mb|vill')), .funs = ~if_else(is.na(.), 0, 1)) %>% 
+#   bind_rows(data.frame(mb_m05 = '116-0005-05', Healthy=1))
+```
 
 Create helpful datasets at the village level
 ```{r}
@@ -531,5 +628,26 @@ for(i in 1:length(village_names)){
   #        get(paste0("jaccard_vil_graph_", i))) 
   
 }
+
+```
+
+```{r}
+library(tableone)
+
+myvars <- c('age_at_survey', 'gender','marital_name')
+
+demographics %>% group_by(household_id_w3) %>%
+  summarise(n = n()) %>% pull(n) %>% mean()
+  
+all_tableone <- CreateTableOne(data = hmb_census, strata = 'village_name_deid', vars = myvars, test = FALSE, addOverall = TRUE, )
+rel_tableone <- CreateTableOne(data = distinct(SN, pair_key, relationship, .keep_all = TRUE), strata = 'village_name_deid_ego', vars = 'relationship', test = FALSE, addOverall = TRUE, )
+wlt_tableone_mat <- print(CreateTableOne(data = covariates, strata = 'village_name_deid', vars = c('DDS', 'household_wealth_index_w3'), test = FALSE, addOverall = TRUE, ), printToggle = FALSE)[]
+
+rel_tableone_mat <- (print(rel_tableone, printToggle = FALSE, format = 'f'))
+rel_tableone_mat[2,] <- rel_tableone_mat[1,]
+rel_tableone_mat <- rel_tableone_mat[-1,]
+rownames(rel_tableone_mat)[1] <- 'Relationship (n=)'
+write.csv(as.data.frame(rbind((print(all_tableone, printToggle = FALSE)), rel_tableone_mat, wlt_tableone_mat)), 'tables/tableone.csv', )
+
 
 ```

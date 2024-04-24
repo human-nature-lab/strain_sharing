@@ -143,7 +143,6 @@ centrality_sim_df_covars <- merge(centrality_sim_df, covariates)
 centrality_sim_df_covars_all <- inner_join(extraction_batch, sequencing_depth, by=join_by(SampleID)) |> 
   inner_join(shipping_batch, by=join_by(SampleID)) |> 
   inner_join(centrality_sim_df_covars, by=join_by(SampleID==mb_m05))
-
 ```
 
 
@@ -336,8 +335,7 @@ set.seed(22)
 test <- sn_vil_graph_15
 
 
-vertex_attr(test)$similarity <- centrality_sim_df$strain_sim_all[match(names(V(test)),
-                                           centrality_sim_df$respondent_master_id)]
+vertex_attr(test)$similarity <- centrality_sim_df$strain_sim_all[match(names(V(test)), centrality_sim_df$respondent_master_id)]
 
 
 palette <- heat.colors(3)
@@ -605,6 +603,11 @@ set.seed(1)
 ```{r}
 sub_covar_centrality <- centrality_sim_df_covars_all |> select(BMI, age_at_survey, household_wealth_index_w3, gender, DDS, starts_with('med_'), l0400, mb_m0300)
 sub_covar_centrality$gender <- ifelse(sub_covar_centrality$gender == 'man', 1, 0)
+sub_covar_centrality$mb_m0300 <- as.integer(sub_covar_centrality$mb_m0300)
+sub_covar_centrality$l0400 <- as.integer(sub_covar_centrality$l0400)
+
+saveRDS(centrality_sim_df_covars_all, 'centrality_sim_df_covars_all.RDS')
+saveRDS(sub_covar_centrality, 'sub_covar_centrality.RDS')
 ```
 
 # Social Network Position and Strain Network Position
@@ -901,13 +904,13 @@ sum(hmb_census$respondent_master_id == names(V(SN_Graph_all)[i]))
 for( i in 1:length(V(SN_Graph_all))){
   test_incident <- incident(SN_Graph_all, V(SN_Graph_all)[i])
   
-  if(hmb_census$gender[hmb_census$respondent_master_id == names(V(SN_Graph_all)[i])] == "woman"){
+  if(hmb_census$gender[hmb_census$respondent_master_id == names(V(SN_Graph_all)[i])] == "woman") {
     woman_list_strain <- c(woman_list_strain,
                     mean(edge_attr(SN_Graph_all, "strain_sharing_rate", test_incident)))
     woman_list_bray <- c(woman_list_bray,
                     mean(edge_attr(SN_Graph_all, "bray_curtis_sim", test_incident)))
     woman_list_jaccard <- c(woman_list_jaccard,
-                    mean(edge_attr(SN_Graph_all, "jaccard_sim", test_incident)))
+                          mean(edge_attr(SN_Graph_all, "jaccard_sim", test_incident)))
   }
   
   else{
@@ -927,38 +930,25 @@ man_woman_df <- data.frame("Strain_Sharing_Rate" = c(man_list_strain, woman_list
                            "Gender" = c(rep("Male", length(man_list_strain)),
                                         rep("Female", length(woman_list_strain))))
 
+man_woman_df.m <- man_woman_df |>
+  pivot_longer(-Gender, names_to = 'variable', values_to = 'value')
 
-
-head(man_woman_df)
-
-# Assume your data frame is named dat
-man_woman_df.m = reshape2::melt(man_woman_df %>% select(-Jaccard_Similarity), id.var=c("Gender"))
-
-man_woman_df.m = reshape2::melt(man_woman_df, id.var=c("Gender"))
-
-
-levels(man_woman_df.m$variable) <- c("Strain-Sharing Rate", "Bray-Curtis Similarity", "Jaccard Similarity")
-
-medians_mw <- aggregate(value~variable + Gender, data = man_woman_df.m, median, na.rm = TRUE)
+medians_mw <- aggregate(value ~ variable + Gender, data = man_woman_df.m, median, na.rm = TRUE)
 
 #Want all pairwise comparisons
 man_woman_df.m$all_group <- paste0(man_woman_df.m$Gender, man_woman_df.m$variable)
-mw_share_pvals <- compare_means(value ~all_group, data = man_woman_df.m)
+man_woman_df.m$variable <- factor(man_woman_df.m$variable, levels = c('Strain_Sharing_Rate','Bray_Curtis_Similarity','Jaccard_Similarity'))
+mw_share_pvals  <- compare_means(value ~ all_group, data = man_woman_df.m)
 
-mw_share_pvals <- mw_share_pvals[c(1,10,15),] 
-
-mw_share_pvals$p.adj <- mw_share_pvals$p %>% p.adjust(method = "BH")
-
-mw_share_pvals$p.adj
+mw_share_pvals <- mw_share_pvals[c(3, 8, 12), ]
 
 # If you want the two levels of event plotted side by side
-mw_share <- ggplot(man_woman_df.m, aes(Gender, value, colour=variable)) +
-  facet_wrap(. ~ variable, scales = "free") +
+mw_share  <- ggplot(man_woman_df.m, aes(Gender, value, colour=variable)) +
+  facet_wrap(~variable, scales = "free") +
   geom_boxplot(width=0.7, show.legend = FALSE) +
   theme_minimal() +
   stat_compare_means(comparisons = list(c("Female", "Male")),
     method = "wilcox.test",
-    label.y = .6,
     size = 3,
     tip.length = 0) +
   geom_text(data = medians_mw,
@@ -1041,16 +1031,16 @@ ann_text$lab <- paste0(as.character(round(ann_text$strain_sharing_rate,3)),
 
 
 #Want to have FDR control here
-gender_split_share <- ggboxplot(SN_tri_gender, color = "pair_gender",
+gender_split_share_ssr <- ggboxplot(SN_tri_gender, color = "pair_gender",
                                 x = "pair_gender", y = "strain_sharing_rate",
                                 facet.by = "relationship",outlier.shape = NA) +
-  coord_cartesian(ylim = c(0,.35)) +
+  coord_cartesian(ylim = c(0,35)) +
   theme(#axis.text.x = element_text(angle = 45, hjust=1),
     axis.text.x = element_blank(),
     legend.title = element_blank(),
     legend.position= "bottom",
     legend.margin=margin(0,0,0,0, unit='cm')) +
-  stat_compare_means(label.y = c(.20,.25,.30),
+  stat_compare_means(label.y = c(20,25,30), tip.length = 0,
                      comparisons = my_comparisons) +
   xlab("") +
   ylab("Strain-Sharing Rate") +
@@ -1077,17 +1067,16 @@ ann_text$lab <- paste0(as.character(round(ann_text$bray_curtis_sim,3)),
 
 #Want to have FDR control here
 #May need to do this manually
-ggboxplot(SN_tri_gender, color = "pair_gender",
+gender_split_share_bc <- ggboxplot(SN_tri_gender, color = "pair_gender",
                                 x = "pair_gender", y = "bray_curtis_sim",
                                 facet.by = "relationship",outlier.shape = NA) +
-  coord_cartesian(ylim = c(0,.8)) +
   theme(#axis.text.x = element_text(angle = 45, hjust=1),
     axis.text.x = element_blank(),
     legend.title = element_blank(),
     legend.position= "bottom",
     legend.margin=margin(0,0,0,0, unit='cm')) +
-  stat_compare_means(label.y = c(.6,.65,.7),
-                     comparisons = my_comparisons,
+  stat_compare_means(label.y = c(.85,.9,.95),
+                     comparisons = my_comparisons, tip.length = 0,
                      method.args = list(method.args = list(p.adjust.method = "BH"))) +
   xlab("") +
   ylab("Bray-Curtis Similarity") +
@@ -1113,97 +1102,68 @@ ann_text <- merge(ann_text, ann_text_2)
 ann_text$lab <- paste0(as.character(round(ann_text$jaccard_sim,3)),
                        "\n(N = ", ann_text$count, ")")
 
-#compare_means(jaccard_sim ~  relationship + pair_gender,
-#                     SN_tri_gender,
- #             p.adjust.method = "BH")
+compare_means(jaccard_sim ~  pair_gender,
+                     SN_tri_gender, p.adjust.method = "BH", )
 
 
 #Want to have FDR control here
 #Can add this in later
-ggboxplot(SN_tri_gender, color = "pair_gender",
+gender_split_share_jac <- ggboxplot(SN_tri_gender, color = "pair_gender",
                                 x = "pair_gender", y = "jaccard_sim",
                                 facet.by = "relationship",outlier.shape = NA) +
-  coord_cartesian(ylim = c(.1,.8)) +
   theme(#axis.text.x = element_text(angle = 45, hjust=1),
     axis.text.x = element_blank(),
     legend.title = element_blank(),
     legend.position= "bottom",
     legend.margin=margin(0,0,0,0, unit='cm')) +
-  stat_compare_means(label.y = c(.6,.65,.7),
+  stat_compare_means(label.y = c(.78,.8,.85),
+                     tip.length = 0,
                      comparisons = my_comparisons,
+                     method = 'wilcox.test',
                      method.args = list(method.args = list(p.adjust.method = "BH"))) +
   xlab("") +
   ylab("Jaccard Similarity") +
   geom_text(data = ann_text, label = ann_text$lab,
             size = 3)
 
-#adjust p-value with Bonferroni
-wilcox.test(SN_tri_gender$bray_curtis_sim[SN_tri_gender$pair_gender == "Male - Male" &
-                                            SN_tri_gender$relationship == "Sibling"],
-            SN_tri_gender$bray_curtis_sim[SN_tri_gender$pair_gender == "Female - Female" &
-                                            SN_tri_gender$relationship == "Sibling"])$p.value * 12*3
-
-# tri_gender_df.m <- SN_tri_gender %>% select(bray_curtis_sim, jaccard_sim, strain_sharing_rate, pair_gender)
-# tri_gender_df.m <- reshape2::melt(tri_gender_df.m, id.var=c("pair_gender"))
-# head(tri_gender_df.m)
-# tri_gender_df.m$all_group <- paste0(tri_gender_df.m$pair_gender,tri_gender_df.m$variable)
-# 
-# tri_gender_df_pvals <- compare_means(value ~ all_group, data = tri_gender_df.m)
-# 
-# tri_gender_df_pvals $>$ filter(group1 == )
 ```
 
-
-
-```{r}
-gender_split_share <-ggboxplot(SN_tri_gender, color = "pair_gender",
-          x = "pair_gender", y = "bray_curtis_sim",
-          facet.by = "relationship",outlier.shape = NA) +
-  coord_cartesian(ylim = c(0.25,1.1)) +
-  theme(#axis.text.x = element_text(angle = 45, hjust=1),
-    axis.text.x = element_blank(),
-        legend.title = element_blank()) +
-  stat_compare_means(label.y = c(.85,.9,.95),
-                     comparisons = my_comparisons) +
-  xlab("") +
-  ylab("Bray-Curtis Distance") +
-  geom_text(data = ann_text, label = ann_text$lab)
-
-
-```
 
 Make nice plot
 ```{r}
 
-gender_fig <- ggarrange(gender_split_share +
-                   #rremove("xlab") +
-                   rremove("ylab"),
-          ggarrange(mw_share +
-                      rremove("ylab") ,
-                    parent_share +
-                      rremove("ylab") ,
-                    labels = c("7B", "7C"),
-                    align = "h",
-                    ncol = 2,
-                    label.y = 1.05),
-          nrow = 2, 
-          labels = "7A",
-          label.y = .95,
-          heights = c(2,1))
+gender_fig <- ggarrange(ggarrange(gender_split_share_jac, gender_split_share_bc, labels = c('A','B')),
+ggarrange(gender_split_share_ssr, mw_share, labels = c('C','D')), nrow = 2)
+          
+svglite('Figures/supp_fig9.svg', fix_text_size = FALSE, height = 16, width = 12)
+gender_fig
+dev.off()
+#           ggarrange(mw_share +
+#                       rremove("ylab") ,
+#                     parent_share +
+#                       rremove("ylab") ,
+#                     labels = c("7B", "7C"),
+#                     align = "h",
+#                     ncol = 2,
+#                     label.y = 1.05),
+#           nrow = 2, 
+#           labels = "7A",
+#           label.y = .95,
+#           heights = c(2,1))
 
-annotate_figure(gender_fig, 
-                left = text_grob("Strain-Sharing Rate",
-                                 rot = 90,
-                                 size = 12),
-                top = text_grob("Gender Differences in Strain-Sharing",
-                                size = 12))
+# annotate_figure(gender_fig, 
+#                 left = text_grob("Strain-Sharing Rate",
+#                                  rot = 90,
+#                                  size = 12),
+#                 top = text_grob("Gender Differences in Strain-Sharing",
+#                                 size = 12))
 
-annotate_figure(gender_fig, 
-                left = text_grob("Bray-Curtis Dissimilarity",
-                                 rot = 90,
-                                 size = 12),
-                top = text_grob("Gender Differences in Species-Similarity",
-                                size = 12))
+# annotate_figure(gender_fig, 
+#                 left = text_grob("Bray-Curtis Dissimilarity",
+#                                  rot = 90,
+#                                  size = 12),
+#                 top = text_grob("Gender Differences in Species-Similarity",
+#                                 size = 12))
 ```
 
 Mother-Child sharing by father sharing and age differential

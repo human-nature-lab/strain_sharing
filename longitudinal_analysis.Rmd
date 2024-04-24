@@ -25,7 +25,7 @@ metadata_followup <- read_csv('~/F_BEGHINI_HM/COHORT1_FOLLOWUP/v2/hmb_respondent
   mutate(mb_m05 = str_replace(mb_m00, '-00$', '-15'),
   marital_name = if_else(!is.na(mb_c004),mb_c004, 'Married')) |> 
   filter(!is.na(mb_m05)) |> 
-  mutate(BMI = (mb_d0100 / mb_d0200 **2) * 10000)
+  mutate(BMI = (mb_d0100 / mb_d0200 **2) * 10000) 
 
 metadata_baseline <- read_csv('~/F_BEGHINI_HM/COHORT1/v3/hmb_respondents_cohort1_baseline_v3_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
   filter(respondent_master_id %in% metadata_followup$respondent_master_id,
@@ -82,7 +82,7 @@ respondents_w4 <- read_csv('~/F_BEGHINI_G/WAVE4/v1/honduras_respondents_WAVE4_v1
 ```
 
 ```{r collapse_multiple_ties}
-reduced_SN_w3 <- SN_w3 |> 
+reduced_SN_w3 <- SN |> 
   unite(a2703a, a2703a, a2704a, na.rm = TRUE,) |> 
   unite(a2703b, a2703b, a2704b, na.rm = TRUE,) |> 
   unite(a2703c, a2703c, a2704c, na.rm = TRUE,) |> 
@@ -92,10 +92,10 @@ reduced_SN_w3 <- SN_w3 |>
   unite(a2703g, a2703g, a2704g, na.rm = TRUE,) |> 
   mutate(across(starts_with('a2703'), ~ na_if(.x, ''))) |> 
   select(-a2703, -a2704, -question,-a2703h, -alter_source, -office_w3, -municipality_w3) |> 
-  group_by(pair) |> 
+  group_by(pair_key) |> 
   summarize(ego, alter, relationship = paste(relationship, collapse = ','), across(starts_with('a2703'), ~ paste(unique(.x[!is.na(.x)]), collapse = ',')) , village_name_w3, village_code_w3) |> 
-  distinct(pair, .keep_all = TRUE) |> 
-  mutate(is_kin = grepl('mother|father|child|sibling', relationship)) |> 
+  distinct(pair_key, .keep_all = TRUE) |> 
+  mutate(is_kin = grepl('Mother|Father|Child|Sibling', relationship)) |> 
   select(ego, alter, everything()) |> 
   ungroup()
 
@@ -255,14 +255,23 @@ strain_shared |>
   filter(same_subject==TRUE) |> 
   mutate(trans = dist <= threshold) |> 
   mutate(timepoint = 'Intra-timepoint') |>
-  group_by(pair, timepoint, village_code_w3) |>  
-  summarize(ssr=sum(trans==TRUE)/n()) |> 
+  group_by(pair, timepoint, village_code_ego) |>  
+  summarize(ssr=sum(trans==TRUE)/n())
   ggplot() + 
-    geom_boxplot(aes(village_code_w3, ssr))
+    geom_boxplot(aes(as.factor(timepoint), ssr))
     #ggbeeswarm::geom_quasirandom(aes(timepoint, ssr))
 ```
 
-
+```{r}
+strain_shared |> 
+  filter(same_subject==TRUE) |> 
+  mutate(trans = dist <= threshold) |> 
+  mutate(timepoint = 'Intra-timepoint') |>
+  group_by(species, village_code_ego) |>
+  summarize(sum(trans) / n(), n = n()) |>
+  filter(n>10) |>
+  arrange(desc(n)) |>View()
+```
 ```{r eval=FALSE, include=FALSE}
 status_sharing_w3 |> 
   distinct() |> 
@@ -537,7 +546,7 @@ sharing_rate_only_followup <- sharing_rate |>
   left_join((pairwise_mahalanomis_long |> select(pair, maha_dist)), by = 'pair') |> 
   mutate(village_code_ego = as.factor(village_code_ego))
   
-saveRDS(sharing_rate_only_followup, 'sharing_rate_only_followup.Rds')
+# saveRDS(sharing_rate_only_followup, 'sharing_rate_only_followup.Rds')
 ```
 
 ```{r}
@@ -573,10 +582,10 @@ dotplot_compare_models <- bind_rows(data.frame(summary(lmer_first_model)$coef[2:
   tibble::rownames_to_column('term') |>
   mutate(term = str_remove(term, '...[0-9]')) |>
   rename(SE = `Std..Error`) |>
-  bind_rows(list(term='T1:relationshipyes', class='interact', Estimate = fixef(lmer_second_model)[[5]], SE = summary(lmer_second_model)$coef[5,2])) |>
+  bind_rows(list(term='relationshipyes', class='interact', Estimate = fixef(lmer_second_model)[[5]], SE = summary(lmer_second_model)$coef[5,2])) |>
   mutate(term = factor(term, levels = unique(term))) |>
   ggplot(aes(reorder(term, desc(term)), Estimate, group=class)) +
-  geom_errorbar(aes(ymin=Estimate-SE, ymax=Estimate+SE, color = class),size = 1.5, width=.2, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin=Estimate-1.96*SE, ymax=Estimate+1.96*SE, color = class),size = 1.5, width=.2, position = position_dodge(width = 0.4)) +
   geom_point(aes(color = class), size = 4, position = position_dodge(width = 0.4)) +
   coord_flip() +
   cowplot::theme_cowplot() + xlab('Terms') +
@@ -712,14 +721,15 @@ foreach(i = 1:4) %do% {
     select(ego, alter, pair, tie, timepoint, n1) |>
     filter(ego %in% V(sg)$name & alter %in% V(sg)$name) |>
     pivot_wider(names_from = timepoint, values_from = n1) -> wide_ssr
-
-    wide_ssr |>
-    group_by(tie) |> summarize(median(T1), median(T2), mean(T1), mean(T2))
     
-    ratio_plot <- wide_ssr |>
+    ratio <- wide_ssr |>
     #pivot_longer(cols = c(T1,T2), names_to = 'timepoint', values_to = 'ssr') |>
     mutate(delta_ssr = abs(T2-T1),
-           tie = factor(wide_ssr$tie, labels = c('No','Yes'))) |>
+           tie = factor(wide_ssr$tie, labels = c('No','Yes')))
+    
+    wilcox.test(delta_ssr ~ tie, ratio)
+
+    ratio_plot  <- ratio |>
     ggplot() + 
     geom_boxplot(aes(tie, delta_ssr, fill=tie)) + 
     coord_flip() +
@@ -728,7 +738,7 @@ foreach(i = 1:4) %do% {
     ylim(c(0,0.5)) + 
     guides(fill='none') +
     scale_fill_manual(values = c('white', '#027fffff'))
-
+    
     wide_ssr |>
     filter(tie == 'yes') |>
     mutate(c = T1 > median(T1, na.rm = TRUE)) |> 
