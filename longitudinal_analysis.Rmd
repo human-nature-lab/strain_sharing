@@ -70,19 +70,10 @@ SN_w3 <- read_csv("~/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v3_F_BEGHIN
                      ) |> 
                 mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
                        wave = 3)
-
-SN_w4 <- read_csv("~/F_BEGHINI_G/WAVE4/v1/honduras_connections_WAVE4_v1_F_BEGHINI_2023-11-01.csv", guess_max = 50000,show_col_types = FALSE) |> 
-              filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling'), #Remove not get along
-                     ego %in% metadata_followup$respondent_master_id, 
-                     alter %in% metadata_followup$respondent_master_id) |> 
-                mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
-                       wave = 4)
-respondents_w4 <- read_csv('~/F_BEGHINI_G/WAVE4/v1/honduras_respondents_WAVE4_v1_F_BEGHINI_2023-11-01.csv', guess_max = 50000,show_col_types = FALSE) |> 
-              filter(respondent_master_id %in% metadata_followup$respondent_master_id)
 ```
 
 ```{r collapse_multiple_ties}
-reduced_SN_w3 <- SN |> 
+reduced_SN_w3 <- SN_w3 |> 
   unite(a2703a, a2703a, a2704a, na.rm = TRUE,) |> 
   unite(a2703b, a2703b, a2704b, na.rm = TRUE,) |> 
   unite(a2703c, a2703c, a2704c, na.rm = TRUE,) |> 
@@ -92,9 +83,9 @@ reduced_SN_w3 <- SN |>
   unite(a2703g, a2703g, a2704g, na.rm = TRUE,) |> 
   mutate(across(starts_with('a2703'), ~ na_if(.x, ''))) |> 
   select(-a2703, -a2704, -question,-a2703h, -alter_source, -office_w3, -municipality_w3) |> 
-  group_by(pair_key) |> 
+  group_by(pair) |> 
   summarize(ego, alter, relationship = paste(relationship, collapse = ','), across(starts_with('a2703'), ~ paste(unique(.x[!is.na(.x)]), collapse = ',')) , village_name_w3, village_code_w3) |> 
-  distinct(pair_key, .keep_all = TRUE) |> 
+  distinct(pair, .keep_all = TRUE) |> 
   mutate(is_kin = grepl('Mother|Father|Child|Sibling', relationship)) |> 
   select(ego, alter, everything()) |> 
   ungroup()
@@ -219,161 +210,6 @@ sharing_rate_inter <- sharing_rate |>
   filter(timepoint=='T1/T2')
 ```
 
-# Calculate SSR only on shared species between timepoints
-```{r}
-strain_shared |> 
-  filter(timepoint %in% c('T1','T2')) |> 
-  group_by(pair, timepoint) |> 
-  summarize(l = list(unique(species))) |> 
-  ungroup(timepoint) -> xx
-  
-xx
-summarize(length(.[,timepoint=='T1',l]))
-```
-
-
-```{r edge_change_t1_t2, cache=FALSE}
-cluster <- multidplyr::new_cluster(20)
-multidplyr::cluster_library(cluster, "dplyr")
-status_sharing_w3 <- strain_shared |> 
-  filter(same_timepoint==TRUE) |> 
-  select(s1,s2, pair, dist, species, timepoint, relationship=relationship.x, shared ) |> 
-  distinct(pair, species, relationship, timepoint, .keep_all = TRUE) |> 
-  arrange(species, timepoint) |> 
-  group_by(pair, species, relationship) |> 
-  multidplyr::partition(cluster) |> 
-  summarise(status = dplyr::case_when(
-    n() == 1 & timepoint=='T1' & shared == TRUE ~ 'sharing_lost_at_t2',
-    n() == 1 & timepoint=='T2' & shared == TRUE ~ 'sharing_acquired_only_at_t2',
-    n() == 2 & shared == TRUE                   ~ 'kept_sharing',
-    .default = 'no_share'
-  )) |> 
-  collect()
-```
-```{r include=FALSE}
-strain_shared |> 
-  filter(same_subject==TRUE) |> 
-  mutate(trans = dist <= threshold) |> 
-  mutate(timepoint = 'Intra-timepoint') |>
-  group_by(pair, timepoint, village_code_ego) |>  
-  summarize(ssr=sum(trans==TRUE)/n())
-  ggplot() + 
-    geom_boxplot(aes(as.factor(timepoint), ssr))
-    #ggbeeswarm::geom_quasirandom(aes(timepoint, ssr))
-```
-
-```{r}
-strain_shared |> 
-  filter(same_subject==TRUE) |> 
-  mutate(trans = dist <= threshold) |> 
-  mutate(timepoint = 'Intra-timepoint') |>
-  group_by(species, village_code_ego) |>
-  summarize(sum(trans) / n(), n = n()) |>
-  filter(n>10) |>
-  arrange(desc(n)) |>View()
-```
-```{r eval=FALSE, include=FALSE}
-status_sharing_w3 |> 
-  distinct() |> 
-  filter(!is.na(relationship)) |> 
-  ggplot(aes(relationship, fill=status)) +
-  geom_bar(position="stack", stat="count")
-```
-
-```{r eval=FALSE, include=FALSE}
-status_sharing_w3 |> 
-  sample_n(100)
-  distinct() |> 
-  filter(!is.na(relationship)) |> 
-  pivot_wider(-status)
-  group_by(pair) |> 
-  summarize()
-```
-```{r eval=FALSE, include=FALSE}
-cols = c('T1'=NA,'T2'=NA,'T1/T2'=NA,'T2/T1'=NA)
-all_pairs <- foreach(ego_l = c(SN_w3$ego, SN_w3$alter), .combine = 'rbind') %do% {
-  ego_n = make_ego_graph(SN_w3_graph, nodes = ego_l, mindist = 0)[[1]]
-  foreach(alter_l = setdiff(names(V(ego_n)), ego_l), .combine = 'rbind') %do%{
-    pair_l = stri_c(stri_sort(stri_split_boundaries(str_c(ego_l, alter_l), type='character')[[1]]), collapse = '')
-    c(pair_l, ego_l, alter_l)
-  } 
-}
-colnames(all_pairs) = c('pairs','ego','alter')
-all_pairs <- as.data.frame(all_pairs) |> 
-  distinct(pairs, .keep_all = TRUE)
-
-cl <- parallel::makeForkCluster(12)
-doParallel::registerDoParallel(cl)
-
-longitudinal_ds <- foreach(row = rownames(all_pairs), .combine = 'rbind') %dopar% {
-  pair_l = all_pairs[row,'pairs']
-  ego_l = all_pairs[row,'ego']
-  alter_l = all_pairs[row,'alter']
-  ego_kept_strain_overtime = strain_shared |> filter(ego==ego_l&alter==ego_l) |> select(-same_village,-threshold)
-  alter_kept_strain_overtime = strain_shared |> filter(ego==alter_l & alter==alter_l) |> select(-same_village,-threshold)
-    tmp <- strain_shared |> filter(pair == pair_l) |> 
-      pivot_wider(id_cols = everything(), names_from = timepoint, values_from = shared)
-    
-     tmp <- tibble::add_column(tmp, !!!cols[setdiff(names(cols),names(tmp))]) |> 
-      group_by(pair, species) |>
-      summarise(T1 = sum(T1, na.rm = TRUE), 
-                T2 = sum(T2, na.rm = TRUE),
-                `T1/T2` = sum(`T1/T2`, na.rm = TRUE),
-                `T2/T1` = sum(`T2/T1`, na.rm = TRUE)
-                ) |> 
-      arrange(species) |> 
-      left_join(ego_kept_strain_overtime |> filter(ego == ego_l) |> select(species, ego_kept=shared), by=join_by(species)) |> 
-      left_join(alter_kept_strain_overtime |> filter(alter == alter_l) |> select(species, alter_kept=shared), by=join_by(species)) |> 
-      mutate(across(where(is.logical), ~ if_else(is.na(.x), 0, as.integer(.x)))) |> 
-       ungroup()
-
-     tmp
-  
-}
-parallel::stopCluster(cl)
-```
-
-```{r eval=FALSE, include=FALSE}
-longitudinal_ds |> 
-  ungroup() |> 
-  mutate(trans_only_t1 = as.integer(T1==1 & rowSums(across(starts_with('T')))==1 & rowSums(across(contains('_kept'))) == 0),
-         trans_only_t2 = as.integer(T2==1 & rowSums(across(starts_with('T')))==1 & rowSums(across(contains('_kept'))) == 0),
-         retained = as.integer(T1 == 1 & T2 == 1 & rowSums(across(contains('_kept'))) == 2 & rowSums(across(contains('/'))) ==2 )
-         ) |> 
-  group_by(pair) |> 
-  summarize(srr = sum(retained) / n(),
-            ssr_t1 = sum(T1) / n(),
-            ssr_t2 = sum(T2) / n()) |> 
-  left_join(SN_w3, by=join_by(pair)) |> 
-  select(pair, relationship, srr, ssr_t1, ssr_t2) |> 
-  pivot_longer(cols = 3:5, names_to = 'rate', values_to = 'value') |> 
-  ggplot() +
-  geom_boxplot(aes(relationship, value, fill=rate))
-```
-
-
-```{r}
-
-ak <- inner_join(metadata_baseline, demographics2, by="respondent_master_id")
-ak |> 
-  filter(respondent_master_id %in% xxx[which(!xxx %in% pairwise_mahalanomis_long$s1)]) |> 
-    unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
-  dplyr::select(respondent_master_id,
-                building_id,
-                BMI, 
-                gender = gender.x,
-                indigenous_status, 
-                age_at_survey = age_at_survey.x,
-                religion = b0600,
-                education = b0100,
-                status_mb,
-                status_w3
-                ) |> 
-  left_join(household_wealth_data, by = join_by('building_id'))
-  
-```
-
-
 ```{r}
 demographics <- read_csv("/WORKAREA/work/HONDURAS_MICROBIOME/J_PULLMAN/DATA/COHORT_1/v2/honduras_respondents_demographics_J_PULLMAN_2022-11-07.csv")
 demographics2 <- read_csv("~/F_BEGHINI_G/WAVE3/v3/honduras_respondents_WAVE3_v3_F_BEGHINI_2023-10-23.csv")
@@ -449,14 +285,13 @@ sub_covar$genderm <- ifelse(sub_covar$gender == 'man', 1, 0)
 sub_covar_mat <- sub_covar |> 
   select(-gender) |> 
   tibble::column_to_rownames('respondent_master_id')
-pairwise_mahalanomis <- biotools::D2.dist(sub_covar_mat, cov = cov(sub_covar_mat, use='complete'))
-pairwise_mahalanomis |> 
+pairwise_mahalanomis_long <- biotools::D2.dist(sub_covar_mat, cov = cov(sub_covar_mat, use='complete')) |> 
   as.matrix() |> as.data.frame() |>
   tibble::rownames_to_column('s1') |>
   pivot_longer(-s1, names_to = 's2', values_to = 'maha_dist') |> 
   rowwise() |> 
   mutate(pair = stri_c(stri_sort(stri_split_boundaries(str_c(s1, s2), type='character')[[1]]), collapse = '')) |> 
-  distinct(pair, .keep_all = TRUE)-> pairwise_mahalanomis_long
+  distinct(pair, .keep_all = TRUE)
 ```
 
 
@@ -471,21 +306,8 @@ x <- strain_shared |>
   pivot_wider(names_from = 'timepoint', values_from = 'dist') |> 
   filter(!is.na(T1),
          !is.na(T2))
-  # mutate(across(starts_with('T'), ~ replace_na(.x, 0))
-         # )
-
-# intra_distances <- strain_shared |> 
-#   filter(same_subject==TRUE) |> 
-#   mutate(timepoint ='intra') |> 
-#   pivot_wider(names_from = 'timepoint', values_from = 'dist') |> 
-#   dplyr::select(respondent_master_id=ego.x, species, intra) 
 
 xcov <- merge(merge(x, sub_covar, by.x = "ego", by.y = 'respondent_master_id', ), sub_covar, by.x = 'alter', by.y = 'respondent_master_id', suffixes = c('_ego','_alter'))
-
-# xcov <- merge(merge(xcov, intra_distances, by.x = c("ego",'species'), by.y = c('respondent_master_id','species'), all.x = TRUE), intra_distances, by.x =c('alter', 'species'), by.y =c('respondent_master_id', 'species'), suffixes = c('_ego','_alter'), all.x=TRUE)
-
-# xcov$intra_alter[is.na(xcov$intra_alter)] <- 0
-# xcov$intra_ego[is.na(xcov$intra_ego)] <- 0
 
 xcov$gender.mm <- xcov$gender_ego == "man" & xcov$gender_alter == "man"
 xcov$gender.mf <- xcov$gender_ego == "man" & xcov$gender_alter == "woman" | xcov$gender_ego == "woman" & xcov$gender_alter == "man"
@@ -504,30 +326,26 @@ xcov$average_education <- (xcov$education_ego + xcov$education_alter)/2
 xcov$religion_same <- xcov$religion_ego==xcov$religion_alter
 xcov$building_same <- xcov$building_id_ego == xcov$building_id_alter
 
-# colnames(xcov)[8] <- 'T2T1'
-# colnames(xcov)[9] <- 'T1T2'
 
 xcov$T1_t <- xcov$T1 < xcov$threshold
 xcov$T2_t <- xcov$T2 < xcov$threshold
-# xcov$T1T2_t <- xcov$T1T2 < xcov$threshold
-# xcov$T2T1_t <- xcov$T2T1 < xcov$threshold
-# xcov$intra_ego_t <- xcov$intra_ego < xcov$threshold
-# xcov$intra_alter_t <- xcov$intra_alter < xcov$threshold
 
 xcov$relationship <- ifelse(xcov$relationship == 'none', FALSE, TRUE)
 xcov <- merge(xcov, pairwise_mahalanomis_long, by = 'pair')
 ```
 
 
-# Mixed effect model
+# Logistic mixed effect model: sharing of separate species
 ```{r eval=FALSE, include=FALSE}
-# relationship + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS_difference_abs 
-#glmer(data = xcov, T2_t ~ T1_t*T2T1_t*T1T2_t*intra_ego_t*intra_alter_t + maha_dist + relationship + (1|species), family = binomial, nAGQ=0) -> lmer_species_rand
-glmer(data = xcov, T2_t ~ T1_t*relationship + maha_dist + (1|species) + (1|village_code_ego) + (1|ego), family = binomial, nAGQ=0) -> lmer_species_rand
+lmer_species_rand <- glmer(data = xcov, T2_t ~ T1_t + relationship + maha_dist + (1|species) + (1|village_code_ego) + (1|ego), family = binomial, nAGQ=0)
+```
+
+```{r eval=FALSE, include=FALSE}
+lmer_species_rand_expanded <- glmer(T2_t ~ T1_t + relationship + relationship + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS_difference_abs + (1|species) + (1|village_code_ego) + (1|ego), family = binomial, nAGQ=0,data = xcov, )
 ```
 
 ```{r}
-summary(lmer_species_rand)
+summary(lmer_species_rand_expanded)
 ```
 
 ```{r}
@@ -546,17 +364,39 @@ sharing_rate_only_followup <- sharing_rate |>
   left_join((pairwise_mahalanomis_long |> select(pair, maha_dist)), by = 'pair') |> 
   mutate(village_code_ego = as.factor(village_code_ego))
   
+
+sharing_rate_followup_metadata <- merge(merge(sharing_rate_only_followup, sub_covar, by.x = "ego", by.y = 'respondent_master_id', ), sub_covar, by.x = 'alter', by.y = 'respondent_master_id', suffixes = c('_ego','_alter'))
+sharing_rate_followup_metadata$gender.mm <- sharing_rate_followup_metadata$gender_ego == "man" & sharing_rate_followup_metadata$gender_alter == "man"
+sharing_rate_followup_metadata$gender.mf <- sharing_rate_followup_metadata$gender_ego == "man" & sharing_rate_followup_metadata$gender_alter == "woman" | sharing_rate_followup_metadata$gender_ego == "woman" & sharing_rate_followup_metadata$gender_alter == "man"
+sharing_rate_followup_metadata$gender.ff <- sharing_rate_followup_metadata$gender_ego == "woman" & sharing_rate_followup_metadata$gender_alter == "woman"
+sharing_rate_followup_metadata$indigenous.both <- sharing_rate_followup_metadata$indigenous_status_ego != 0 & sharing_rate_followup_metadata$indigenous_status_alter != 0
+sharing_rate_followup_metadata$indigenous.one <- sharing_rate_followup_metadata$indigenous_status_ego == 0 & sharing_rate_followup_metadata$indigenous_status_alter != 0 | sharing_rate_followup_metadata$indigenous_status_ego != 0 & sharing_rate_followup_metadata$indigenous_status_alter == 0
+sharing_rate_followup_metadata$indigenous.none <- sharing_rate_followup_metadata$indigenous_status_ego == 0 & sharing_rate_followup_metadata$indigenous_status_alter == 0
+sharing_rate_followup_metadata$age_difference_abs <- abs(sharing_rate_followup_metadata$age_at_survey_ego - sharing_rate_followup_metadata$age_at_survey_alter)
+sharing_rate_followup_metadata$average_age <- (sharing_rate_followup_metadata$age_at_survey_ego + sharing_rate_followup_metadata$age_at_survey_alter)/2
+sharing_rate_followup_metadata$wealth_difference_abs <- abs(sharing_rate_followup_metadata$household_wealth_index_w3_ego - sharing_rate_followup_metadata$household_wealth_index_w3_alter)
+sharing_rate_followup_metadata$average_wealth <- (sharing_rate_followup_metadata$household_wealth_index_w3_ego + sharing_rate_followup_metadata$household_wealth_index_w3_alter)/2
+sharing_rate_followup_metadata$DDS_difference_abs <- abs(sharing_rate_followup_metadata$DDS_ego - sharing_rate_followup_metadata$DDS_alter)
+sharing_rate_followup_metadata$DDS_average <- (sharing_rate_followup_metadata$DDS_ego + sharing_rate_followup_metadata$DDS_alter)/2
+sharing_rate_followup_metadata$education_difference_abs <- abs(sharing_rate_followup_metadata$education_ego - sharing_rate_followup_metadata$education_alter)
+sharing_rate_followup_metadata$average_education <- (sharing_rate_followup_metadata$education_ego + sharing_rate_followup_metadata$education_alter)/2
+sharing_rate_followup_metadata$religion_same <- sharing_rate_followup_metadata$religion_ego==sharing_rate_followup_metadata$religion_alter
+sharing_rate_followup_metadata$building_same <- sharing_rate_followup_metadata$building_id_ego == sharing_rate_followup_metadata$building_id_alter
 # saveRDS(sharing_rate_only_followup, 'sharing_rate_only_followup.Rds')
 ```
 
+
+# Mixed effect model: strain sharing rate
 ```{r}
 lmer_zero_model   <- lmer(T2 ~ T1 + relationship + (1|village_code_ego) + (1|ego), data = sharing_rate_only_followup)
 lmer_first_model  <- lmer(T2 ~ T1 + relationship + maha_dist + (1|village_code_ego) + (1|ego), data = sharing_rate_only_followup)
+
+lmer_first_model_expanded  <- lmer(T2 ~ T1 + relationship + gender.mm + gender.ff + indigenous.both + indigenous.one + age_difference_abs + average_age + average_age + DDS_difference_abs  + (1|village_code_ego) + (1|ego), data = sharing_rate_followup_metadata)
+
 lmer_second_model <- lmer(T2 ~ T1*relationship + maha_dist + (1|village_code_ego) + (1|ego), data = sharing_rate_only_followup)
 lmer_third_model  <- lmer(T2 ~ T1 + relationship + relationship*maha_dist + maha_dist + (1|village_code_ego) + (1|ego), data = sharing_rate_only_followup)
 lmer_thirdplus_model  <- lmer(T2 ~ T1*relationship*maha_dist + (1|village_code_ego) + (1|ego), data = sharing_rate_only_followup)
 ```
-
 
 ```{r}
 summary(lmer_zero_model)
@@ -599,199 +439,7 @@ svglite('Figures/dotplot_compare_models.svg', fix_text_size = FALSE, bg='transpa
 dotplot_compare_models
 dev.off()
 ```
-```{r}
 
-foreach(i = c(1:5)) %do% {
-set.seed(1993)
-xcov_inds <- c(1:nrow(xcov))
-test_xcov1_inds <- sample(xcov_inds, size = floor(.33*nrow(xcov)), replace = F)
-train_xcov1_inds <- xcov_inds[!(xcov_inds %in% test_xcov1_inds)]
-test_xcov2_inds <- sample(train_xcov1_inds, size = floor(.5*length(train_xcov1_inds)), replace = F)
-train_xcov2_inds <- xcov_inds[!(xcov_inds %in% test_xcov2_inds)]
-test_xcov3_inds <- train_xcov2_inds[!(train_xcov2_inds %in% test_xcov1_inds)]
-train_xcov3_inds <- xcov_inds[!(xcov_inds %in% test_xcov3_inds)]
-
-test1_xcov <- xcov[test_xcov1_inds,]
-train1_xcov <- xcov[train_xcov1_inds,]
-test2_xcov <- xcov[test_xcov2_inds,]
-train2_xcov <- xcov[train_xcov2_inds,]
-test3_xcov <- xcov[test_xcov3_inds,]
-train3_xcov <- xcov[train_xcov3_inds,]
-
-cl2 <- parallel::makeCluster(3)
-
-test_simple <- parLapply(cl=cl2,
-                         list(train1_xcov, train2_xcov, train3_xcov), 
-                        function(x) {glmmTMB::glmmTMB(data = x, T2_t ~ T1_t + (1|species) + (0+T1_t|village_code_w3_ego), family = binomial)}
-)
-
-preds_simple <- parLapply(cl2,
-                          mapply(list, test_simple, list(test1_xcov, test2_xcov, test3_xcov),  SIMPLIFY=FALSE),
-                          function(x) { 
-                            m <- x[[1]]
-                            test_set <- x[[2]] 
-                            predict(m, test_set, type = "response", allow.new.levels = TRUE) 
-                          }
-)
-
-names(preds_simple[[1]]) <- test_xcov1_inds
-names(preds_simple[[2]]) <- test_xcov2_inds
-names(preds_simple[[3]]) <- test_xcov3_inds
-preds.simple <- unlist(preds_simple)
-preds.simple <- preds.simple[order(as.numeric(names(preds.simple)))]
-
-
-test_onlycovars <- parLapply(cl=cl2,
-                         list(train1_xcov, train2_xcov, train3_xcov), 
-                        function(x) {glmmTMB::glmmTMB(data = x, T2_t ~ T1_t + (1|species) + (0+T1_t|village_code_w3_ego), family = binomial)}
-)
-
-preds_onlycovars <- parLapply(cl2,
-                          mapply(list, test_simple, list(test1_xcov, test2_xcov, test3_xcov),  SIMPLIFY=FALSE),
-                          function(x) { 
-                            m <- x[[1]]
-                            test_set <- x[[2]] 
-                            predict(m, test_set, type = "response", allow.new.levels = TRUE) 
-                          }
-)
-
-names(preds_onlycovars[[1]]) <- test_xcov1_inds
-names(preds_onlycovars[[2]]) <- test_xcov2_inds
-names(preds_onlycovars[[3]]) <- test_xcov3_inds
-preds.onlycovars <- unlist(preds_onlycovars)
-preds.onlycovars <- preds.onlycovars[order(as.numeric(names(preds.simple)))]
-
-
-
-test <- parLapply(cl2,
-                  list(train1_xcov, train2_xcov, train3_xcov), 
-                  function(x) {
-                    glmmTMB::glmmTMB(data = x, 
-                                     T2_t ~ T1_t*intra_ego_t*intra_alter_t + gender.mm + gender.ff + 
-                                       religion_same + education_difference_abs + average_education + 
-                                       indigenous.both + indigenous.one + 
-                                       age_difference_abs + average_age + 
-                                       wealth_difference_abs + average_wealth + 
-                                       DDS_difference_abs + building_same + 
-                                       relationship + (1|species) + (0+T1_t|village_code_w3_ego), 
-                                     family = binomial
-                                     )
-                    }
-                  )
-
-preds <- parLapply(cl2,  
-                          mapply(list, test, list(test1_xcov, test2_xcov, test3_xcov),  SIMPLIFY=FALSE),
-                          function(x) { 
-                            m <- x[[1]]
-                            test_set <- x[[2]] 
-                            predict(m, test_set, type = "response", allow.new.levels = TRUE) 
-                          }
-)
-
-parallel::stopCluster(cl2)
-
-names(preds[[1]]) <- test_xcov1_inds
-names(preds[[2]]) <- test_xcov2_inds
-names(preds[[3]]) <- test_xcov3_inds
-preds.round <- unlist(preds)
-preds.round <- preds.round[order(as.numeric(names(preds.round)))]
-
-list(preds.simple, preds.round)
-} -> preds
-
-
-pred.all <- rowSums(sapply(preds, `[[`, 1))/5
-pred.all.covars <- rowSums(sapply(preds, `[[`, 2))/5
-
-#pred.all <- Reduce(`+`, preds)/5
-
-roc_pred_simple <- pROC::roc(xcov$T2_t, pred.all, ci=TRUE, plot=TRUE, levels=c(FALSE, TRUE), direction = "<", na.rm=TRUE)
-roc_pred <- pROC::roc(xcov$T2_t, pred.all.covars, ci=TRUE, plot=TRUE, levels=c(FALSE, TRUE), direction = "<", na.rm=TRUE)
-
-ggroc(roc_pred)
-```
-
-```{r}
-foreach(i = 1:4) %do% {
-  v = unique(metadata_followup$village_code)[i]
-  g <- get(paste0('sn_vil_graph_',match(v, village_names)))
-  sg <- igraph::subgraph(g, match(intersect(unique(master_key_fw[subset_samples_fw |> filter(village == str_pad(v, 3, pad = 0)) |> pull(sample_id),'respondent_master_id']), V(g)$name), V(g)$name))
-  
-  sharing_rate |> 
-    select(ego, alter, pair, tie, timepoint, n1) |>
-    filter(ego %in% V(sg)$name & alter %in% V(sg)$name) |>
-    pivot_wider(names_from = timepoint, values_from = n1) -> wide_ssr
-    
-    ratio <- wide_ssr |>
-    #pivot_longer(cols = c(T1,T2), names_to = 'timepoint', values_to = 'ssr') |>
-    mutate(delta_ssr = abs(T2-T1),
-           tie = factor(wide_ssr$tie, labels = c('No','Yes')))
-    
-    wilcox.test(delta_ssr ~ tie, ratio)
-
-    ratio_plot  <- ratio |>
-    ggplot() + 
-    geom_boxplot(aes(tie, delta_ssr, fill=tie)) + 
-    coord_flip() +
-    cowplot::theme_cowplot() + 
-    xlab('Is tie present?') + ylab(bquote('Δ Strain-sharing' ~ rate[T])) +
-    ylim(c(0,0.5)) + 
-    guides(fill='none') +
-    scale_fill_manual(values = c('white', '#027fffff'))
-    
-    wide_ssr |>
-    filter(tie == 'yes') |>
-    mutate(c = T1 > median(T1, na.rm = TRUE)) |> 
-    graph_from_data_frame(directed=FALSE) -> sg_t1
-  
-    wide_ssr |>
-    filter(tie == 'yes') |>
-    mutate(c = T2 > median(T1, na.rm = TRUE)) |>
-    graph_from_data_frame(directed=FALSE) -> sg_t2
-  
-  pred_colors <- edge_attr(sg_t1, "c")
-  E(sg_t1)$size <- 2
-  pred_colors[pred_colors == TRUE] <- "#027fffff"
-  pred_colors[pred_colors == FALSE] <- "grey"  
-  E(sg_t1)$color <- pred_colors
-
-  pred_colors <- edge_attr(sg_t2, "c")
-  E(sg_t2)$size <- 2
-  pred_colors[pred_colors == TRUE] <- "#027fffff"
-  pred_colors[pred_colors == FALSE] <- "grey"  
-  E(sg_t2)$color <- pred_colors
-
-  # par(mar=c(0,0,0,0)+.1)
-  set.seed(1993)
-  layout <- layout.fruchterman.reingold(sg_t1)
-  v_t1 <- as.ggplot(expression(par(mar=c(0,0,0,0)+.1),plot(sg_t1,
-       vertex.label = NA,
-       vertex.size = 3,
-       layout = layout,
-       edge.width = E(sg_t1)$size,
-       main = paste('T1', village_map[village_map$village_code == v,'village_name_deid', TRUE]))
-      ))
-  v_t2 <- as.ggplot(expression(par(mar=c(0,0,0,0)+.1), plot(sg_t2,
-       vertex.label = NA,
-       vertex.size = 3,
-       layout = layout,
-       edge.width = E(sg_t2)$size, 
-       main = paste('T2', village_map[village_map$village_code == v,'village_name_deid', TRUE])),
-  legend("topleft",
-         legend=c(">median", "<median"),
-         col=c("#027fffff", "grey"),
-         lty = c(1,1),
-         lwd = 2,
-         bty = "n")))
-  ggarrange(v_t1, v_t2, ratio_plot, nrow =3, heights = c(1,1,0.35))
-} -> plots_t1t2
-```
-
-```{r}
-png('/tmp/RtmpDF3hA7/vscode-R/plot1.png', width = 1500, height = 1100)
-ggarrange(plotlist = plots_t1t2, nrow = 1)
-dev.off()
-```
 
 ```{r}
 svglite(filename = 'Figures/timepoint_ssr_difference1.svg', width = 17, height = 10, bg='transparent', pointsize = 10, fix_text_size = FALSE)
