@@ -2,7 +2,7 @@
 title: "RelationshipScramble_Jaccard"
 author: "Jackson Pullman"
 date: "2023-03-05"
-output: html_document
+output: html_notebook
 ---
 
 ```{r setup, include=FALSE}

@@ -1,8 +1,8 @@
 ---
-title: "CentralitySharing"
+title: "Centrality Sharing"
 author: "Jackson Pullman"
 date: "2022-12-23"
-output: html_document
+output: html_notebook
 ---
 
 ```{r setup, include=FALSE}

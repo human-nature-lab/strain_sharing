@@ -2,7 +2,7 @@
 title: "Longitudinal Analysis"
 author: "Francesco Beghini"
 date: "2023-10-26"
-output: html_document
+output: html_notebook
 ---
 
 ```{r setup, include=FALSE}

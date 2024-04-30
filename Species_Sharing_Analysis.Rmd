@@ -2,7 +2,7 @@
 title: "Analysis_Species"
 author: "Jackson Pullman"
 date: "2023-02-02"
-output: html_document
+output: html_notebook
 ---
 
 ```{r setup, include=FALSE}

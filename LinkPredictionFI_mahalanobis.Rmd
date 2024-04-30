@@ -1,8 +1,8 @@
 ---
-title: "LinkPrediction"
-author: "Jackson Pullman"
-date: "2023-02-05"
-output: html_document
+title: "Link Prediction using Mahalanobis distance"
+author: "Francesco Beghini"
+date: "2024-01-03"
+output: html_notebook
 ---
 
 ```{r setup, include=FALSE}
@@ -715,95 +715,6 @@ write_tsv(metrics_non_kin_prediction, 'tables/metrics_non_kin_network_villages_p
 writexl::write_xlsx(metrics_non_kin_prediction, 'tables/metrics_non_kin_network_villages_prediction.xlsx')
 ```
 
-```{r}
-#Mariposal and Carrizalito 1 do well and Quesaras
-Downsamp_all <- Downsamp_all %>% mutate(tp = predicted == related)
-
-
-pred_graph <- Downsamp_all %>%
-  filter(village_code_w3 == 17 , related ==1) %>%
-  graph_from_data_frame(directed = FALSE) 
-
-pred_colors <- edge_attr(pred_graph, "predicted")
-E(pred_graph)$size <- pred_colors*1.5+3.5
-
-pred_colors[pred_colors == 1] <- "blue"
-pred_colors[pred_colors == 0] <- "grey"
-
-#Good ad predictig within cluster
-E(pred_graph)$color <- pred_colors
-par(mar=c(0,0,0,0))
-set.seed(1)
-layout <- layout.fruchterman.reingold(pred_graph)
-
-#svglite("../Figures/Figure3/Prediction_Network_All.svg")
-
-plot(pred_graph,
-     vertex.label = NA,
-     vertex.size = 5,
-     layout = layout,
-     edge.width = E(pred_graph)$size)
-legend("topleft",
-       legend=c("True Positive", "False Negative"),
-       col=c("blue", "grey"),
-       lty = c(1,1),
-       lwd = 2,
-       bty = "n")
-
-#dev.off()
-
-```
-
-Prediction plot nkh
-```{r}
-Downsamp_all_nkh <- Downsamp_all_nkh %>% mutate(tp = predicted == related)
-
-
-#Fuck shouldn't this be simplified
-pred_graph_nkh <- Downsamp_all_nkh %>%
-  filter(village_code_w3 == 17, related ==1) %>%
-  graph_from_data_frame(directed = FALSE)
-
-
-pred_colors <- edge_attr(pred_graph_nkh, "predicted")
-E(pred_graph_nkh)$size <- pred_colors*1.5+3.5
-pred_colors[pred_colors == 1] <- "blue"
-pred_colors[pred_colors == 0] <- "grey"
-
-#Good ad predictig within cluster
-E(pred_graph_nkh)$color <- pred_colors
-
-#Set layout
-#Add missing vertices
-layout <- as.data.frame(layout)
-layout$vertex_name <- names(V(pred_graph))
-
-missing_verts <- layout$vertex_name[!(layout$vertex_name %in% names(V(pred_graph_nkh)))]
-pred_graph_nkh <- add_vertices(pred_graph_nkh,length(missing_verts), name = missing_verts)
-
-layout_nkh <- layout[match(names(V(pred_graph_nkh)),layout$vertex_name), ]
-layout_nkh <- as.matrix(layout_nkh %>% select(-vertex_name))
-layout <- as.matrix(layout %>% select(-vertex_name))
-
-par(mar=c(0,0,0,0))
-set.seed(1)
-
-#svglite("../Figures/Figure3/Prediction_Network_NKH.svg")
-
-plot(pred_graph_nkh,
-     vertex.label = NA,
-     vertex.size = 5,
-     layout = layout_nkh,
-     edge.width = E(pred_graph_nkh)$size)
-legend("topleft",
-       legend=c("True Positive", "False Negative"),
-       col=c("blue", "grey"),
-       lty = c(1,1),
-       lwd = 2,
-       bty = "n")
-
-#dev.off()
-```
 
 Make network prediction figure
 

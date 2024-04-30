@@ -1,6 +1,6 @@
 ---
 title: "Analysis"
-output: html_document
+output: html_notebook
 date: "2022-12-12"
 ---
 

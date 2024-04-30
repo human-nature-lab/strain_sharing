@@ -2,7 +2,7 @@
 title: "Centrality_Species_Correlations"
 author: "Jackson Pullman"
 date: "2023-01-25"
-output: html_document
+output: html_notebook
 ---
 
 ```{r setup, include=FALSE}
