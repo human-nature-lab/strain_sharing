@@ -1,0 +1,153 @@
+---
+title: "Latent Space network analysis"
+author: "Francesco Beghini"
+date: "2024-01-12"
+output: html_notebook
+---
+
+
+```{r}
+library("latentnet")
+set.seed(0)
+
+# Define roc plotting function,
+roc2<-function(probs, Y, NUM=1e2)
+  {
+  N<-nrow(Y)
+  delete<-seq(from=1, to=(N*N), by=(N+1)) 
+  
+  true_pos<-rep(NaN,NUM)
+  theta<-quantile(probs,probs=seq(1,0,l=NUM))
+  false_pos<-seq(0,1,length.out=NUM)
+  tmpfunc<-function(x) abs(sum((probs[-delete]>x)[Y[-delete]==0],na.rm=1)-false_pos[i]*sum(Y==0,na.rm=1))
+  
+  
+  for (i in 1:length(theta))
+  {
+      false_pos[i]=sum((probs[-delete]>theta[i])[Y[-delete]==0],na.rm=1)/sum(Y[-delete]==0,na.rm=1)
+      true_pos[i]=sum((probs[-delete]>theta[i])[Y[-delete]==1],na.rm=1)/sum(Y[-delete]==1,na.rm=1)
+  }
+  tl<-length(true_pos)
+  AUC=sum(diff(false_pos)*apply(matrix(c(true_pos[1:(tl-1)],true_pos[2:tl]),ncol=2),1,mean))
+  cat("AUC = ", AUC, "\n")
+  plot(false_pos,true_pos,t='l',col=2,xlab="false positive rate", ylab="true positive rate",
+       main=paste("AUC = ",round(AUC,3),sep=""))
+  points(c(0,1),c(0,1),t='l')
+  return(AUC)
+}
+```
+
+```{r}
+household_sharing_matrix <- cross_join(Covars_ego[,c('ego','ego_household')],Covars_alter[,c('alter','alter_household')]) |> 
+  mutate(same_household = if_else(ego_household == alter_household, 1, 0)) |> 
+  select(ego, alter, same_household) |> 
+  pivot_wider(names_from = alter, values_from = same_household) |> 
+  tibble::column_to_rownames('ego') |> 
+  as.matrix()
+
+all_edges_n <- all_edges |> 
+  distinct(pair_key, .keep_all = TRUE) |> 
+  filter(ego %in% Covars_ego[complete.cases(Covars_ego[,c('ego_indigenous','ego_gender','ego_religion', 'ego_age','ego_household','ego_household_wealth','ego_education','village_code')]),]$ego, alter %in% Covars_ego[complete.cases(Covars_ego[,c('ego_indigenous','ego_gender','ego_religion', 'ego_age','ego_household','ego_household_wealth','ego_education','village_code')]),]$ego) |> 
+  network(directed = FALSE)
+
+for(n in c('ego_indigenous','ego_gender','ego_religion', 'ego_age','ego_household','ego_household_wealth','ego_education','village_code'))
+{
+  all_edges_n <- set.vertex.attribute(all_edges_n, n, Covars_ego[match(all_edges_n%v%"vertex.names", Covars_ego$ego), n ])
+}
+all_edges_n <- set.network.attribute(all_edges_n,
+                                     'strain_sharing_rate',
+                                     strain_rate[all_edges_n%v%"vertex.names",all_edges_n%v%"vertex.names"]
+)
+all_edges_n <- set.network.attribute(all_edges_n,
+                                     'same_household',
+                                     household_sharing_matrix[all_edges_n%v%"vertex.names",all_edges_n%v%"vertex.names"]
+)
+for(i in 1:length(village_names)){
+  tmp_adj <- as_adjacency_matrix(get(paste0("sn_vil_graph_", i)), sparse = FALSE)
+  tmp_adj <- tmp_adj[rownames(tmp_adj) %in% Covars_ego[complete.cases(Covars_ego[,c('ego_indigenous','ego_gender','ego_religion', 'ego_age','ego_household','ego_household_wealth','ego_education')]),'ego'], colnames(tmp_adj) %in% Covars_ego[complete.cases(Covars_ego[,c('ego_indigenous','ego_gender','ego_religion', 'ego_age','ego_household','ego_household_wealth','ego_education','village_code')]),'ego']]
+  assign(paste0("sn_vil_graph_", i, "_n"), network(tmp_adj, directed = FALSE, multiple = FALSE))
+  for(n in c('ego_indigenous','ego_gender','ego_religion', 'ego_age','ego_household','ego_household_wealth','ego_education'))
+  {
+    assign(paste0("sn_vil_graph_", i, "_n"), set.vertex.attribute(get(paste0("sn_vil_graph_", i, "_n")), n, Covars_ego[match(get(paste0("sn_vil_graph_", i, "_n"))%v%"vertex.names", Covars_ego$ego), n ]))
+  }
+  assign(paste0("sn_vil_graph_", i, "_n"), set.network.attribute(get(paste0("sn_vil_graph_", i, "_n")),
+                                                                 'strain_sharing_rate',
+                                                                 get(paste0("strain_rate_vil_", i))[get(paste0("sn_vil_graph_", i, "_n"))%v%"vertex.names",get(paste0("sn_vil_graph_", i, "_n"))%v%"vertex.names"]
+  ))
+  assign(paste0("sn_vil_graph_", i, "_n"), set.network.attribute(get(paste0("sn_vil_graph_", i, "_n")),
+                                                                 'same_household',
+                                                                 household_sharing_matrix[get(paste0("sn_vil_graph_", i, "_n"))%v%"vertex.names",get(paste0("sn_vil_graph_", i, "_n"))%v%"vertex.names"]
+  ))
+}
+
+samp_fit_all_fact <- ergmm(all_edges_n ~ euclidean(d=2) + 
+                  absdiff('ego_age') + 
+                  absdiffcat('ego_education') + 
+                  nodefactor('ego_gender') +
+                  absdiff('ego_household_wealth') + 
+                  nodefactor('ego_indigenous') +
+                  nodefactor('ego_religion') +
+                  nodematch('ego_household') +
+                  nodefactor('village_code') +
+                  edgecov('strain_sharing_rate'),
+                family = 'Bernoulli',
+                #control = ergmm.control(threads = 10),
+                verbose = 30)
+
+samp_fit_all_onlyvillage <- ergmm(all_edges_n ~ euclidean(d=2) + 
+                  nodefactor('village_code') +
+                  edgecov('strain_sharing_rate'),
+                family = 'Bernoulli',
+                #control = ergmm.control(threads = 10),
+                verbose = 30)
+
+cl <- parallel::makeCluster(18)
+doParallel::registerDoParallel(cl)
+
+foreach(i = c(1:length(village_names)), .packages = c('latentnet'), .export = ls(pattern='sn_vil_graph_')) %dopar% {
+  tmp_sn_vil <- get(paste0("sn_vil_graph_", i, "_n"))
+  tmp_sn_vil_m <- as.sociomatrix(tmp_sn_vil)
+  samp_fit <- ergmm(tmp_sn_vil ~ euclidean(d=2) +
+                    nodefactor('ego_age') +
+                    absdiff('ego_age') + 
+                    nodefactor('ego_education') + 
+                    absdiffcat('ego_education') + 
+                    nodefactor('ego_gender') +
+                    nodefactor('ego_household_wealth') + 
+                    absdiff('ego_household_wealth') + 
+                    nodefactor('ego_indigenous') +
+                    nodefactor('ego_religion') +
+                    nodematch('ego_household') +
+                    # nodefactor('village_code') +
+                    edgecov('strain_sharing_rate'),
+                  verbose = TRUE)
+
+  sim_fit <- simulate(samp_fit, nsim = 100)
+  probs<-matrix(apply(sapply(sim_fit$networks,as.sociomatrix),1,sum),nrow(tmp_sn_vil_m))
+  auc <- roc2(probs, as.sociomatrix(tmp_sn_vil), NUM=100)
+
+  tmp_pred <- predict(samp_fit)
+  rownames(tmp_pred) <- colnames(tmp_pred) <- tmp_sn_vil%v%"vertex.names"
+
+  #it's a bernoulli, so this could make sense
+  acc <- mean((tmp_pred ** as.sociomatrix(tmp_sn_vil)) * ((1-tmp_pred) ** (1-as.sociomatrix(tmp_sn_vil))))
+
+  list(samp_fit, auc, acc)
+} -> all_acc
+
+saveRDS(all_acc, 'all_acc_ergmm.RDS')
+parallel::stopCluster(cl)
+
+
+samp_fit_all <- readRDS('samp_fit_all.RDS')
+sim_fit_all <- simulate(samp_fit_all, nsim = 100)
+probs_all<-matrix(apply(sapply(sim_fit_all$networks,as.sociomatrix),1,sum),1596)
+auc <- roc2(probs_all, as.sociomatrix(all_edges_n), NUM=1000)
+roc2(probs_all, as.sociomatrix(all_edges_n), NUM=100)
+
+mean((test ** as.sociomatrix(all_edges_n)) * ((1-test) ** (1-as.sociomatrix(all_edges_n))))
+test <- predict(samp_fit_all)
+rownames(test) <- colnames(test) <- rownames(as.sociomatrix(all_edges_n))
+roc(c(test), c(as.sociomatrix(all_edges_n)))
+
+```
