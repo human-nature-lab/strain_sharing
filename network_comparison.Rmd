@@ -2,12 +2,11 @@
 title: "Network Comparison"
 author: "Francesco Beghini"
 date: "2023-12-21"
-output: html_notebook
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-source(file = 'deltacon.R')
 library(foreach)
 ```
 
@@ -18,12 +17,12 @@ resample_graph <- function(g){
   return(rewire(g, keeping_degseq(niter = ecount(g)*10)))
 }
 
-asd = boot::boot(strain_rate_vil_graph_1, R=1000, parallel = 'multicore', statistic = function(x, ...){ 
-  tmp = rewire(x, keeping_degseq(loops = FALSE, niter = ecount(x)*10)) 
+asd = boot::boot(strain_rate_vil_graph_1, R=1000, parallel = 'multicore', statistic = function(x, ...){
+  tmp = rewire(x, keeping_degseq(loops = FALSE, niter = ecount(x)*10))
   centralization.betweenness(tmp)$centralization
   })
-asd1 = boot::boot(sn_vil_graph_1, R=1000, parallel = 'multicore', statistic = function(x, ...){ 
-  tmp = rewire(x, keeping_degseq(loops = FALSE, niter = ecount(x)*10)) 
+asd1 = boot::boot(sn_vil_graph_1, R=1000, parallel = 'multicore', statistic = function(x, ...){
+  tmp = rewire(x, keeping_degseq(loops = FALSE, niter = ecount(x)*10))
   centralization.betweenness(tmp)$centralization
   })
 
@@ -40,9 +39,9 @@ foreach(i=1:length(village_names), .combine = 'rbind') %do% {
   sn_adj <- sn_adj[sort(rownames(sn_adj)),sort(colnames(sn_adj))]
   st_adj <- as_adjacency_matrix(st_g, sparse = FALSE)
   st_adj <- st_adj[sort(rownames(st_adj)),sort(colnames(st_adj))]
-  
+
   all_nodes <- sort(V(sn_g)$name)
-  
+
   edg_sn <- data.frame(as_edgelist(sn_g))
   edg_st <- data.frame(as_edgelist(simplify(st_g)))
   colnames(edg_sn) <- c('src','dst')
@@ -51,18 +50,22 @@ foreach(i=1:length(village_names), .combine = 'rbind') %do% {
   edg_sn$dst <- match(edg_sn$dst, all_nodes)
   edg_st$src <- match(edg_st$src, all_nodes)
   edg_st$dst <- match(edg_st$dst, all_nodes)
-  
-  data.frame(village_code = village_names[i],
-       village_name = village_map[village_map$village_code==village_names[i],'village_name_deid'][[1]],
-       no_components_social_network = count_components(sn_g),
-       no_components_strain_transmission = count_components(st_g),
-       clustering_coefficient_social_network = transitivity(sn_g, type = "global", isolates = 'zero'),
-       clustering_coefficient_strain_transmission = transitivity(st_g, type = "global", isolates = 'zero'),
-       average_shortest_path_social_network = mean_distance(sn_g, directed = FALSE),
-       average_shortest_path_strain_transmission = mean_distance(st_g, directed = FALSE),
-       L2 = norm(sn_adj - st_adj, type = '2'),
-       discrete_spectral_distance = NetworkDistance::nd.dsd(list(sn_adj, st_adj))$D[[1]],
-       delta_con = delta_con(edg_sn, edg_st, nnodes = length(all_nodes), method = 'naive', symmetrical = TRUE, seed = 1993))
+  degree_distribution_sn <- degree(sn_g)
+  degree_distribution_st <- degree(st_g)
+  data.frame(
+       "Village name" = village_map[village_map$village_code==village_names[i],'village_name_deid'][[1]],
+       "Clustering coefficient social network" = transitivity(sn_g, type = "global", isolates = 'zero'),
+       "Clustering coefficient strain sharing network" = transitivity(st_g, type = "global", isolates = 'zero'),
+       "Degree social network Min" = min(degree_distribution_sn),
+       "Degree social network Max" = max(degree_distribution_sn),
+       "Degree social network Median" = median(degree_distribution_sn),
+       "Degree social network Mean" = mean(degree_distribution_sn),
+       "Degree strain sharing network Min" = min(degree_distribution_st),
+       "Degree strain sharing network Max" = max(degree_distribution_st),
+       "Degree strain sharing network Median" = median(degree_distribution_st),
+       "Degree strain sharing network Mean" = mean(degree_distribution_st),
+       'Fraction of shared edges' = length(E(intersection(st_g, sn_g))) / length(E(union(st_g, sn_g)))
+  )
 } -> graph_distances
 
 graph_distances
@@ -73,16 +76,12 @@ writexl::write_xlsx(graph_distances, 'tables/graph_distances.xlsx')
 ```{r}
 par(mfrow=c(3,2))
 for (i in 1:length(village_names)) {
-  igraph::plot.igraph(get(paste0('sn_vil_graph_',i)),
-                      vertex.label = NA, 
+  igraph::plot.igraph(get(paste0('strain_rate_vil_graph_',i)),
+                      vertex.label = NA,
                       vertex.size = 5,
-                      layout = layout.fruchterman.reingold(get(paste0('sn_vil_graph_',i))), 
-                      edge.width = E(get(paste0('sn_vil_graph_',i)))$width,
+                      #layout = layout.fruchterman.reingold(get(paste0('strain_rate_vil_graph_',i))),
+                      edge.width = E(get(paste0('strain_rate_vil_graph_',i)))$width,
                       main = paste( village_map[village_map$village_code==village_names[i],'village_name_deid'][[1]], village_names[i])
                       )
 }
 ```
-```{r}
-
-```
-
