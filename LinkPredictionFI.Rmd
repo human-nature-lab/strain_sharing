@@ -426,14 +426,12 @@ pred.all.covars <- rowSums(sapply(preds, `[[`, 3))/5
 pred.all.all <- rowSums(sapply(preds, `[[`, 4))/5
 
 #add on predictions from strain-sharing only model
-pred.all.acc <- pred.all
+pred.all.acc <- pred.all.all
 pred.all.acc[pred.all.acc >=.5] <- 1
 pred.all.acc[pred.all.acc <.5] <- 0
 
 Downsamp_all$predicted <- pred.all.acc
 
-#Create ROC object weird it got worse, could do this over multiple downsamples as well
-#I think my predictions will be fairly consistent
 logit.base.roc <- pROC::roc(Downsamp_all$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
@@ -760,7 +758,7 @@ Downsamp_all <- Downsamp_all %>% mutate(tp = predicted == related)
 
 
 pred_graph <- Downsamp_all %>%
-  filter(village_code_w3 == 17 , related ==1) %>%
+  filter(village_code_w3 == 145 , related ==1) %>%
   graph_from_data_frame(directed = FALSE) 
 
 pred_colors <- edge_attr(pred_graph, "predicted")
@@ -771,8 +769,8 @@ pred_colors[pred_colors == 0] <- "grey"
 
 #Good ad predictig within cluster
 E(pred_graph)$color <- pred_colors
-par(mar=c(0,0,0,0))
-set.seed(1)
+par(mar=c(0,0,0,0)+.1)
+set.seed(1993)
 layout <- layout.fruchterman.reingold(pred_graph)
 
 #svglite("../Figures/Figure3/Prediction_Network_All.svg")
@@ -800,7 +798,7 @@ Downsamp_all_nkh <- Downsamp_all_nkh %>% mutate(tp = predicted == related)
 
 #Fuck shouldn't this be simplified
 pred_graph_nkh <- Downsamp_all_nkh %>%
-  filter(village_code_w3 == 17, related ==1) %>%
+  filter(village_code_w3 == 145, related ==1) %>%
   graph_from_data_frame(directed = FALSE)
 
 
@@ -824,8 +822,8 @@ layout_nkh <- layout[match(names(V(pred_graph_nkh)),layout$vertex_name), ]
 layout_nkh <- as.matrix(layout_nkh %>% select(-vertex_name))
 layout <- as.matrix(layout %>% select(-vertex_name))
 
-par(mar=c(0,0,0,0))
-set.seed(1)
+par(mar=c(0,0,0,0)+.1)
+set.seed(1993)
 
 #svglite("../Figures/Figure3/Prediction_Network_NKH.svg")
 
@@ -849,7 +847,7 @@ Make network prediction figure
 ```{r}
 
 library("ggplotify")
-set.seed(1)
+set.seed(1993)
 p1_test <- as.ggplot(expression(
   plot(
     pred_graph,
@@ -895,24 +893,13 @@ p2_test <- as.ggplot(expression(
 )) 
 
 
-roc_test_2 <- as.ggplot(roc.plot.nkh)
-roc_test_1 <- as.ggplot(roc.plot)
-
-rocs_1 <-ggarrange(roc.plot, roc.plot.nkh, nrow = 2, labels = c("A", "C"))
-
-
-networks_1 <- ggarrange(p1_test, p2_test, nrow = 2,
-                        labels = c("B",
-                                   "D"))
-
-fig3 <- ggarrange(rocs_1, networks_1, ncol = 2)
-
-
-svglite("Figures/fig3_full_updated.svg")
-fig3
+svglite('Figures/fig3_a.svg', width = 6, height = 5, )
+p1_test
 dev.off()
 
-
+svglite('Figures/fig3_d.svg', width = 6, height = 5)
+p2_test
+dev.off()
 ```
 
 

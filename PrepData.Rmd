@@ -168,6 +168,12 @@ hmb_census <- hmb_census |>
          DDS = rowSums(across(starts_with('dds_')))
   )
 
+
+diet_dist_mat <- hmb_census |> 
+  select(mb_m05, starts_with('dds_')) |>
+  tibble::column_to_rownames('mb_m05') |>
+  dist(method = 'euclidean') |>
+  as.matrix()
 ```
 
 # Load StrainPhlAn data
