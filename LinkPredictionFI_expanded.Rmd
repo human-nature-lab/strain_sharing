@@ -184,22 +184,22 @@ SN_All_Covars_for_Regression <- SN_All_Covars |>
          education_difference_abs = abs(ego_education - alter_education),
          average_education = (ego_education + alter_education)/2,
          household_same = ego_household == alter_household,
-        average_diet = (ego_DDS == alter_DDS) / 2,
-        different_diet = abs(ego_DDS - alter_DDS),
-        average_bristol = (ego_bristol == alter_bristol) / 2,
-        different_bristol = abs(ego_bristol - alter_bristol),
-        watersource_same = ego_watersource == alter_watersource, 
-        same_usage_painkillers = alter_med_painkillers == ego_med_painkillers,
-        same_usage_antibiotics = alter_med_antibiotics == ego_med_antibiotics,
-        same_usage_antidiarrheal = alter_med_antidiarrheal == ego_med_antidiarrheal,
-        same_usage_antiparasite = alter_med_antiparasite == ego_med_antiparasite,
-        same_usage_vitamins = alter_med_vitamins == ego_med_vitamins,
-        same_usage_zinc = alter_med_zinc == ego_med_zinc,
-        same_usage_antifungal = alter_med_antifungal == ego_med_antifungal,
-        same_usage_antihypertensives = alter_med_antihypertensives == ego_med_antihypertensives,
-        same_usage_antidiabetics = alter_med_antidiabetics == ego_med_antidiabetics,
-        same_usage_antiacids = alter_med_antiacids == ego_med_antiacids,
-        same_usage_laxatives = alter_med_laxatives == ego_med_laxatives
+         average_diet = (ego_DDS == alter_DDS) / 2,
+         different_diet = abs(ego_DDS - alter_DDS),
+         average_bristol = (ego_bristol == alter_bristol) / 2,
+         different_bristol = abs(ego_bristol - alter_bristol),
+         watersource_same = ego_watersource == alter_watersource, 
+         same_usage_painkillers = alter_med_painkillers == ego_med_painkillers,
+         same_usage_antibiotics = alter_med_antibiotics == ego_med_antibiotics,
+         same_usage_antidiarrheal = alter_med_antidiarrheal == ego_med_antidiarrheal,
+         same_usage_antiparasite = alter_med_antiparasite == ego_med_antiparasite,
+         same_usage_vitamins = alter_med_vitamins == ego_med_vitamins,
+         same_usage_zinc = alter_med_zinc == ego_med_zinc,
+         same_usage_antifungal = alter_med_antifungal == ego_med_antifungal,
+         same_usage_antihypertensives = alter_med_antihypertensives == ego_med_antihypertensives,
+         same_usage_antidiabetics = alter_med_antidiabetics == ego_med_antidiabetics,
+         same_usage_antiacids = alter_med_antiacids == ego_med_antiacids,
+         same_usage_laxatives = alter_med_laxatives == ego_med_laxatives
          )
 
 #Make dataframe with only non-kin in different house
@@ -463,7 +463,7 @@ foreach(i = c(1:5)) %dopar% {
                         same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
                         education_difference_abs + average_education + household_same +
                         strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
-                              data = train1, family = binomial)
+                              data = train1, family = binomial, control=lme4::glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
   logit.test.2.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
@@ -471,7 +471,7 @@ foreach(i = c(1:5)) %dopar% {
                         same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
                         education_difference_abs + average_education + household_same +
                         strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
-                              data = train2, family = binomial)
+                              data = train2, family = binomial, control=lme4::glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
   logit.test.3.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
@@ -479,7 +479,7 @@ foreach(i = c(1:5)) %dopar% {
                         average_age + wealth_difference_abs + average_wealth +
                         education_difference_abs + average_education + household_same +
                         strain_sharing_rate + (0+strain_sharing_rate|village_code_w3),
-                              data = train3, family = binomial)
+                              data = train3, family = binomial, control=lme4::glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
   
   preds.1.all <- predict(logit.test.1.all, newdata = test1, type = "response")
   preds.2.all <- predict(logit.test.2.all, newdata = test2, type = "response")
@@ -804,13 +804,13 @@ pred_graph <- Downsamp_all %>%
 pred_colors <- edge_attr(pred_graph, "predicted")
 E(pred_graph)$size <- pred_colors*1.5+3.5
 
-pred_colors[pred_colors == 1] <- "blue"
+pred_colors[pred_colors == 1] <- "#027fffff"
 pred_colors[pred_colors == 0] <- "grey"
 
 #Good ad predictig within cluster
 E(pred_graph)$color <- pred_colors
-par(mar=c(0,0,0,0))
-set.seed(1)
+par(mar=c(0,0,0,0)+.1)
+set.seed(1993)
 layout <- layout.fruchterman.reingold(pred_graph)
 
 #svglite("../Figures/Figure3/Prediction_Network_All.svg")
@@ -822,7 +822,7 @@ plot(pred_graph,
      edge.width = E(pred_graph)$size)
 legend("topleft",
        legend=c("True Positive", "False Negative"),
-       col=c("blue", "grey"),
+       col=c("#027fffff", "grey"),
        lty = c(1,1),
        lwd = 2,
        bty = "n")
@@ -842,7 +842,7 @@ pred_graph_nkh <- Downsamp_all_nkh %>%
 
 pred_colors <- edge_attr(pred_graph_nkh, "predicted")
 E(pred_graph_nkh)$size <- pred_colors*1.5+3.5
-pred_colors[pred_colors == 1] <- "blue"
+pred_colors[pred_colors == 1] <- "#027fffff"
 pred_colors[pred_colors == 0] <- "grey"
 
 #Good ad predictig within cluster
@@ -860,8 +860,8 @@ layout_nkh <- layout[match(names(V(pred_graph_nkh)),layout$vertex_name), ]
 layout_nkh <- as.matrix(layout_nkh %>% select(-vertex_name))
 layout <- as.matrix(layout %>% select(-vertex_name))
 
-par(mar=c(0,0,0,0))
-set.seed(1)
+par(mar=c(0,0,0,0)+.1)
+set.seed(1993)
 
 #svglite("../Figures/Figure3/Prediction_Network_NKH.svg")
 
@@ -872,7 +872,7 @@ plot(pred_graph_nkh,
      edge.width = E(pred_graph_nkh)$size)
 legend("topleft",
        legend=c("True Positive", "False Negative"),
-       col=c("blue", "grey"),
+       col=c("#027fffff", "grey"),
        lty = c(1,1),
        lwd = 2,
        bty = "n")
@@ -883,9 +883,8 @@ legend("topleft",
 Make network prediction figure
 
 ```{r}
-
 library("ggplotify")
-set.seed(1)
+set.seed(1993)
 p1_test <- as.ggplot(expression(
   plot(
     pred_graph,
@@ -901,13 +900,13 @@ p1_test <- as.ggplot(expression(
     x = .3,
     y = 1,
     legend = c("True Positive", "False Negative"),
-    col = c("blue", "grey"),
+    col = c("#027fffff", "grey"),
     lty = c(1, 1),
     lwd = 2,
     bty = "n"
   )
 ))
-set.seed(1)
+set.seed(1993)
 p2_test <- as.ggplot(expression(
   plot(
     pred_graph_nkh,
@@ -923,7 +922,7 @@ p2_test <- as.ggplot(expression(
     x = .3,
     y = 1.1,
     legend = c("True Positive", "False Negative"),
-    col = c("blue", "grey"),
+    col = c("#027fffff", "grey"),
     lty = c(1, 1),
     lwd = 2,
     bty = "n"
