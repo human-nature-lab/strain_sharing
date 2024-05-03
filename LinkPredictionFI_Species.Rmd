@@ -2,7 +2,7 @@
 title: "LinkPredictionFI_Species"
 author: "Jackson Pullman"
 date: "2023-02-05"
-output: html_notebook
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -14,37 +14,71 @@ Link Prediction Methods
 ```{r}
 #Change format of covariates to merge onto edge list
 Covars_ego <- covariates %>% merge(household_wealth_data) %>%
+  unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |> 
   rename(ego = respondent_master_id, ego_age = age_at_survey, ego_gender = gender,
-         ego_household_wealth = household_wealth_index_w3, ego_education = b0100, ego_indigenous = b0200, 
+         ego_household = building_id,
+         ego_household_wealth = household_wealth_index_w3, ego_education = b0100, ego_indigenous = indigenous_status, 
          ego_religion = b0600, ego_length_in_village = b0800, ego_length_in_village_years = b0900,
+         ego_bristol = mb_m0300,
+         ego_DDS = DDS, ego_watersource = l0400,
+         ego_med_painkillers = med_painkillers, 
+         ego_med_antibiotics = med_antibiotics,  
+         ego_med_antidiarrheal = med_antidiarrheal,  
+         ego_med_antiparasite = med_antiparasite,  
+         ego_med_vitamins = med_vitamins, 
+         ego_med_zinc = med_zinc,  
+         ego_med_antifungal = med_antifungal,  
+         ego_med_antihypertensives = med_antihypertensives,  
+         ego_med_antidiabetics = med_antidiabetics,  
+         ego_med_antiacids = med_antiacids,  
+         ego_med_laxatives = med_laxatives,
          ego_latitude = building_latitude, ego_longitude = building_longitude) %>%
-  mutate(ego_education = recode(ego_education, "Have not completed any type of school" = 0,
+  mutate(ego_education = dplyr::recode(ego_education, "Have not completed any type of school" = 0,
                                 "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
                                 "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
                                 "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
-         ego_indigenous = recode(ego_indigenous, "No" = 0, "Dont_Know" = 0, "Yes, Lenca" = 1, "Yes, Maya Chorti"= 1)) %>% 
-  dplyr::select(-c("village_name", "marital_name", "building_id"))
+         ego_indigenous = recode(ego_indigenous, "Lenca" = 1, "Ch'orti'/Maya Chorti" = 1, .default = 0),
+         ego_bristol = as.numeric(ego_bristol)) %>% 
+  dplyr::select(-c("village_name", "marital_name"))
 
 Covars_alter <- covariates %>% merge(household_wealth_data) %>%
+    unite('indigenous_status', mb_a0500a:mb_a0500i, na.rm = TRUE) |>
   rename(alter = respondent_master_id, alter_age = age_at_survey, alter_gender = gender,
-         alter_household_wealth = household_wealth_index_w3, alter_education = b0100, alter_indigenous = b0200, 
+         alter_household = building_id,
+         alter_household_wealth = household_wealth_index_w3, alter_education = b0100, alter_indigenous = indigenous_status, 
          alter_religion = b0600, alter_length_in_village = b0800, alter_length_in_village_years = b0900,
+         alter_bristol = mb_m0300,
+         alter_DDS = DDS, alter_watersource = l0400, 
+         alter_med_painkillers = med_painkillers,  
+         alter_med_antibiotics = med_antibiotics,  
+         alter_med_antidiarrheal = med_antidiarrheal,  
+         alter_med_antiparasite = med_antiparasite,  
+         alter_med_vitamins = med_vitamins, 
+         alter_med_zinc = med_zinc,  
+         alter_med_antifungal = med_antifungal,  
+         alter_med_antihypertensives = med_antihypertensives,  
+         alter_med_antidiabetics = med_antidiabetics,  
+         alter_med_antiacids = med_antiacids,  
+         alter_med_laxatives = med_laxatives,
          alter_latitude = building_latitude, alter_longitude = building_longitude) %>%
   mutate(alter_education = recode(alter_education, "Have not completed any type of school" = 0,
                                 "1st grade" = 1, "2nd grade" = 2, "3rd grade" = 3,
                                 "4th grade" = 4, "5th grade" = 5, "6th grade" = 6,
                                 "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
-         alter_indigenous = recode(alter_indigenous, "No" = 0, "Dont_Know" = 0, "Yes, Lenca" = 1, "Yes, Maya Chorti"= 1)) %>% 
-  dplyr::select(-c("village_name", "marital_name", "building_id"))
+         alter_indigenous = recode(alter_indigenous, "Lenca" = 1, "Ch'orti'/Maya Chorti" = 1, .default = 0),
+         alter_bristol = as.numeric(alter_bristol)) %>% 
+  dplyr::select(-c("village_name", "marital_name"))
 
 #Merge covariate data onto edge list
 SN_All_Covars <- merge(SN, Covars_ego, by = "ego")
 SN_All_Covars <- merge(SN_All_Covars, Covars_alter, by = "alter")
 
 #Get covariate matrix for people without a relationship
-for(v in 1:length(village_names)){
+cl <- parallel::makeCluster(10)
+doParallel::registerDoParallel(cl)
+foreach(v = village_names, .combine = rbind) %dopar% {
   #Split up matrix into villages
-  SN_Village <- SN_All_Covars %>% filter(village_name_w3 == village_names[v])
+  SN_Village <- SN_All_Covars[SN_All_Covars$village_code_w3 == v,]
   #IDs of everyone in village
   Village_IDs <- unique(c(as.character(SN_Village$ego), as.character(SN_Village$alter)))
 
@@ -52,25 +86,24 @@ for(v in 1:length(village_names)){
   
   Village_NoRels <- data.frame(matrix(NA,
                                       nrow = length(Village_IDs) * (length(Village_IDs)-1)/2 - length(Village_Pairs),
-                                      ncol = 16))
+                                      ncol = 17))
   colnames(Village_NoRels) <- c("ego","alter","gender.mm","gender.ff", "gender.mf", "indigenous.both", "indigenous.one", "indigenous.none",
                                 "religion.same", "age_difference_abs","average_age",
                                 "wealth_difference_abs", "average_weatlh", "education_difference_abs",
-                                "average_education", "village_name_w3")
+                                "average_education", "village_code_w3", "household.same")
   
   k <- 1
   for(i in 1:length(Village_IDs)){
     j <- i+1
     while(j <=  length(Village_IDs)){
-      pair <- paste((sort(str_split(paste0(Village_IDs[i], Village_IDs[j]),"")[[1]])),sep="", collapse="")
+      pair <- paste((sort(stringr::str_split(paste0(Village_IDs[i], Village_IDs[j]),"")[[1]])),sep="", collapse="")
       if(!pair %in% Village_Pairs){
         p1 <- Covars_ego[Covars_ego$ego == Village_IDs[i],]
         p2 <- Covars_alter[Covars_alter$alter == Village_IDs[j],]
         Village_NoRels$ego[k] <- p1$ego
         Village_NoRels$alter[k] <- p2$alter
         Village_NoRels$gender.mm[k] <- p1$ego_gender == "man" & p2$alter_gender == "man"
-        Village_NoRels$gender.mf[k] <- 
-          p1$ego_gender == "man" & p2$alter_gender == "woman" | p1$ego_gender == "woman" & p2$alter_gender == "man"
+        Village_NoRels$gender.mf[k] <-  p1$ego_gender == "man" & p2$alter_gender == "woman" | p1$ego_gender == "woman" & p2$alter_gender == "man"
         Village_NoRels$gender.ff[k] <- p1$ego_gender == "woman" & p2$alter_gender == "woman"
         Village_NoRels$indigenous.both[k] <- p1$ego_indigenous == 1 & p2$alter_indigenous == 1
         Village_NoRels$indigenous.one[k] <- 
@@ -83,22 +116,37 @@ for(v in 1:length(village_names)){
         Village_NoRels$average_wealth[k] <- (p1$ego_household_wealth + p2$alter_household_wealth)/2
         Village_NoRels$education_difference_abs[k] <- abs(p1$ego_education - p2$alter_education)
         Village_NoRels$average_education[k] <- (p1$ego_education + p2$alter_education)/2
-        Village_NoRels$village_name_w3[k] <- village_names[v]
+        Village_NoRels$village_code_w3[k] <- v
+        Village_NoRels$household_same[k] <- p1$ego_household == p2$alter_household
+        Village_NoRels$average_diet[k] <- (p1$ego_DDS == p2$alter_DDS) / 2
+        Village_NoRels$different_diet[k] <- abs(p1$ego_DDS - p2$alter_DDS)
+        Village_NoRels$average_bristol[k] <- (p1$ego_bristol == p2$alter_bristol) / 2
+        Village_NoRels$different_bristol[k] <- abs(p1$ego_bristol - p2$alter_bristol)
+        Village_NoRels$watersource_same[k] <- p1$ego_watersource == p2$alter_watersource
+        Village_NoRels$same_usage_painkillers[k] <- p2$alter_med_painkillers == p1$ego_med_painkillers
+        Village_NoRels$same_usage_antibiotics[k] <- p2$alter_med_antibiotics == p1$ego_med_antibiotics
+        Village_NoRels$same_usage_antidiarrheal[k] <- p2$alter_med_antidiarrheal == p1$ego_med_antidiarrheal
+        Village_NoRels$same_usage_antiparasite[k] <- p2$alter_med_antiparasite == p1$ego_med_antiparasite
+        Village_NoRels$same_usage_vitamins[k] <- p2$alter_med_vitamins == p1$ego_med_vitamins
+        Village_NoRels$same_usage_zinc[k] <- p2$alter_med_zinc == p1$ego_med_zinc
+        Village_NoRels$same_usage_antifungal[k] <- p2$alter_med_antifungal == p1$ego_med_antifungal
+        Village_NoRels$same_usage_antihypertensives[k] <- p2$alter_med_antihypertensives == p1$ego_med_antihypertensives
+        Village_NoRels$same_usage_antidiabetics[k] <- p2$alter_med_antidiabetics == p1$ego_med_antidiabetics
+        Village_NoRels$same_usage_antiacids[k] <- p2$alter_med_antiacids == p1$ego_med_antiacids
+        Village_NoRels$same_usage_laxatives[k] <- p2$alter_med_laxatives == p1$ego_med_laxatives
+        
         k <- k+1
       }
       j <- j+1
     }
   }
-  
-  if(v ==1){
-    All_NoRel_Covars <- Village_NoRels
-  }
-  else{
-    All_NoRel_Covars <- rbind(All_NoRel_Covars,Village_NoRels)
-  }
   #Check progress
   print(v)
-}
+  Village_NoRels
+} -> All_NoRel_Covars     #Get covariated for people without relationship ties
+
+parallel::stopCluster(cl)
+
 #Set Un-nominated same village realtionship
 All_NoRel_Covars$relationship <- "Un-Nominated Same Village"
 
@@ -122,7 +170,8 @@ for(i in 1:nrow(All_NoRel_Covars)){
 
 
 #Get dataframe of relationships into format for regression
-SN_All_Covars_for_Regression <- SN_All_Covars %>% distinct(pair_key, .keep_all = TRUE) %>%
+SN_All_Covars_for_Regression <- SN_All_Covars |> 
+  distinct(pair_key, .keep_all = TRUE) |> 
   mutate(gender.mm = ego_gender == "man" & alter_gender == "man",
          gender.mf = ego_gender == "woman" & alter_gender == "man" | ego_gender == "man" & alter_gender == "woman",
          gender.ff = ego_gender == "woman" & alter_gender == "woman",
@@ -135,7 +184,25 @@ SN_All_Covars_for_Regression <- SN_All_Covars %>% distinct(pair_key, .keep_all =
          wealth_difference_abs = abs(ego_household_wealth - alter_household_wealth),
          average_wealth = (ego_household_wealth + alter_household_wealth)/2,
          education_difference_abs = abs(ego_education - alter_education),
-         average_education = (ego_education + alter_education)/2)
+         average_education = (ego_education + alter_education)/2,
+         household_same = ego_household == alter_household,
+         average_diet = (ego_DDS == alter_DDS) / 2,
+         different_diet = abs(ego_DDS - alter_DDS),
+         average_bristol = (ego_bristol == alter_bristol) / 2,
+         different_bristol = abs(ego_bristol - alter_bristol),
+         watersource_same = ego_watersource == alter_watersource, 
+         same_usage_painkillers = alter_med_painkillers == ego_med_painkillers,
+         same_usage_antibiotics = alter_med_antibiotics == ego_med_antibiotics,
+         same_usage_antidiarrheal = alter_med_antidiarrheal == ego_med_antidiarrheal,
+         same_usage_antiparasite = alter_med_antiparasite == ego_med_antiparasite,
+         same_usage_vitamins = alter_med_vitamins == ego_med_vitamins,
+         same_usage_zinc = alter_med_zinc == ego_med_zinc,
+         same_usage_antifungal = alter_med_antifungal == ego_med_antifungal,
+         same_usage_antihypertensives = alter_med_antihypertensives == ego_med_antihypertensives,
+         same_usage_antidiabetics = alter_med_antidiabetics == ego_med_antidiabetics,
+         same_usage_antiacids = alter_med_antiacids == ego_med_antiacids,
+         same_usage_laxatives = alter_med_laxatives == ego_med_laxatives
+         )
 
 #Make dataframe with only non-kin in different house
 SN_Non_Kin_Dif_House_Covars_for_Regression <- SN_All_Covars_for_Regression %>%
@@ -147,25 +214,26 @@ SN_All_Covars_for_Regression <- SN_All_Covars_for_Regression %>%
   mutate(related = 1) %>% 
   dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
          "age_difference_abs", "average_age", "wealth_difference_abs",
-         "average_wealth", "education_difference_abs","average_education",
-         "related", "strain_sharing_rate", "village_name_w3", "bray_curtis_sim", "jaccard_sim")
+         "average_wealth", "education_difference_abs","average_education", "household_same",
+         "average_diet","different_diet", "average_bristol","different_bristol", "watersource_same", starts_with('same_usage'),
+         "related", "strain_sharing_rate", "village_code_w3", "bray_curtis_sim", "jaccard_sim")
 
 SN_Non_Kin_Dif_House_Covars_for_Regression <- SN_Non_Kin_Dif_House_Covars_for_Regression %>%
   mutate(related = 1) %>% 
   dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
          "age_difference_abs", "average_age", "wealth_difference_abs",
-         "average_wealth", "education_difference_abs","average_education",
-         "related", "strain_sharing_rate", "village_name_w3", "bray_curtis_sim", "jaccard_sim")
-
+         "average_wealth", "education_difference_abs","average_education","household_same",
+         "average_diet","different_diet", "average_bristol","different_bristol", "watersource_same", starts_with('same_usage'),
+         "related", "strain_sharing_rate", "village_code_w3", "bray_curtis_sim", "jaccard_sim")
 
 
 All_NoRel_Covars_for_Regression <- All_NoRel_Covars %>%
   mutate(related = 0) %>%
   dplyr::select("ego","alter","gender.mm", "gender.mf", "indigenous.both", "indigenous.one", "religion.same",
                 "age_difference_abs", "average_age", "wealth_difference_abs",
-                "average_wealth", "education_difference_abs","average_education",
-                "related", "strain_sharing_rate", "village_name_w3", "bray_curtis_sim", "jaccard_sim")
-
+                "average_wealth", "education_difference_abs","average_education","household_same",
+                "average_diet","different_diet", "average_bristol","different_bristol", "watersource_same", starts_with('same_usage'),
+                "related", "strain_sharing_rate", "village_code_w3", "bray_curtis_sim", "jaccard_sim")
 
 #Combine relationships and non relationship dataframe
 SN_All_Covars_for_Regression_complete <- SN_All_Covars_for_Regression[complete.cases(SN_All_Covars_for_Regression),]
@@ -187,17 +255,17 @@ Non_Kin_House_for_Regression_complete <-
   Non_Kin_House_for_Regression[complete.cases(Non_Kin_House_for_Regression),]
 
 edge_counts <- SN_All_Covars_for_Regression_complete %>%
-  group_by(village_name_w3) %>%
+  group_by(village_code_w3) %>%
   summarize(edge_count = sum(related)) 
 
-edge_counts <- edge_counts[match(village_names, edge_counts$village_name_w3),] %>%
+edge_counts <- edge_counts[match(village_names, edge_counts$village_code_w3),] %>%
   pull(edge_count)
 
 edge_counts_nkh <- SN_Non_Kin_Dif_House_Covars_for_Regression_complete %>%
-  group_by(village_name_w3) %>%
+  group_by(village_code_w3) %>%
   summarize(edge_count = sum(related))
 
-edge_counts_nkh <- edge_counts_nkh[match(village_names, edge_counts_nkh$village_name_w3),] %>%
+edge_counts_nkh <- edge_counts_nkh[match(village_names, edge_counts_nkh$village_code_w3),] %>%
   pull(edge_count)
 
 
@@ -209,41 +277,41 @@ Downsample
 #Downsample
 set.seed(96)
 Downsamp1 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[1]) %>% slice_sample(n = edge_counts[1])
+  filter(village_code_w3 == village_names[1]) %>% slice_sample(n = edge_counts[1])
 Downsamp2 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[2]) %>% slice_sample(n = edge_counts[2])
+  filter(village_code_w3 == village_names[2]) %>% slice_sample(n = edge_counts[2])
 Downsamp3 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[3]) %>% slice_sample(n = edge_counts[3])
+  filter(village_code_w3 == village_names[3]) %>% slice_sample(n = edge_counts[3])
 Downsamp4 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[4]) %>% slice_sample(n = edge_counts[4])
+  filter(village_code_w3 == village_names[4]) %>% slice_sample(n = edge_counts[4])
 Downsamp5 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[5]) %>% slice_sample(n = edge_counts[5])
+  filter(village_code_w3 == village_names[5]) %>% slice_sample(n = edge_counts[5])
 Downsamp6 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[6]) %>% slice_sample(n = edge_counts[6])
+  filter(village_code_w3 == village_names[6]) %>% slice_sample(n = edge_counts[6])
 Downsamp7 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[7]) %>% slice_sample(n = edge_counts[7])
+  filter(village_code_w3 == village_names[7]) %>% slice_sample(n = edge_counts[7])
 Downsamp8 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[8]) %>% slice_sample(n = edge_counts[8])
+  filter(village_code_w3 == village_names[8]) %>% slice_sample(n = edge_counts[8])
 Downsamp9 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[9]) %>% slice_sample(n = edge_counts[9])
+  filter(village_code_w3 == village_names[9]) %>% slice_sample(n = edge_counts[9])
 Downsamp10 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[10]) %>% slice_sample(n = edge_counts[10])
+  filter(village_code_w3 == village_names[10]) %>% slice_sample(n = edge_counts[10])
 Downsamp11 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[11]) %>% slice_sample(n = edge_counts[11])
+  filter(village_code_w3 == village_names[11]) %>% slice_sample(n = edge_counts[11])
 Downsamp12 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[12]) %>% slice_sample(n = edge_counts[12])
+  filter(village_code_w3 == village_names[12]) %>% slice_sample(n = edge_counts[12])
 Downsamp13 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[13]) %>% slice_sample(n = edge_counts[13])
+  filter(village_code_w3 == village_names[13]) %>% slice_sample(n = edge_counts[13])
 Downsamp14 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[14]) %>% slice_sample(n = edge_counts[14])
+  filter(village_code_w3 == village_names[14]) %>% slice_sample(n = edge_counts[14])
 Downsamp15 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[15]) %>% slice_sample(n = edge_counts[15])
+  filter(village_code_w3 == village_names[15]) %>% slice_sample(n = edge_counts[15])
 Downsamp16 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[16]) %>% slice_sample(n = edge_counts[16])
+  filter(village_code_w3 == village_names[16]) %>% slice_sample(n = edge_counts[16])
 Downsamp17 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[17]) %>% slice_sample(n = edge_counts[17])
+  filter(village_code_w3 == village_names[17]) %>% slice_sample(n = edge_counts[17])
 Downsamp18 <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[18]) %>% slice_sample(n = edge_counts[18])
+  filter(village_code_w3 == village_names[18]) %>% slice_sample(n = edge_counts[18])
 
 Downsamp_all <- rbind(Downsamp1,Downsamp2,Downsamp3,Downsamp4,Downsamp5,
                       Downsamp6,Downsamp7,Downsamp8,Downsamp9,Downsamp10,Downsamp11,
@@ -257,41 +325,41 @@ Downsamp_all <- Downsamp_all[complete.cases(Downsamp_all),]
 #Non-kin different house
 set.seed(96)
 Downsamp1_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[1]) %>% slice_sample(n = edge_counts_nkh[1])
+  filter(village_code_w3 == village_names[1]) %>% slice_sample(n = edge_counts_nkh[1])
 Downsamp2_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[2]) %>% slice_sample(n = edge_counts_nkh[2])
+  filter(village_code_w3 == village_names[2]) %>% slice_sample(n = edge_counts_nkh[2])
 Downsamp3_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[3]) %>% slice_sample(n = edge_counts_nkh[3])
+  filter(village_code_w3 == village_names[3]) %>% slice_sample(n = edge_counts_nkh[3])
 Downsamp4_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[4]) %>% slice_sample(n = edge_counts_nkh[4])
+  filter(village_code_w3 == village_names[4]) %>% slice_sample(n = edge_counts_nkh[4])
 Downsamp5_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[5]) %>% slice_sample(n = edge_counts_nkh[5])
+  filter(village_code_w3 == village_names[5]) %>% slice_sample(n = edge_counts_nkh[5])
 Downsamp6_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[6]) %>% slice_sample(n = edge_counts_nkh[6])
+  filter(village_code_w3 == village_names[6]) %>% slice_sample(n = edge_counts_nkh[6])
 Downsamp7_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[7]) %>% slice_sample(n = edge_counts_nkh[7])
+  filter(village_code_w3 == village_names[7]) %>% slice_sample(n = edge_counts_nkh[7])
 Downsamp8_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[8]) %>% slice_sample(n = edge_counts_nkh[8])
+  filter(village_code_w3 == village_names[8]) %>% slice_sample(n = edge_counts_nkh[8])
 Downsamp9_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[9]) %>% slice_sample(n = edge_counts_nkh[9])
+  filter(village_code_w3 == village_names[9]) %>% slice_sample(n = edge_counts_nkh[9])
 Downsamp10_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[10]) %>% slice_sample(n = edge_counts_nkh[10])
+  filter(village_code_w3 == village_names[10]) %>% slice_sample(n = edge_counts_nkh[10])
 Downsamp11_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[11]) %>% slice_sample(n = edge_counts_nkh[11])
+  filter(village_code_w3 == village_names[11]) %>% slice_sample(n = edge_counts_nkh[11])
 Downsamp12_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[12]) %>% slice_sample(n = edge_counts_nkh[12])
+  filter(village_code_w3 == village_names[12]) %>% slice_sample(n = edge_counts_nkh[12])
 Downsamp13_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[13]) %>% slice_sample(n = edge_counts_nkh[13])
+  filter(village_code_w3 == village_names[13]) %>% slice_sample(n = edge_counts_nkh[13])
 Downsamp14_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[14]) %>% slice_sample(n = edge_counts_nkh[14])
+  filter(village_code_w3 == village_names[14]) %>% slice_sample(n = edge_counts_nkh[14])
 Downsamp15_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[15]) %>% slice_sample(n = edge_counts_nkh[15])
+  filter(village_code_w3 == village_names[15]) %>% slice_sample(n = edge_counts_nkh[15])
 Downsamp16_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[16]) %>% slice_sample(n = edge_counts_nkh[16])
+  filter(village_code_w3 == village_names[16]) %>% slice_sample(n = edge_counts_nkh[16])
 Downsamp17_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[17]) %>% slice_sample(n = edge_counts_nkh[17])
+  filter(village_code_w3 == village_names[17]) %>% slice_sample(n = edge_counts_nkh[17])
 Downsamp18_nkh <- All_NoRel_Covars_for_Regression_complete %>%
-  filter(village_name_w3 == village_names[18]) %>% slice_sample(n = edge_counts_nkh[18])
+  filter(village_code_w3 == village_names[18]) %>% slice_sample(n = edge_counts_nkh[18])
 
 
 Downsamp_all_nkh <- rbind(Downsamp1_nkh,Downsamp2_nkh,Downsamp3_nkh,Downsamp4_nkh,Downsamp5_nkh,
@@ -312,7 +380,9 @@ Jaccard Similarity
 ```{r}
 #Test out of sample
 #Average over 5 CVs
-for(i in 1:5){
+cl <- parallel::makeCluster(5)
+doParallel::registerDoParallel(cl)
+foreach(i = c(1:5)) %dopar% {
   inds <- c(1:nrow(Downsamp_all))
   test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all)), replace = F)
   train1_inds <- inds[!(inds %in% test1_inds)]
@@ -328,11 +398,11 @@ for(i in 1:5){
   train3 <- Downsamp_all[train3_inds,]
   test3 <- Downsamp_all[test3_inds,]
   
-  logit.test.1 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_name_w3),
+  logit.test.1 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train1, family = binomial)
-  logit.test.2 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_name_w3),
+  logit.test.2 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train2, family = binomial)
-  logit.test.3 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_name_w3),
+  logit.test.3 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train3, family = binomial)
   preds.1 <- predict(logit.test.1, newdata = test1, type = "response")
   preds.2 <- predict(logit.test.2, newdata = test2, type = "response")
@@ -344,13 +414,13 @@ for(i in 1:5){
   preds.round <- preds.round[order(as.numeric(names(preds.round)))]
   
   logit.test.1.covars <- lme4::glmer(related ~ jaccard_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+jaccard_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+jaccard_sim|village_code_w3),
                               data = train1, family = binomial)
   logit.test.2.covars <- lme4::glmer(related ~ jaccard_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+jaccard_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+jaccard_sim|village_code_w3),
                               data = train2, family = binomial)
   logit.test.3.covars <- lme4::glmer(related ~ jaccard_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+jaccard_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+jaccard_sim|village_code_w3),
                               data = train3, family = binomial)
   
   preds.1.covars <- predict(logit.test.1.covars, newdata = test1, type = "response")
@@ -365,20 +435,26 @@ for(i in 1:5){
   logit.test.1.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        jaccard_sim + (0+jaccard_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        education_difference_abs + average_education + household_same +
+                        jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train1, family = binomial)
   logit.test.2.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        jaccard_sim + (0+jaccard_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        education_difference_abs + average_education + household_same +
+                        jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train2, family = binomial)
   logit.test.3.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        jaccard_sim + (0+jaccard_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        education_difference_abs + average_education + household_same +
+                        jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train3, family = binomial)
   
   preds.1.all <- predict(logit.test.1.all, newdata = test1, type = "response")
@@ -390,25 +466,16 @@ for(i in 1:5){
   preds.round.all <- c(preds.1.all, preds.2.all, preds.3.all)
   preds.round.all <- preds.round.all[order(as.numeric(names(preds.round.all)))]
   
-  if(i == 1){
-    pred.all <- preds.round
-    pred.all.covars <- preds.round.covars
-    pred.all.all <- preds.round.all
-  }
-  else{
-    pred.all <- pred.all + preds.round
-    pred.all.covars <- pred.all.covars + preds.round.covars
-    pred.all.all <- pred.all.all + preds.round.all
-  }
-  
-}
-#Could make this without random effect don't have to deal with this stuff
-pred.all <- pred.all/5
-pred.all.covars <- pred.all.covars/5
-pred.all.all <- pred.all.all/5
+  list(preds.round, preds.round.covars, preds.round.all)
+} -> preds
+parallel::stopCluster(cl)
+
+pred.all <- rowSums(sapply(preds, `[[`, 1))/5
+pred.all.covars <- rowSums(sapply(preds, `[[`, 2))/5
+pred.all.all <- rowSums(sapply(preds, `[[`, 3))/5
 
 #add on predictions from strain-sharing only model
-pred.all.acc <- pred.all
+pred.all.acc <- pred.all.all
 pred.all.acc[pred.all.acc >=.5] <- 1
 pred.all.acc[pred.all.acc <.5] <- 0
 
@@ -479,7 +546,9 @@ Bray-Curtis Similarity
 ```{r}
 #Test out of sample
 #Average over 5 CVs
-for(i in 1:5){
+cl <- parallel::makeCluster(5)
+doParallel::registerDoParallel(cl)
+foreach(i = c(1:5)) %dopar% {
   inds <- c(1:nrow(Downsamp_all))
   test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all)), replace = F)
   train1_inds <- inds[!(inds %in% test1_inds)]
@@ -495,11 +564,11 @@ for(i in 1:5){
   train3 <- Downsamp_all[train3_inds,]
   test3 <- Downsamp_all[test3_inds,]
   
-  logit.test.1 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+  logit.test.1 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train1, family = binomial)
-  logit.test.2 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+  logit.test.2 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train2, family = binomial)
-  logit.test.3 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+  logit.test.3 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train3, family = binomial)
   preds.1 <- predict(logit.test.1, newdata = test1, type = "response")
   preds.2 <- predict(logit.test.2, newdata = test2, type = "response")
@@ -511,13 +580,13 @@ for(i in 1:5){
   preds.round <- preds.round[order(as.numeric(names(preds.round)))]
   
   logit.test.1.covars <- lme4::glmer(related ~ bray_curtis_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+bray_curtis_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+bray_curtis_sim|village_code_w3),
                               data = train1, family = binomial)
   logit.test.2.covars <- lme4::glmer(related ~ bray_curtis_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+bray_curtis_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+bray_curtis_sim|village_code_w3),
                               data = train2, family = binomial)
   logit.test.3.covars <- lme4::glmer(related ~ bray_curtis_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+bray_curtis_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+bray_curtis_sim|village_code_w3),
                               data = train3, family = binomial)
   
   preds.1.covars <- predict(logit.test.1.covars, newdata = test1, type = "response")
@@ -532,20 +601,24 @@ for(i in 1:5){
   logit.test.1.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        education_difference_abs + average_education + household_same +
+                        bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train1, family = binomial)
   logit.test.2.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train2, family = binomial)
   logit.test.3.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train3, family = binomial)
   
   preds.1.all <- predict(logit.test.1.all, newdata = test1, type = "response")
@@ -557,25 +630,16 @@ for(i in 1:5){
   preds.round.all <- c(preds.1.all, preds.2.all, preds.3.all)
   preds.round.all <- preds.round.all[order(as.numeric(names(preds.round.all)))]
   
-  if(i == 1){
-    pred.all <- preds.round
-    pred.all.covars <- preds.round.covars
-    pred.all.all <- preds.round.all
-  }
-  else{
-    pred.all <- pred.all + preds.round
-    pred.all.covars <- pred.all.covars + preds.round.covars
-    pred.all.all <- pred.all.all + preds.round.all
-  }
-  
-}
-#Could make this without random effect don't have to deal with this stuff
-pred.all <- pred.all/5
-pred.all.covars <- pred.all.covars/5
-pred.all.all <- pred.all.all/5
+  list(preds.round, preds.round.covars, preds.round.all)
+} -> preds
+parallel::stopCluster(cl)
+
+pred.all <- rowSums(sapply(preds, `[[`, 1))/5
+pred.all.covars <- rowSums(sapply(preds, `[[`, 2))/5
+pred.all.all <- rowSums(sapply(preds, `[[`, 3))/5
 
 #add on predictions from strain-sharing only model
-pred.all.acc <- pred.all
+pred.all.acc <- pred.all.all
 pred.all.acc[pred.all.acc >=.5] <- 1
 pred.all.acc[pred.all.acc <.5] <- 0
 
@@ -648,7 +712,9 @@ Jaccard Similarity non-kin dif-house
 ```{r}
 #Test out of sample
 #Average over 5 CVs
-for(i in 1:5){
+cl <- parallel::makeCluster(5)
+doParallel::registerDoParallel(cl)
+foreach(i = c(1:5)) %dopar% {
   inds <- c(1:nrow(Downsamp_all_nkh))
   test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_nkh)), replace = F)
   train1_inds <- inds[!(inds %in% test1_inds)]
@@ -664,11 +730,11 @@ for(i in 1:5){
   train3 <- Downsamp_all_nkh[train3_inds,]
   test3 <- Downsamp_all_nkh[test3_inds,]
   
-  logit.test.1 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_name_w3),
+  logit.test.1 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train1, family = binomial)
-  logit.test.2 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_name_w3),
+  logit.test.2 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train2, family = binomial)
-  logit.test.3 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_name_w3),
+  logit.test.3 <- lme4::glmer(related ~ jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train3, family = binomial)
   preds.1 <- predict(logit.test.1, newdata = test1, type = "response")
   preds.2 <- predict(logit.test.2, newdata = test2, type = "response")
@@ -680,13 +746,13 @@ for(i in 1:5){
   preds.round <- preds.round[order(as.numeric(names(preds.round)))]
   
   logit.test.1.covars <- lme4::glmer(related ~ jaccard_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+jaccard_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+jaccard_sim|village_code_w3),
                               data = train1, family = binomial)
   logit.test.2.covars <- lme4::glmer(related ~ jaccard_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+jaccard_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+jaccard_sim|village_code_w3),
                               data = train2, family = binomial)
   logit.test.3.covars <- lme4::glmer(related ~ jaccard_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+jaccard_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+jaccard_sim|village_code_w3),
                               data = train3, family = binomial)
   
   preds.1.covars <- predict(logit.test.1.covars, newdata = test1, type = "response")
@@ -701,20 +767,23 @@ for(i in 1:5){
   logit.test.1.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        jaccard_sim + (0+jaccard_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train1, family = binomial)
   logit.test.2.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        jaccard_sim + (0+jaccard_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train2, family = binomial)
   logit.test.3.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        jaccard_sim + (0+jaccard_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        jaccard_sim + (0+jaccard_sim|village_code_w3),
                               data = train3, family = binomial)
   
   preds.1.all <- predict(logit.test.1.all, newdata = test1, type = "response")
@@ -725,26 +794,17 @@ for(i in 1:5){
   names(preds.1.all) <- test1_inds
   preds.round.all <- c(preds.1.all, preds.2.all, preds.3.all)
   preds.round.all <- preds.round.all[order(as.numeric(names(preds.round.all)))]
-  
-  if(i == 1){
-    pred.all <- preds.round
-    pred.all.covars <- preds.round.covars
-    pred.all.all <- preds.round.all
-  }
-  else{
-    pred.all <- pred.all + preds.round
-    pred.all.covars <- pred.all.covars + preds.round.covars
-    pred.all.all <- pred.all.all + preds.round.all
-  }
-  
-}
-#Could make this without random effect don't have to deal with this stuff
-pred.all <- pred.all/5
-pred.all.covars <- pred.all.covars/5
-pred.all.all <- pred.all.all/5
+
+    list(preds.round, preds.round.covars, preds.round.all)
+} -> preds
+parallel::stopCluster(cl)
+
+pred.all <- rowSums(sapply(preds, `[[`, 1))/5
+pred.all.covars <- rowSums(sapply(preds, `[[`, 2))/5
+pred.all.all <- rowSums(sapply(preds, `[[`, 3))/5
 
 #add on predictions from strain-sharing only model
-pred.all.acc <- pred.all
+pred.all.acc <- pred.all.all
 pred.all.acc[pred.all.acc >=.5] <- 1
 pred.all.acc[pred.all.acc <.5] <- 0
 
@@ -815,7 +875,9 @@ Bray-Curtis Similarity non kin house
 ```{r}
 #Test out of sample
 #Average over 5 CVs
-for(i in 1:5){
+cl <- parallel::makeCluster(5)
+doParallel::registerDoParallel(cl)
+foreach(i = c(1:5)) %dopar% {
   inds <- c(1:nrow(Downsamp_all_nkh))
   test1_inds <- sample(inds, size = floor(.33*nrow(Downsamp_all_nkh)), replace = F)
   train1_inds <- inds[!(inds %in% test1_inds)]
@@ -831,11 +893,11 @@ for(i in 1:5){
   train3 <- Downsamp_all_nkh[train3_inds,]
   test3 <- Downsamp_all_nkh[test3_inds,]
   
-  logit.test.1 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+  logit.test.1 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train1, family = binomial)
-  logit.test.2 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+  logit.test.2 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train2, family = binomial)
-  logit.test.3 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+  logit.test.3 <- lme4::glmer(related ~ bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train3, family = binomial)
   preds.1 <- predict(logit.test.1, newdata = test1, type = "response")
   preds.2 <- predict(logit.test.2, newdata = test2, type = "response")
@@ -847,13 +909,13 @@ for(i in 1:5){
   preds.round <- preds.round[order(as.numeric(names(preds.round)))]
   
   logit.test.1.covars <- lme4::glmer(related ~ bray_curtis_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+bray_curtis_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+bray_curtis_sim|village_code_w3),
                               data = train1, family = binomial)
   logit.test.2.covars <- lme4::glmer(related ~ bray_curtis_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+bray_curtis_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+bray_curtis_sim|village_code_w3),
                               data = train2, family = binomial)
   logit.test.3.covars <- lme4::glmer(related ~ bray_curtis_sim + gender.mm + gender.mf +
-                        age_difference_abs + average_age + (0+bray_curtis_sim|village_name_w3),
+                        age_difference_abs + average_age + (0+bray_curtis_sim|village_code_w3),
                               data = train3, family = binomial)
   
   preds.1.covars <- predict(logit.test.1.covars, newdata = test1, type = "response")
@@ -868,20 +930,23 @@ for(i in 1:5){
   logit.test.1.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train1, family = binomial)
   logit.test.2.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train2, family = binomial)
   logit.test.3.all <- lme4::glmer(related ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_age + wealth_difference_abs + average_wealth +
-                        education_difference_abs + average_education +
-                        bray_curtis_sim + (0+bray_curtis_sim|village_name_w3),
+                        average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
+                        same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
+                        bray_curtis_sim + (0+bray_curtis_sim|village_code_w3),
                               data = train3, family = binomial)
   
   preds.1.all <- predict(logit.test.1.all, newdata = test1, type = "response")
@@ -893,25 +958,16 @@ for(i in 1:5){
   preds.round.all <- c(preds.1.all, preds.2.all, preds.3.all)
   preds.round.all <- preds.round.all[order(as.numeric(names(preds.round.all)))]
   
-  if(i == 1){
-    pred.all <- preds.round
-    pred.all.covars <- preds.round.covars
-    pred.all.all <- preds.round.all
-  }
-  else{
-    pred.all <- pred.all + preds.round
-    pred.all.covars <- pred.all.covars + preds.round.covars
-    pred.all.all <- pred.all.all + preds.round.all
-  }
-  
-}
-#Could make this without random effect don't have to deal with this stuff
-pred.all <- pred.all/5
-pred.all.covars <- pred.all.covars/5
-pred.all.all <- pred.all.all/5
+    list(preds.round, preds.round.covars, preds.round.all)
+} -> preds
+parallel::stopCluster(cl)
+
+pred.all <- rowSums(sapply(preds, `[[`, 1))/5
+pred.all.covars <- rowSums(sapply(preds, `[[`, 2))/5
+pred.all.all <- rowSums(sapply(preds, `[[`, 3))/5
 
 #add on predictions from strain-sharing only model
-pred.all.acc <- pred.all
+pred.all.acc <- pred.all.all
 pred.all.acc[pred.all.acc >=.5] <- 1
 pred.all.acc[pred.all.acc <.5] <- 0
 
@@ -985,7 +1041,7 @@ Plots
 rocs_1 <-ggarrange(roc.plot.bc, roc.plot.bc.nkh, nrow = 1, labels = c("A", "B"))
 rocs_2 <-ggarrange(roc.plot.j, roc.plot.j.nkh, nrow = 1, labels = c("C", "D"))
 
-svglite("../FiguresNew/SFigure8/sfigure8_full.svg")
+svglite("Figures/sfigure8_full.svg", height = 10, width = 8, fix_text_size = FALSE)
 ggarrange(rocs_1,
           rocs_2,
           ncol = 1)

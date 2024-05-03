@@ -30,13 +30,28 @@ lmer_first_model <- lmer(T2 ~ T1 + relationship + maha_dist + (1|village_code_eg
 summary(lmer_first_model)
 ```
 \newpage
-<!--
+
 ```{r, echo=FALSE}
-lmer_second_model <- lmer(T2 ~ T1*relationship + maha_dist + (1|village_code_ego) + (1|ego), 
-                          sharing_rate_only_followup)
-summary(lmer_second_model)
+lmer_first_model_expanded  <- lmer(T2 ~ T1 + relationship + 
+                                      gender.mm + gender.ff + 
+                                      indigenous.both + indigenous.one + 
+                                      age_difference_abs + average_age  + 
+                                      DDS_average + DDS_difference_abs + 
+                                      education_difference_abs + average_education + 
+                                      religion_same + building_same +
+                                      wealth_difference_abs + average_wealth +
+                                      average_bristol + different_bristol +
+                                      watersource_same + same_usage_painkillers +
+                                      same_usage_antibiotics +
+                                      same_usage_antidiarrheal +
+                                      same_usage_antiparasite +
+                                      same_usage_vitamins +
+                                      same_usage_zinc +
+                                      same_usage_antifungal  + (1|village_code_ego) + (1|ego), data = sharing_rate_only_followup)
+
+summary(lmer_first_model_expanded)
 ```
--->
+\newpage
 ```{r}
 lmer_species_rand <- glmer(data = xcov, T2_t ~ T1_t + relationship + maha_dist + (1|species) + (1|village_code_ego) + (1|ego), family = binomial, nAGQ=0)
 summary(lmer_species_rand)

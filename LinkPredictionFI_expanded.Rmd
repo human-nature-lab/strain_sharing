@@ -940,10 +940,17 @@ networks_1 <- ggarrange(p1_test, p2_test, nrow = 2,
                         labels = c("B",
                                    "D"))
 
-fig3 <- ggarrange(rocs_1, networks_1, ncol = 2)
+fig3 <- ggarrange(networks_1, rocs_1, rocs_1, ncol = 3)
 
+svglite("Figures/fig3_a.svg")
+p1_test
+dev.off()
 
-svglite("Figures/fig3_full_updated.svg")
+svglite("Figures/fig3_b.svg")
+p2_test
+dev.off()
+
+svglite("Figures/fig3_full_updated_extended.svg", fix_text_size = FALSE, width = 14, height = 8)
 fig3
 dev.off()
 
@@ -1047,9 +1054,511 @@ metrics_non_kin_prediction
 write_tsv(metrics_non_kin_prediction, 'tables/metrics_non_kin_network_villages_prediction_expanded.tsv')
 writexl::write_xlsx(metrics_non_kin_prediction, 'tables/metrics_non_kin_network_villages_prediction_expanded.xlsx')
 ```
+Permutation Feature Importance
+```{r}
+#head(Downsamp_all)
+#Downsamp_all_importance <- Downsamp_all %>%
+#  select(-c(ego, alter, tp, bray_curtis_sim, jaccard_sim, village_code_w3, predicted))
+
+Downsamp_all_importance <- Downsamp_all %>%
+  select(-c(ego, alter, bray_curtis_sim, predicted))
+
+auc_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 11))
+colnames(auc_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
+                             "education_difference","average_education","household_same","strain_sharing_rate")
+
+#only permute within village NEED to ADD BACK
+#Damn ok, shouldn't be that hard. 
+#I think it's ok to drop mixed effect
+#Doesn't really do that much
+#Gender
+print("gender")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  gender_cols <- dat_permuted[,c("gender.mm", "gender.mf")]
+  gender_cols <- gender_cols[sample(nrow(gender_cols)),]
+  dat_permuted[,c("gender.mm", "gender.mf")] <- gender_cols
+  logit_perm <- glm(related ~ .,
+                    family = binomial, data = dat_permuted)
+  auc_perms_ssr$gender[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+
+#indigenous status
+print("indigenous status")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  indigenous_cols <- dat_permuted[,c("indigenous.both", "indigenous.one")]
+  indigenous_cols <- indigenous_cols[sample(nrow(indigenous_cols)),]
+  dat_permuted[,c("indigenous.both", "indigenous.one")] <- indigenous_cols
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$indigenous_status[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#religion
+print("religion")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$religion.same <- sample(dat_permuted$religion.same)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$religion[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#age difference
+print("age difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$age_difference_abs <- sample(dat_permuted$age_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$age_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average age
+print("average age")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_age <- sample(dat_permuted$average_age)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_age[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#wealth difference
+print("wealth difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$wealth_difference_abs <- sample(dat_permuted$wealth_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$wealth_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average wealth
+print("average wealth")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_wealth <- sample(dat_permuted$average_wealth)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_wealth[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#education
+print("education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$education_difference_abs <- sample(dat_permuted$education_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$education_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average education
+print("average education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_education <- sample(dat_permuted$average_education)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_education[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#strain sharing rate 
+print("strain sharing rate")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$strain_sharing_rate <- sample(dat_permuted$strain_sharing_rate)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$strain_sharing_rate[i] <- auc(dat_permuted$related , logit_perm$fitted.values, 
+                                              levels=c("0","1"), direction = "<")
+}
+
+print("same_household")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$household_same <- sample(dat_permuted$household_same)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$household_same[i] <- auc(dat_permuted$related , logit_perm$fitted.values, 
+                                              levels=c("0","1"), direction = "<")
+}
+
+print("different diet")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$different_diet <- sample(dat_permuted$different_diet)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$different_diet[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+print("average diet")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_diet <- sample(dat_permuted$average_diet)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_diet[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+print("different bristol")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$different_bristol <- sample(dat_permuted$different_bristol)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$different_bristol[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+print("average bristol")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_bristol <- sample(dat_permuted$average_bristol)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_bristol[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+print("watersource_same")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$watersource_same <- sample(dat_permuted$watersource_same)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$watersource_same[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+
+print("same_med_usage")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  med_cols <- dat_permuted[,c('same_usage_painkillers', 'same_usage_antibiotics', 'same_usage_antidiarrheal', 'same_usage_antiparasite', 
+                              'same_usage_vitamins', 'same_usage_zinc', 'same_usage_antifungal', 'same_usage_antihypertensives', 
+                              'same_usage_antidiabetics', 'same_usage_antiacids', 'same_usage_laxatives')]
+  med_cols <- med_cols[sample(nrow(med_cols)),]
+  dat_permuted[,c('same_usage_painkillers', 'same_usage_antibiotics', 'same_usage_antidiarrheal', 'same_usage_antiparasite', 
+                              'same_usage_vitamins', 'same_usage_zinc', 'same_usage_antifungal', 'same_usage_antihypertensives', 
+                              'same_usage_antidiabetics', 'same_usage_antiacids', 'same_usage_laxatives')] <- med_cols
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$same_med_usage[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+
+#Get original logistic regression model
+logit_ssr <- glm(related ~ . ,
+                 family = binomial,
+                 data = Downsamp_all_importance)
+
+auc_ssr <-  auc(Downsamp_all_importance$related , logit_ssr$fitted.values,
+                levels=c("0","1"), direction = "<")
+
+#Get percent change in auc from original under permutation
+auc_perms_percent_ssr <- auc_perms_ssr
+auc_perms_percent_ssr <- (as.numeric(auc_ssr) - auc_perms_percent_ssr) / as.numeric(auc_ssr) * 100
+
+#Get mean drop and standard devation in dataframe
+auc_perms_ssr_dat <- data.frame(name = names(auc_perms_percent_ssr),
+                                value = colMeans(auc_perms_percent_ssr),
+                                sd = apply(auc_perms_percent_ssr,2,sd))
+
+#Change Name to Make More Readable
+auc_perms_ssr_dat$name <-c("Gender",
+                           "Indigenous\nStatus",
+                           "Religion",
+                           "Age\nDifference",
+                           "Average\nAge",
+                           "Wealth\nDifference",
+                           "Average\nWealth",
+                           "Education\nDifference",
+                           "Average\nEducation",
+                           "Household\nSharing",
+                           "Strain-Sharing\nRate",
+                           'Diet\ndifference',
+                           "Average\ndiet",
+                           'Different\nBristol\nScale',
+                           'Average\nBristol\nScale',
+                           'Water\nsource',
+                           'Medication\nusage'
+                           )
 
 
-# Permutation feature importance: all relationships
+
+
+#Create plot
+fi_all <- ggplot(auc_perms_ssr_dat) +
+  geom_bar(
+    aes(x = reorder(name,-value), y = value),
+    stat = "identity",
+    fill = "skyblue",
+    alpha = 0.7
+  ) +
+  geom_errorbar(
+    aes(
+      x = name,
+      ymin = value - sd,
+      ymax = value + sd
+    ),
+    width = 0.4,
+    colour = "orange",
+    alpha = 0.9,
+    linewidth = 1.3
+  ) +
+  coord_cartesian(ylim = c(0, 15)) +
+  xlab("Covariate") +
+  ylab("Average % Drop in AUC under Permutation") +
+  theme_bw() +
+  theme(axis.text.x = element_text( vjust = 1, hjust=.5, size = 8),
+        plot.title = element_text(hjust=.5)
+  ) +
+  ggtitle("All Social and Familial Relationships") +
+  theme_pubr() +
+  labs_pubr()
+
+
+
+```
+
+
+
+
+
+Permutation Inference for Non-Kin Different House
+
+```{r}
+Downsamp_all_importance <- Downsamp_all_nkh %>%
+  select(-c(ego, alter, bray_curtis_sim, village_code_w3, predicted))
+
+
+auc_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 11))
+colnames(auc_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
+                             "education_difference","average_education","household_same","strain_sharing_rate")
+
+#only permute within village NEED to ADD BACK
+#Damn ok, shouldn't be that hard. 
+#I think it's ok to drop mixed effect
+#Doesn't really do that much
+#Gender
+print("gender")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  gender_cols <- dat_permuted[,c("gender.mm", "gender.mf")]
+  gender_cols <- gender_cols[sample(nrow(gender_cols)),]
+  dat_permuted[,c("gender.mm", "gender.mf")] <- gender_cols
+  logit_perm <- glm(related ~ .,
+                    family = binomial, data = dat_permuted)
+  auc_perms_ssr$gender[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+
+#indigenous status
+print("indigenous status")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  indigenous_cols <- dat_permuted[,c("indigenous.both", "indigenous.one")]
+  indigenous_cols <- indigenous_cols[sample(nrow(indigenous_cols)),]
+  dat_permuted[,c("indigenous.both", "indigenous.one")] <- indigenous_cols
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$indigenous_status[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#religion
+print("religion")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$religion.same <- sample(dat_permuted$religion.same)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$religion[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#age difference
+print("age difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$age_difference_abs <- sample(dat_permuted$age_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$age_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average age
+print("average age")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_age <- sample(dat_permuted$average_age)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_age[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#wealth difference
+print("wealth difference")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$wealth_difference_abs <- sample(dat_permuted$wealth_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$wealth_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average wealth
+print("average wealth")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_wealth <- sample(dat_permuted$average_wealth)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_wealth[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#education
+print("education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$education_difference_abs <- sample(dat_permuted$education_difference_abs)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$education_difference[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#average education
+print("average education")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_education <- sample(dat_permuted$average_education)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_education[i] <- auc(dat_permuted$related , logit_perm$fitted.values,
+                levels=c("0","1"), direction = "<")
+}
+#strain sharing rate 
+print("strain sharing rate")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$strain_sharing_rate <- sample(dat_permuted$strain_sharing_rate)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$strain_sharing_rate[i] <- auc(dat_permuted$related , logit_perm$fitted.values, 
+                                              levels=c("0","1"), direction = "<")
+}
+print("same_household")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$household_same <- sample(dat_permuted$household_same)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$household_same[i] <- auc(dat_permuted$related , logit_perm$fitted.values, 
+                                              levels=c("0","1"), direction = "<")
+}
+
+print("different diet")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$different_diet <- sample(dat_permuted$different_diet)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$different_diet[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+print("average diet")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_diet <- sample(dat_permuted$average_diet)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_diet[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+print("different bristol")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$different_bristol <- sample(dat_permuted$different_bristol)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$different_bristol[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+print("average bristol")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$average_bristol <- sample(dat_permuted$average_bristol)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$average_bristol[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+print("watersource_same")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  dat_permuted$watersource_same <- sample(dat_permuted$watersource_same)
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$watersource_same[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+
+print("same_med_usage")
+dat_permuted <- Downsamp_all_importance
+for(i in 1:100){
+  med_cols <- dat_permuted[,c('same_usage_painkillers', 'same_usage_antibiotics', 'same_usage_antidiarrheal', 'same_usage_antiparasite', 
+                              'same_usage_vitamins', 'same_usage_zinc', 'same_usage_antifungal', 'same_usage_antihypertensives', 
+                              'same_usage_antidiabetics', 'same_usage_antiacids', 'same_usage_laxatives')]
+  med_cols <- med_cols[sample(nrow(med_cols)),]
+  dat_permuted[,c('same_usage_painkillers', 'same_usage_antibiotics', 'same_usage_antidiarrheal', 'same_usage_antiparasite', 
+                              'same_usage_vitamins', 'same_usage_zinc', 'same_usage_antifungal', 'same_usage_antihypertensives', 
+                              'same_usage_antidiabetics', 'same_usage_antiacids', 'same_usage_laxatives')] <- med_cols
+  logit_perm <- glm(related ~ . ,family = binomial, data = dat_permuted)
+  auc_perms_ssr$same_med_usage[i] <- auc(dat_permuted$related , logit_perm$fitted.values,                                                levels=c("0","1"), direction = "<")
+
+}
+
+#Get original logistic regression model
+logit_ssr <- glm(related ~ . ,
+                 family = binomial,
+                 data = Downsamp_all_importance)
+
+auc_ssr <-  auc(Downsamp_all_importance$related , logit_ssr$fitted.values,
+                levels=c("0","1"), direction = "<")
+
+#Get percent change in auc from original under permutation
+auc_perms_percent_ssr <- auc_perms_ssr
+auc_perms_percent_ssr <- (as.numeric(auc_ssr) - auc_perms_percent_ssr) / as.numeric(auc_ssr) * 100
+
+#Get mean drop and standard devation in dataframe
+auc_perms_ssr_dat <- data.frame(name = names(auc_perms_percent_ssr),
+                                value = colMeans(auc_perms_percent_ssr),
+                                sd = apply(auc_perms_percent_ssr,2,sd))
+
+#Change Name to Make More Readable
+auc_perms_ssr_dat$name <-c("Gender",
+                           "Indigenous\nStatus",
+                           "Religion",
+                           "Age\nDifference",
+                           "Average\nAge",
+                           "Wealth\nDifference",
+                           "Average\nWealth",
+                           "Education\nDifference",
+                           "Average\nEducation",
+                           "Household\nSharing",
+                           "Strain-Sharing\nRate",
+                           'Diet\ndifference',
+                           "Average\ndiet",
+                           'Different\nBristol\nScale',
+                           'Average\nBristol\nScale',
+                           'Water\nsource',
+                           'Medication\nusage'
+                           )
+
+
+fi_all_nkh <- ggplot(auc_perms_ssr_dat) +
+  geom_bar( aes(x=reorder(name, -value), y=value), stat="identity", fill="skyblue", alpha=0.7) +
+  geom_errorbar( aes(x=name, ymin=value-sd, ymax=value+sd), width=0.4, colour="orange", alpha=0.9, linewidth=1.3) +
+  coord_cartesian(ylim = c(0,15)) +
+  xlab("Covariate") +
+  ylab("Average % Drop in AUC under Permutation") +
+  theme_bw() +
+  theme(axis.text.x = element_text( vjust = 1, hjust=.5, size = 8),
+        plot.title = element_text(hjust=.5)) +
+  ggtitle("Non-Kin Different House Relationships") +
+  theme_pubr() +
+  labs_pubr()
+
+
+```
+
+```{r}
+fi_fig <- ggarrange(fi_all + rremove("ylab"),
+                    fi_all_nkh+ rremove("ylab"),
+                    nrow = 2,
+                    labels = c("A", "B"))
+
+
+svglite("Figures/sfigure9_full.svg", width = 16, height = 12, bg = 'transparent',fix_text_size = FALSE)
+annotate_figure(fi_fig, 
+                left = text_grob("Average % Drop in AUC under Permutation",rot = 90, size = 14),
+                top = text_grob("Permutation Feature Importance", size = 14),
+                )
+dev.off()
+```
+
+# Flip relationship and strain sharing rate
+
+# Permutation feature importance: all relationships strain sharing prediction
 ```{r}
 Downsamp_all_importance <- Downsamp_all %>%
   select(-c(ego, alter, bray_curtis_sim, predicted))
