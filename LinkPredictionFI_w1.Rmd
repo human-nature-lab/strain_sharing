@@ -3,6 +3,8 @@ title: "LinkPrediction"
 author: "Francesco Beghini"
 date: "2023-11-22"
 output: html_notebook
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -213,8 +215,6 @@ All_for_Regression_stable_ties <- rbind(All_NoRel_Covars_for_Regression_stable_t
 Non_Kin_House_for_Regression_stable_ties <- rbind(All_NoRel_Covars_for_Regression_stable_ties,
                                       SN_Non_Kin_Dif_House_Covars_for_Regression_complete_stable_ties)
 
-#May want to check if this is missing completely at random or input columns
-#filter to complete cases
 All_for_Regression_complete_stable_ties <- All_for_Regression_stable_ties[complete.cases(All_for_Regression_stable_ties), ]
 
 All_NoRel_Covars_for_Regression_complete_stable_ties <- All_NoRel_Covars_for_Regression_stable_ties[complete.cases(All_NoRel_Covars_for_Regression_stable_ties), ]

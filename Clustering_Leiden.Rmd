@@ -3,6 +3,8 @@ title: "Clustering"
 author: "Jackson Pullman"
 date: "2022-12-24"
 output: html_notebook
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -571,16 +573,11 @@ add.alpha <- function(col, alpha = 1) {
 
 par(mar=c(0,0,0,0))
 for(i in 1:length(village_names)){
-  #i<- 1
-  #SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
   set.seed(1)
-  #min(E(mbiome_all)$weight)
-  #mbiome_all <- mbiome_all - E(mbiome_all)[E(mbiome_all)$weight ==0]
   SN_Village <- SN %>% filter(village_code_w3 == village_names[i])
   #Filter to relationships of interest
   #Get ids for that village
   village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
-  #mbiome_all <- get(paste0("strain_rate_vil_graph_",i))
   strain_vil <- strain_rate[rownames(strain_rate) %in% village_ids ,
                             colnames(strain_rate) %in% village_ids]
   #Create social network and microbiome networks
@@ -601,7 +598,6 @@ sn_cluster <- cluster_leiden(sn_vil, objective_function = 'modularity')
   colors <- add.alpha(colors, alpha = .5)
 
   mbiome_cols <- colors[membership(mbiome_cluster)]
-  #Want colors here to best visually map to social network
 
   plot(mbiome_cluster,
        mbiome_all,
@@ -616,21 +612,6 @@ sn_cluster <- cluster_leiden(sn_vil, objective_function = 'modularity')
        layout = layout_with_fr,
        main = paste(village_names[i], "Strain Clusters")
   )
-  # table(membership(sn_cluster))
-  # table(membership(mbiome_cluster))
-  # temp <- membership(mbiome_cluster)
-  # swap <- c(temp)
-  # swap <- case_when(
-  #   swap == 1 ~ 5,
-  #   swap == 5 ~ 2,
-  #   swap == 3 ~ 6,
-  #   swap == 2 ~ 1,
-  #   swap == 4 ~ 3,
-  #   TRUE ~ swap
-  # )
-  # names(swap) <- names(temp)
-
-
   
   V(sn_vil)$color <- colors[membership(sn_cluster)]
   set.seed(1)
@@ -646,8 +627,6 @@ sn_cluster <- cluster_leiden(sn_vil, objective_function = 'modularity')
       main = paste(village_names[i], "Social Network Clusters")
   )
 
-  #Could Change these to match colors, hard would have to do manually
-  #V(sn_vil)$color <- swap[match(V(sn_vil)$name, names(swap))]
   V(sn_vil)$color <- membership(mbiome_cluster)[match(V(sn_vil)$name, names(membership(mbiome_cluster)))]
   V(sn_vil)$color <- colors[as.numeric(V(sn_vil)$color)]
   set.seed(1)
@@ -666,7 +645,7 @@ sn_cluster <- cluster_leiden(sn_vil, objective_function = 'modularity')
 ```
 
 
-Basauri Visualization
+Illustrative Visualization
 ```{r}
 
 add.alpha <- function(col, alpha = 1) {
@@ -714,7 +693,7 @@ V(sn_vil)$color <- colors[membership(sn_cluster)]
 sn_colors <- colors[membership(sn_cluster)]
 
 set.seed(1)
-mariposal_sn_leiden <- as.ggplot(expression(plot(#sn_cluster,
+illustrative_village_sn_leiden <- as.ggplot(expression(plot(#sn_cluster,
   sn_vil,
   vertex.label = NA,
   vertex.size = 5,
@@ -732,7 +711,7 @@ V(sn_vil)$color <- swap[match(V(sn_vil)$name, names(swap))]
 V(sn_vil)$color <- colors[as.numeric(V(sn_vil)$color)]
 
 set.seed(1)
-mariposal_overlay_leiden <- as.ggplot(expression(plot(
+illustrative_village_overlay_leiden <- as.ggplot(expression(plot(
   sn_vil,
   vertex.label = NA,
   vertex.size = 5,
@@ -748,7 +727,7 @@ mbiome_cols_rect <- colors
 mbiome_cols_rect <- mbiome_cols_rect[c(3,4,2,5)]
 V(mbiome_all)$color <- mbiome_cols
 
-mariposal_mbiome_leiden <- as.ggplot(expression(plot(
+illustrative_village_mbiome_leiden <- as.ggplot(expression(plot(
   mbiome_cluster,
   mbiome_all,
   col = mbiome_cols,
@@ -766,7 +745,7 @@ title("Microbiome Similarity Clusters",line = 0)))
 
 create_figure
 ```{r}
-fig_13l <- ggarrange(mariposal_mbiome_leiden,mariposal_sn_leiden,mariposal_overlay_leiden,
+fig_13l <- ggarrange(illustrative_village_mbiome_leiden,illustrative_village_sn_leiden,illustrative_village_overlay_leiden,
                       labels = c("A", "B", "C"),
                       ncol = 1)
 

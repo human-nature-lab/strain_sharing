@@ -3,6 +3,8 @@ title: "Clustering"
 author: "Jackson Pullman"
 date: "2022-12-24"
 output: html_notebook
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -572,75 +574,6 @@ ggarrange(cluster_pvals_fig, cluster_bucket_fig, nrow = 1, labels = c("", "h"))
 
 
 
-Statistics on which relationships are typically grouped together
-Probably just following the strain-sharing rate
-
-
-```{r}
-# #Get probability each relationship is grouped together
-# #Probably total accuracy
-# #Probability of looping in degree two
-# #Split up by relationship type
-# #Don't really need the SN Clusters
-# for(i in 1:length(village_names)) {
-#   mbiome_membership <- get(paste0("mbiome_member_", i))
-#   #Probability first-degree connections included
-#   sn_edges <- get(paste0("sn_vil_", i))
-#   for (j in 1:nrow(sn_edges)) {
-#     sn_edges$clustered[j] <-
-#       mbiome_membership[names(mbiome_membership) == sn_edges$ego[j]] ==
-#       mbiome_membership[names(mbiome_membership) == sn_edges$alter[j]]
-#   }
-#   assign(paste0("sn_vil_", i), sn_edges)
-# }
-# 
-# for(i in 1:length(village_names)) {
-#   sn_membership <- get(paste0("sn_member_", i))
-#   #Probability first-degree connections included
-#   sn_edges <- get(paste0("sn_vil_", i))
-#   for (j in 1:nrow(sn_edges)) {
-#     sn_edges$clustered_social[j] <-
-#       sn_membership[names(sn_membership) == sn_edges$ego[j]] ==
-#       sn_membership[names(sn_membership) == sn_edges$alter[j]]
-#   }
-#   assign(paste0("sn_vil_", i), sn_edges)
-# }
-# 
-# 
-# 
-# 
-# sn_cluster_stack <- rbind(sn_vil_1,
-#                           sn_vil_2,
-#                           sn_vil_3,
-#                           sn_vil_4,
-#                           sn_vil_5,
-#                           sn_vil_6,
-#                           sn_vil_7,
-#                           sn_vil_8,
-#                           sn_vil_9)
-# 
-# #Baseline it
-# 
-# sn_cluster_stack %>%
-#   distinct(pair_key,.keep_all = TRUE) %>% 
-#   summarize(prob_clustered = mean(clustered))
-# 
-# sn_cluster_stack %>%
-#   distinct(pair_key,.keep_all = TRUE) %>% 
-#   summarize(prob_mbiome_clustered = mean(clustered),
-#             prob_sn_clustered = mean(clustered_social),
-#             prob_overlap = mean(clustered == clustered_social) )
-# 
-# sn_cluster_stack %>%
-#   distinct(relationship, pair_key,.keep_all = TRUE) %>%
-#   group_by(relationship) %>% 
-#   summarize(prob_clustered = mean(clustered)) %>%
-#   arrange(desc(prob_clustered))
-
-```
-
-
-
 
 
 Village Plots
@@ -657,16 +590,11 @@ add.alpha <- function(col, alpha = 1) {
 pdf('test.pdf')
 par(mar=c(0,0,0,0))
 for(i in 1:length(village_names)){
-  #i<- 1
-  #SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
   set.seed(1)
-  #min(E(mbiome_all)$weight)
-  #mbiome_all <- mbiome_all - E(mbiome_all)[E(mbiome_all)$weight ==0]
   SN_Village <- SN %>% filter(village_code_w3 == village_names[i])
   #Filter to relationships of interest
   #Get ids for that village
   village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
-  #mbiome_all <- get(paste0("strain_rate_vil_graph_",i))
   strain_vil <- strain_rate[rownames(strain_rate) %in% village_ids ,
                             colnames(strain_rate) %in% village_ids]
   #Create social network and microbiome networks
@@ -687,7 +615,6 @@ for(i in 1:length(village_names)){
   colors <- add.alpha(colors, alpha = .5)
 
   mbiome_cols <- colors[membership(mbiome_cluster)]
-  #Want colors here to best visually map to social network
   par(mfrow=c(1,3))
   plot(mbiome_cluster,
        mbiome_all,
@@ -702,19 +629,6 @@ for(i in 1:length(village_names)){
        layout = layout_with_fr,
       main = paste(village_names[i], "Strain Clusters")
   )
-  # table(membership(sn_cluster))
-  # table(membership(mbiome_cluster))
-  # temp <- membership(mbiome_cluster)
-  # swap <- c(temp)
-  # swap <- case_when(
-  #   swap == 1 ~ 5,
-  #   swap == 5 ~ 2,
-  #   swap == 3 ~ 6,
-  #   swap == 2 ~ 1,
-  #   swap == 4 ~ 3,
-  #   TRUE ~ swap
-  # )
-  # names(swap) <- names(temp)
 
 
   
@@ -732,8 +646,6 @@ for(i in 1:length(village_names)){
        main = paste(village_names[i], "Social Network Clusters")
   )
 
-  #Could Change these to match colors, hard would have to do manually
-  #V(sn_vil)$color <- swap[match(V(sn_vil)$name, names(swap))]
   V(sn_vil)$color <- membership(mbiome_cluster)[match(V(sn_vil)$name, names(membership(mbiome_cluster)))]
   V(sn_vil)$color <- colors[as.numeric(V(sn_vil)$color)]
   set.seed(1)
@@ -747,11 +659,10 @@ for(i in 1:length(village_names)){
   )
 }
 dev.off()
-#there's a couple good ones I say bring in the old strains for Mariposal
 ```
 
 
-Mariposal Visualization
+Illustrative Visualizations
 ```{r}
 
 add.alpha <- function(col, alpha = 1) {
@@ -762,7 +673,7 @@ add.alpha <- function(col, alpha = 1) {
           rgb(x[1], x[2], x[3], alpha = alpha))
 }
 
-SN_Village <- SN %>% filter(village_name_w3 == "mariposal")
+SN_Village <- SN %>% filter(village_code_w3 == 116)
 #Filter to relationships of interest
 #Get ids for that village
 village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
@@ -811,10 +722,10 @@ plot(
   col = sn_colors,
   edge.color = "black",
   layout = layout_with_fr,
-  main = "Social Network Clusters for Mariposal"
+  main = "Social Network Clusters for illustrative_village"
 )
 set.seed(1)
-mariposal_sn <- as.ggplot(expression(plot(#sn_cluster,
+illustrative_village_sn <- as.ggplot(expression(plot(#sn_cluster,
   sn_vil,
   vertex.label = NA,
   vertex.size = 5,
@@ -827,7 +738,6 @@ mariposal_sn <- as.ggplot(expression(plot(#sn_cluster,
 ),
 title("Social Network Clusters",line = 0)))
 
-#Could Change these to match colors, hard would have to do manually
 V(sn_vil)$color <- swap[match(V(sn_vil)$name, names(swap))]
 V(sn_vil)$color <- colors[as.numeric(V(sn_vil)$color)]
 set.seed(1)
@@ -841,7 +751,7 @@ plot(
   main = "Microbiome Similarity Clusters\non Social Network"
 )
 set.seed(1)
-mariposal_overlay <- as.ggplot(expression(plot(
+illustrative_village_overlay <- as.ggplot(expression(plot(
   sn_vil,
   vertex.label = NA,
   vertex.size = 5,
@@ -873,7 +783,7 @@ plot(
 )
 
 
-mariposal_mbiome <- as.ggplot(expression(plot(
+illustrative_village_mbiome <- as.ggplot(expression(plot(
   mbiome_cluster,
   mbiome_all,
   col = mbiome_cols,
@@ -889,134 +799,6 @@ mariposal_mbiome <- as.ggplot(expression(plot(
 title("Microbiome Similarity Clusters",line = 0)))
 ```
 
-Quesaras Visualization
-```{r}
-village_map
-SN_Village <- SN %>% filter(village_name_w3 == "Hernani")
-
-
-village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
-
-strain_vil <-
-  strain_rate[rownames(strain_rate) %in% village_ids ,
-                  colnames(strain_rate) %in% village_ids]
-
-sn_vil <-
-  igraph::simplify(graph_from_data_frame(SN_Village, directed = FALSE))
-
-mbiome_all <-
-  simplify(graph_from_adjacency_matrix(strain_vil, mode = "undirected", weighted = TRUE))
-
-#Cluster
-mbiome_cluster <-
-  cluster_louvain(mbiome_all, weights = E(mbiome_all)$weight)
-sn_cluster <- cluster_louvain(sn_vil)
-
-max_cluster <-
-  max(max(membership(mbiome_cluster)), max(membership(sn_cluster)))
-
-colors <- pals::cols25(max_cluster)
-
-
-#need to line up the cluster plot now
-temp <- membership(mbiome_cluster)
-swap <- c(temp)
-swap <- case_when(swap == 1 ~ 5,
-                  swap == 5 ~ 2,
-                  swap == 3 ~ 6,
-                  swap == 2 ~ 1,
-                  swap == 4 ~ 3,
-                  TRUE ~ swap)
-names(swap) <- names(temp)
-
-
-
-V(sn_vil)$color <- colors[membership(sn_cluster)]
-sn_colors <- colors[membership(sn_cluster)]
-set.seed(1)
-plot(#sn_cluster,
-  sn_vil,
-  vertex.label = NA,
-  vertex.size = 5,
-  mark.col = colors,
-  mark.border = colors,
-  col = sn_colors,
-  edge.color = "black",
-  layout = layout_with_fr
-)
-set.seed(1)
-quesaras_sn <- as.ggplot(expression(plot(#sn_cluster,
-  sn_vil,
-  vertex.label = NA,
-  vertex.size = 5,
-  mark.col = colors,
-  mark.border = colors,
-  col = sn_colors,
-  edge.color = "black",
-  layout = layout_with_fr,
-  #main = "Social Network Clusters"
-),
-title("Social Network Clusters")))
-
-#Could Change these to match colors, hard would have to do manually
-V(sn_vil)$color <- swap[match(V(sn_vil)$name, names(swap))]
-#V(sn_vil)$color <- membership(mbiome_cluster)[match(V(sn_vil)$name, names(membership(mbiome_cluster)))]
-V(sn_vil)$color <- colors[as.numeric(V(sn_vil)$color)]
-set.seed(1)
-plot(
-  sn_vil,
-  vertex.label = NA,
-  vertex.size = 5,
-  edge.color = "black",
-  layout = layout_with_fr,
-  main = "Microbiome Similarity Clusters\non Social Network"
-)
-set.seed(1)
-quesaras_overlay <- as.ggplot(expression(plot(
-  sn_vil,
-  vertex.label = NA,
-  vertex.size = 5,
-  edge.color = "black",
-  layout = layout_with_fr,
-  #main = "Microbiome Similarity Clusters\non Social Network"
-),
-title("Microbiome Similarity Clusters\non Social Network")))
-colors <- add.alpha(colors, alpha = .5)
-mbiome_cols <- colors[swap]
-mbiome_cols_rect <- colors
-mbiome_cols_rect <- mbiome_cols_rect[c(5,1,6,3,2)]
-
-V(mbiome_all)$color <- mbiome_cols
-
-plot(
-  mbiome_cluster,
-  mbiome_all,
-  col = mbiome_cols,
-  mark.col = mbiome_cols_rect,
-  mark.border = mbiome_cols_rect,
-  vertex.label = NA,
-  vertex.size = 5,
-  edge.width = E(mbiome_all)$weight / 25,
-  edge.color = "black",
-  layout = layout_with_fr
-)
-
-quesaras_mbiome <- as.ggplot(expression(plot(
-  mbiome_cluster,
-  mbiome_all,
-  col = mbiome_cols,
-  mark.col = mbiome_cols_rect,
-  mark.border = mbiome_cols_rect,
-  vertex.label = NA,
-  vertex.size = 5,
-  edge.width = E(mbiome_all)$weight / 25,
-  edge.color = "black",
-  layout = layout_with_fr,
-  #main = "Microbiome Similarity Clusters"
-),
-title("Microbiome Similarity Clusters")))
-
-```
 
 create_figure
 ```{r}
@@ -1026,12 +808,12 @@ ggarrange(cluster_pvals_fig, cluster_bucket_fig, nrow = 1, labels = c("g", "h"))
 
 
 fig5_1 <- ggarrange(cluster_bucket_fig,
-          mariposal_mbiome,
+          illustrative_village_mbiome,
           labels = c("A", "B"),
           nrow = 1)
 
-fig5_2 <- ggarrange(mariposal_sn,
-          mariposal_overlay,
+fig5_2 <- ggarrange(illustrative_village_sn,
+          illustrative_village_overlay,
           labels = c("C", "D"),
           nrow = 1)
 
@@ -1060,154 +842,3 @@ fig5
 dev.off()
 
 ```
-
-
-```{r}
-ggarrange(cluster_bucket_fig,
-          mariposal_mbiome,
-          mariposal_sn,
-          mariposal_overlay,
-          labels = c("A", "B",
-                     "C", "D"), nrow = 2)
-
-mariposal_cluster_fig <-ggarrange(mariposal_mbiome, mariposal_sn, mariposal_overlay,
-                                  nrow = 1, labels = c("A", "C", "E"))
-
-quesaras_cluster_fig <-ggarrange(quesaras_mbiome, quesaras_sn, quesaras_overlay,
-                                  nrow = 1, labels = c("B", "D", "F"))
-
-ggarrange(mariposal_cluster_fig, quesaras_cluster_fig, nrow = 2)
-
-cluster_overlap_fig <- ggarrange(mariposal_mbiome, mariposal_overlay, mariposal_sn,
-                                 quesaras_mbiome, quesaras_overlay, quesaras_sn,
-                                 nrow = 2, labels = c("a", "b", "c", "d", "e", "f"))
-```
-
-
-
-Test Visualization
-```{r}
-village_map
-village_names
-plot(sn_vil_graph_8,vertex.label = NA,
-  vertex.size = 5)
-
-sn_vil <- sn_vil_graph_8
-
-mbiome_all <- strain_rate_vil_graph_8
-
-# plot(sn_cluster_8,
-#   sn_vil_graph_8,
-#   vertex.label = NA,
-#   vertex.size = 5,
-#   mark.col = colors,
-#   mark.border = colors,
-#   col = sn_colors,
-#   edge.color = "black",
-#   layout = layout_with_fr
-# )
-# 
-# SN_Village <- SN %>% filter(village_name_w3 == "Plan El Perico")
-# 
-# village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
-# 
-# strain_vil <-
-#   strain_rate[rownames(strain_rate) %in% village_ids ,
-#                   colnames(strain_rate) %in% village_ids]
-# 
-# sn_vil <-
-#   igraph::simplify(graph_from_data_frame(SN_Village, directed = FALSE))
-# 
-# mbiome_all <-
-#   simplify(graph_from_adjacency_matrix(strain_vil, mode = "undirected", weighted = TRUE))
-
-#Cluster
-mbiome_cluster <-
-  cluster_louvain(mbiome_all, weights = E(mbiome_all)$weight)
-sn_cluster <- cluster_louvain(sn_vil)
-
-max_cluster <-
-  max(max(membership(mbiome_cluster)), max(membership(sn_cluster)))
-
-colors <- pals::cols25(max_cluster)
-
-
-
-
-V(sn_vil)$color <- colors[membership(sn_cluster)]
-sn_colors <- colors[membership(sn_cluster)]
-set.seed(1)
-plot(#sn_cluster,
-  sn_vil,
-  vertex.label = NA,
-  vertex.size = 5,
-  mark.col = colors,
-  mark.border = colors,
-  col = sn_colors,
-  edge.color = "black",
-  layout = layout_with_fr
-)
-
-
-#Could Change these to match colors, hard would have to do manually
-#V(sn_vil)$color <- swap[match(V(sn_vil)$name, names(swap))]
-V(sn_vil)$color <- membership(mbiome_cluster)[match(V(sn_vil)$name, names(membership(mbiome_cluster)))]
-V(sn_vil)$color <- colors[as.numeric(V(sn_vil)$color)]
-set.seed(1)
-plot(
-  sn_vil,
-  vertex.label = NA,
-  vertex.size = 5,
-  edge.color = "black",
-  layout = layout_with_fr,
-  main = "Microbiome Similarity Clusters\non Social Network"
-)
-set.seed(1)
-quesaras_overlay <- as.ggplot(expression(plot(
-  sn_vil,
-  vertex.label = NA,
-  vertex.size = 5,
-  edge.color = "black",
-  layout = layout_with_fr,
-  #main = "Microbiome Similarity Clusters\non Social Network"
-),
-title("Microbiome Similarity Clusters\non Social Network")))
-colors <- add.alpha(colors, alpha = .5)
-mbiome_cols <- colors[swap]
-mbiome_cols_rect <- colors
-mbiome_cols_rect <- mbiome_cols_rect[c(5,1,6,3,2)]
-
-V(mbiome_all)$color <- mbiome_cols
-
-plot(
-  mbiome_cluster,
-  mbiome_all,
-  col = mbiome_cols,
-  mark.col = mbiome_cols_rect,
-  mark.border = mbiome_cols_rect,
-  vertex.label = NA,
-  vertex.size = 5,
-  edge.width = E(mbiome_all)$weight / 25,
-  edge.color = "black",
-  layout = layout_with_fr
-)
-
-quesaras_mbiome <- as.ggplot(expression(plot(
-  mbiome_cluster,
-  mbiome_all,
-  col = mbiome_cols,
-  mark.col = mbiome_cols_rect,
-  mark.border = mbiome_cols_rect,
-  vertex.label = NA,
-  vertex.size = 5,
-  edge.width = E(mbiome_all)$weight / 25,
-  edge.color = "black",
-  layout = layout_with_fr,
-  #main = "Microbiome Similarity Clusters"
-),
-title("Microbiome Similarity Clusters")))
-
-```
-
-
-
