@@ -2,19 +2,19 @@
 title: "Strain-sharing prediction"
 author: "Francesco Beghini"
 date: "2024-05-1"
-output: html_notebook
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 Downsamp_all <- readRDS('Downsamp_all.Rds')
-Downsamp_all_nkh <- readRDS('Downsamp_all_nkh.RDS')
+Downsamp_all_nkh <- readRDS('Downsamp_all_nkh.Rds')
 ```
 
 # Calculate R2 for all relationships
 ```{r}
-llm_all_kin_for2 <- lme4::lmer(strain_sharing_rate ~ gender.mm + gender.mf + indigenous.both +
+llm_all_kin_for2 <- lmerTest::lmer(strain_sharing_rate ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
                         same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
@@ -22,7 +22,7 @@ llm_all_kin_for2 <- lme4::lmer(strain_sharing_rate ~ gender.mm + gender.mf + ind
                         education_difference_abs + average_education + household_same +
                         related + (1|village_code_w3),
                               data = Downsamp_all)
-summarise(llm_all_kin_for2)
+summary(llm_all_kin_for2)
 ```
 ```{r}
 r2glmm::r2beta(llm_all_kin_for2, method = 'nsj')
@@ -30,14 +30,14 @@ r2glmm::r2beta(llm_all_kin_for2, method = 'nsj')
 
 # Calculate R2 for non-kin relationships
 ```{r}
-llm_non_kin_for2 <- lme4::lmer(strain_sharing_rate ~ gender.mm + gender.mf + indigenous.both +
+llm_non_kin_for2 <- lmerTest::lmer(strain_sharing_rate ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
                         same_usage_painkillers + same_usage_antibiotics + same_usage_antidiarrheal + same_usage_antiparasite + same_usage_vitamins + same_usage_zinc + same_usage_antifungal + same_usage_antihypertensives + same_usage_antidiabetics + same_usage_antiacids + same_usage_laxatives +
                         average_age + wealth_difference_abs + average_wealth +
                         education_difference_abs + average_education + household_same + related + (1|village_code_w3),
                               data = Downsamp_all_nkh)
-summarise(llm_non_kin_for2)
+summary(llm_non_kin_for2)
 ```
 
 ```{r}
