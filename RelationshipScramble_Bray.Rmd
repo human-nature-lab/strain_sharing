@@ -3,6 +3,8 @@ title: "RelationshipScramble_Bray"
 author: "Jackson Pullman"
 date: "2023-03-05"
 output: html_notebook
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -103,8 +105,6 @@ for(i in 1:length(relationships)){
     sn_vil_rel_scram_18$alter <- sample(sn_vil_rel_scram_18$alter)
     
     #Get scrambled alter list
-    #May want to order this so that we're also scrambling the genders, fine for now
-    #It's done by scrambling like this for parent child and spouse, but while network scramble for the other
     scram_alters <- c(sn_vil_rel_scram_1$alter,
               sn_vil_rel_scram_2$alter,
               sn_vil_rel_scram_3$alter,
@@ -148,7 +148,6 @@ for(i in 1:length(relationships)){
 }
 
 #add in same house scramble and non-kin different house scramble
-#Probably should mark this relationship as same building
 sn_vil_rel_1 <- sn_vil_1 %>% filter(same_building == 1) %>%
   distinct(pair_key, .keep_all = TRUE)
 sn_vil_rel_2 <- sn_vil_2 %>% filter(same_building == 1) %>%
@@ -271,8 +270,6 @@ for(j in 1:100){
     sn_vil_rel_scram_18$alter <- sample(sn_vil_rel_scram_18$alter)
     
     #Get scrambled alter list
-    #May want to order this so that we're also scrambling the genders, fine for now
-    #It's done by scrambling like this for parent child and spouse, but while network scramble for the other
     scram_alters <- c(sn_vil_rel_scram_1$alter,
               sn_vil_rel_scram_2$alter,
               sn_vil_rel_scram_3$alter,
@@ -434,8 +431,6 @@ for(j in 1:100){
     sn_vil_rel_scram_18$alter <- sample(sn_vil_rel_scram_18$alter)
     
     #Get scrambled alter list
-    #May want to order this so that we're also scrambling the genders, fine for now
-    #It's done by scrambling like this for parent child and spouse, but while network scramble for the other
     scram_alters <- c(sn_vil_rel_scram_1$alter,
               sn_vil_rel_scram_2$alter,
               sn_vil_rel_scram_3$alter,
@@ -478,8 +473,6 @@ for(j in 1:100){
 
 ```{r}
 #Create plot of strain sharing rate by relationship
-#Make relationship factor variable for plottin
-#manually reorder factor levels to match relationships plot
 SN_Rels$relationship <- factor(SN_Rels$relationship,
                                levels=c("Partner", "Same Building", "Mother",
                                         "Child", "Spend Free Time",
@@ -567,9 +560,4 @@ rel_scramb_p_bray <- ggboxplot(
   font("xlab", face = "bold", size = 10)
 
 
-
-
-# svglite("../Figures/Figure1/B.svg")
-# rel_scramb_p
-# dev.off()
 ```

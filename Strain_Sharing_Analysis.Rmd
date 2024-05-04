@@ -2,6 +2,8 @@
 title: "Analysis"
 output: html_notebook
 date: "2022-12-12"
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -279,7 +281,6 @@ SN_All_Relationship_DF$relationship <- reorder(as.factor(SN_All_Relationship_DF$
 
 
 #Change names for plotting
-#Make sure this is correct still
 levels(SN_All_Relationship_DF$relationship) <- c("Partner",
                                                  "Same Building",
                                                  "Mother",
@@ -643,7 +644,6 @@ free_time_pvals <- compare_means(strain_sharing_rate ~ Free_Time,
 free_time_pvals <- free_time_pvals %>% filter(p.signif == "ns") %>%
   mutate(y.position = c(45))
 
-#Something is weird with the jitter here
 
 free_time_all_plot <- ggplot(SN_Symmetrized_2, aes(Free_Time, strain_sharing_rate, color = Free_Time)) +
   geom_quasirandom(size = 1, alpha = 0.5) +
@@ -987,18 +987,6 @@ SN_Greeting_Non_Kin_House <- SN_Greeting_Non_Kin_House %>%
   mutate(max_greeting = max(max_greeting)) %>%
   ungroup() %>% distinct(pair_key, .keep_all = TRUE)
 
-#Reverse map on values from survey
-# SN_Greeting_Non_Kin_House <- SN_Greeting_Non_Kin_House %>% mutate(
-#   Riskiest_Greeting = case_when(
-#     max_greeting == 7 ~ "Kiss on\nthe cheek",
-#     max_greeting == 6 ~ "Hug",
-#     max_greeting == 5 ~ "Pat on\nthe back",
-#     max_greeting == 4 ~ "Handshake\nor hi-five",
-#     max_greeting == 3 ~ "Verbal salute\n(Hello)",
-#     max_greeting == 2 ~ "A gesture\n(wave, nod, etc.)",
-#     max_greeting == 1 ~ "A smile",
-#     max_greeting == 0 ~ "Other/Refused",
-#   ))
 
 SN_Greeting_Non_Kin_House <- SN_Greeting_Non_Kin_House %>% mutate(
   Riskiest_Greeting = case_when(
@@ -1032,7 +1020,6 @@ kruskal.test(strain_sharing_rate ~ Riskiest_Greeting,
                                  data = SN_Greeting_Non_Kin_House)
 nrow(SN_Greeting_Non_Kin_House)
 
-#Should double check this
 greetings_pvals_nkh <- compare_means(strain_sharing_rate ~ Riskiest_Greeting,
                                  data = SN_Greeting_Non_Kin_House,
                                  p.adjust.method = "BH"

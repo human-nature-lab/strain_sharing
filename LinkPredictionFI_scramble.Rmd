@@ -3,6 +3,8 @@ title: "LinkPrediction"
 author: "Jackson Pullman"
 date: "2023-02-05"
 output: html_notebook
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -191,8 +193,7 @@ foreach(p = seq(from = .05, to = 1, by = .05), .packages = c('doParallel','dplyr
     Non_Kin_House_for_Regression <- rbind(All_NoRel_Covars_for_Regression,
                                         SN_Non_Kin_Dif_House_Covars_for_Regression_complete)
 
-    #May want to check if this is missing completely at random or input columns
-    #filter to complete cases
+
     All_for_Regression_complete <- All_for_Regression[complete.cases(All_for_Regression),]
 
     All_NoRel_Covars_for_Regression_complete <- All_NoRel_Covars_for_Regression[complete.cases(All_NoRel_Covars_for_Regression),]

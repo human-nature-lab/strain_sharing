@@ -2,7 +2,11 @@
 title: "Link Prediction using Mahalanobis distance"
 author: "Francesco Beghini"
 date: "2024-01-03"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -109,11 +113,11 @@ foreach(v = village_names, .combine = rbind) %dopar% {
   #Check progress
   print(v)
   Village_NoRels
-} -> All_NoRel_Covars     #Get covariated for people without relationship ties
+} -> All_NoRel_Covars     #Get covariates for people without relationship ties
 
 parallel::stopCluster(cl)
 
-#Set Un-nominated same village realtionship
+#Set Un-nominated same village relationship
 All_NoRel_Covars$relationship <- "Un-Nominated Same Village"
 
 #Attach strain sharing data to non-nominated relationships
@@ -129,11 +133,6 @@ for(i in 1:nrow(All_NoRel_Covars)){
 }
 
 All_NoRel_Covars <- merge(All_NoRel_Covars,sub_covar_maha_l)
-
-# for(i in 1:nrow(All_NoRel_Covars)){
-#   All_NoRel_Covars$jaccard_sim[i] <- species_jaccard_sim[rownames(species_jaccard_sim) == All_NoRel_Covars$ego[i],
-#                                                          colnames(species_jaccard_sim) == All_NoRel_Covars$alter[i]]
-# }
 
 
 #Get dataframe of all known relationships into format for regression
@@ -173,7 +172,6 @@ All_for_Regression <- rbind(All_NoRel_Covars_for_Regression, SN_All_Covars_for_R
 Non_Kin_House_for_Regression <- rbind(All_NoRel_Covars_for_Regression,
                                       SN_Non_Kin_Dif_House_Covars_for_Regression_complete)
 
-#May want to check if this is missing completely at random or input columns
 #filter to complete cases
 All_for_Regression_complete <- All_for_Regression[complete.cases(All_for_Regression),]
 
@@ -423,8 +421,7 @@ pred.all.acc[pred.all.acc <.5] <- 0
 
 Downsamp_all$predicted <- pred.all.acc
 
-#Create ROC object weird it got worse, could do this over multiple downsamples as well
-#I think my predictions will be fairly consistent
+#Create ROC object
 logit.base.roc <- pROC::roc(Downsamp_all$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
@@ -592,8 +589,7 @@ pred.all.acc[pred.all.acc <.5] <- 0
 
 Downsamp_all_nkh$predicted <- pred.all.acc
 
-#Create ROC object weird it got worse, could do this over multiple downsamples as well
-#I think my predictions will be fairly consistent
+#Create ROC object
 logit.base.roc <- pROC::roc(Downsamp_all_nkh$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
@@ -790,9 +786,6 @@ dev.off()
 
 Permutation Feature Importance
 ```{r}
-#head(Downsamp_all)
-#Downsamp_all_importance <- Downsamp_all %>%
-#  select(-c(ego, alter, tp, bray_curtis_sim, jaccard_sim, village_code_w3, predicted))
 
 Downsamp_all_importance <- Downsamp_all %>%
   select(-c(ego, alter, bray_curtis_sim, predicted))
@@ -801,10 +794,7 @@ auc_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 11))
 colnames(auc_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
                              "education_difference","average_education","household_same","strain_sharing_rate")
 
-#only permute within village NEED to ADD BACK
-#Damn ok, shouldn't be that hard. 
-#I think it's ok to drop mixed effect
-#Doesn't really do that much
+
 #Gender
 print("gender")
 dat_permuted <- Downsamp_all_importance
@@ -919,18 +909,17 @@ logit_ssr <- glm(related ~ . ,
 #Summary of logistic regression
 summary(logit_ssr)
 
-# #Calculate VIF for validity of permutation null
-# library(car)
-# #All relatively low, good to go
-# vif(logit_ssr)
-# vif_values <- vif(logit_ssr)
+#Calculate VIF for validity of permutation null
+library(car)
+vif(logit_ssr)
+vif_values <- vif(logit_ssr)
 
 #create horizontal bar chart to display each VIF value
-# par(mar=c(5.1, 4.1, 4.1, 2.1))
-# barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue", las = 2)
+par(mar=c(5.1, 4.1, 4.1, 2.1))
+barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue", las = 2)
 
 #add vertical line at 5
-#abline(v = 5, lwd = 3, lty = 2)
+abline(v = 5, lwd = 3, lty = 2)
 
 #Get original auc
 auc_ssr <-  auc(Downsamp_all_importance$related , logit_ssr$fitted.values,
@@ -1003,9 +992,6 @@ Permutation Inference for Non-Kin Different House
 
 ```{r}
 
-#Downsamp_all_importance <- Downsamp_all_nkh %>%
-#  select(-c(ego, alter, tp, bray_curtis_sim, jaccard_sim, village_code_w3, predicted))
-
 Downsamp_all_importance <- Downsamp_all_nkh %>%
   select(-c(ego, alter, bray_curtis_sim, village_code_w3, predicted))
 
@@ -1014,10 +1000,7 @@ auc_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 11))
 colnames(auc_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
                              "education_difference","average_education","household_same","strain_sharing_rate")
 
-#only permute within village NEED to ADD BACK
-#Damn ok, shouldn't be that hard. 
-#I think it's ok to drop mixed effect
-#Doesn't really do that much
+
 #Gender
 print("gender")
 dat_permuted <- Downsamp_all_importance
@@ -1130,18 +1113,15 @@ logit_ssr <- glm(related ~ . ,
 #Summary of logistic regression
 summary(logit_ssr)
 
-# #Calculate VIF for validity of permutation null
-# library(car)
-# #All relatively low, good to go
-# vif(logit_ssr)
-# vif_values <- vif(logit_ssr)
-# 
-# #create horizontal bar chart to display each VIF value
-# par(mar=c(5.1, 4.1, 4.1, 2.1))
-# barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue", las = 2)
+#Calculate VIF for validity of permutation null
+library(car)
+vif(logit_ssr)
+vif_values <- vif(logit_ssr)
 
-#add vertical line at 5
-#abline(v = 5, lwd = 3, lty = 2)
+#create horizontal bar chart to display each VIF value
+par(mar=c(5.1, 4.1, 4.1, 2.1))
+barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue", las = 2)
+abline(v = 5, lwd = 3, lty = 2)
 
 #Get original auc
 auc_ssr <-  auc(Downsamp_all_importance$related , logit_ssr$fitted.values,
@@ -1171,9 +1151,6 @@ auc_perms_ssr_dat$name <-c("Gender",
 
 
 #Create plot
-#Whether to downsample of not from this
-#hmmmmm
-#Also could do the other way
 fi_all_nkh <- ggplot(auc_perms_ssr_dat) +
   geom_bar( aes(x=reorder(name, -value), y=value), stat="identity", fill="skyblue", alpha=0.7) +
   geom_errorbar( aes(x=name, ymin=value-sd, ymax=value+sd), width=0.4, colour="orange", alpha=0.9, linewidth=1.3) +
@@ -1213,383 +1190,4 @@ annotate_figure(fi_fig,
                 top = text_grob("Permutation Feature Importance", size = 14),
                 )
 
-```
-
-
-
-
-
-Flipping to predict similarity
-
-
-```{r}
-library(betareg)
-
-hist(Downsamp_all$strain_sharing_rate, breaks = 50)
-
-Downsamp_all_importance <- Downsamp_all %>%
-  select(-c(ego, alter, tp, bray_curtis_sim, village_code_w3, predicted))
-
-auc_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 10))
-colnames(auc_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
-                             "education_difference","average_education","related")
-?betareg
-#Adjust values to be within 0 and 1
-Downsamp_all_importance$strain_sharing_rate[Downsamp_all_importance$strain_sharing_rate == 0] <- .01
-
-Downsamp_all_importance$strain_sharing_rate[Downsamp_all_importance$strain_sharing_rate == 1] <- .99
-#Downsamp_all_importance$strain_sharing_rate <- Downsamp_all_importance$strain_sharing_rate+.0001
-
-range(Downsamp_all_importance$strain_sharing_rate)
-beta.mod <- betareg(strain_sharing_rate ~ ., data = Downsamp_all_importance)
-lm.mod <- lm(strain_sharing_rate ~ ., data = Downsamp_all_importance)
-
-plot(beta.mod$fitted.values, Downsamp_all_importance$strain_sharing_rate)
-plot(lm.mod$fitted.values, Downsamp_all_importance$strain_sharing_rate)
-
-#LM actually has lower MSE
-mean((fitted(beta.mod) - Downsamp_all_importance$strain_sharing_rate)^2)
-mean((fitted(lm.mod) - Downsamp_all_importance$strain_sharing_rate)^2)
-
-plot(beta.mod$fitted.values, Downsamp_all_importance$related)
-
-plot(lm.mod$fitted.values, Downsamp_all_importance$related)
-
-plot(fitted(beta.mod),
-     residuals(beta.mod))
-
-plot(fitted(lm.mod),
-     residuals(lm.mod))
-
-
-#Gender
-print("gender")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  gender_cols <- dat_permuted[,c("gender.mm", "gender.mf")]
-  gender_cols <- gender_cols[sample(nrow(gender_cols)),]
-  dat_permuted[,c("gender.mm", "gender.mf")] <- gender_cols
-  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
-  auc_perms_ssr$gender[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
-}
-
-#indigenous status
-print("indigenous status")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  indigenous_cols <- dat_permuted[,c("indigenous.both", "indigenous.one")]
-  indigenous_cols <- indigenous_cols[sample(nrow(indigenous_cols)),]
-  dat_permuted[,c("indigenous.both", "indigenous.one")] <- indigenous_cols
-  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
-  auc_perms_ssr$indigenous_status[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
-}
-#religion
-print("religion")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$religion.same <- sample(dat_permuted$religion.same)
-  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
-  auc_perms_ssr$religion[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
-}
-#age difference
-print("age difference")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$age_difference_abs <- sample(dat_permuted$age_difference_abs)
-  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
-  auc_perms_ssr$age_difference[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
-}
-#average age
-print("average age")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$average_age <- sample(dat_permuted$average_age)
-  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
-  auc_perms_ssr$average_age[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
-}
-#wealth difference
-print("wealth difference")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$wealth_difference_abs <- sample(dat_permuted$wealth_difference_abs)
-  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
-  auc_perms_ssr$wealth_difference[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
-}
-#average wealth
-print("average wealth")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$average_wealth <- sample(dat_permuted$average_wealth)
-  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
-  auc_perms_ssr$average_wealth[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
-}
-#education
-print("education")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$education_difference_abs <- sample(dat_permuted$education_difference_abs)
-  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
-  auc_perms_ssr$education_difference[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
-}
-#average education
-print("average education")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$average_education <- sample(dat_permuted$average_education)
-  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
-  auc_perms_ssr$average_education[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
-}
-#social relationship
-print("social relationship")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$related <- sample(dat_permuted$related)
-  beta.mod <- betareg(strain_sharing_rate ~ ., data = dat_permuted)
-  auc_perms_ssr$related[i] <- mean((fitted(beta.mod) - dat_permuted$strain_sharing_rate)^2)
-}
-
-#Get original bet regression model
-beta.mod <- betareg(strain_sharing_rate ~ ., data = Downsamp_all_importance)
-
-mean((fitted(beta.mod) - Downsamp_all_importance$strain_sharing_rate)^2)
-#Summary of beta regression
-summary(beta.mod)
-
-# #Calculate VIF for validity of permutation null
-# library(car)
-# #All relatively low, good to go
-# vif(logit_ssr)
-# vif_values <- vif(logit_ssr)
-# 
-# #create horizontal bar chart to display each VIF value
-# par(mar=c(5.1, 4.1, 4.1, 2.1))
-# barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue", las = 2)
-# 
-# #add vertical line at 5
-# abline(v = 5, lwd = 3, lty = 2)
-
-#Get original MSE
-auc_ssr <-  mean((fitted(beta.mod) - Downsamp_all_importance$strain_sharing_rate)^2)
-
-#Get percent change in auc from original under permutation
-auc_perms_percent_ssr <- auc_perms_ssr
-auc_perms_percent_ssr <- (as.numeric(auc_ssr) - auc_perms_percent_ssr) / as.numeric(auc_ssr)
-
-#Get mean drop and standard devation in dataframe
-auc_perms_ssr_dat <- data.frame(name = names(auc_perms_percent_ssr),
-                                value = colMeans(auc_perms_percent_ssr),
-                                sd = apply(auc_perms_percent_ssr,2,sd))
-auc_perms_ssr_dat$value <- auc_perms_ssr_dat$value*(-1)
-auc_perms_ssr_dat$value <- auc_perms_ssr_dat$value *100
-#Change Name to Make More Readable
-auc_perms_ssr_dat$name <-c("Gender",
-                           "Indigenous\nStatus",
-                           "Religion",
-                           "Age\nDifference",
-                           "Average\nAge",
-                           "Wealth\nDifference",
-                           "Average\nWealth",
-                           "Education\nDifference",
-                           "Average\nEducation",
-                           "Social or \nFamilial\nRelationship")
-
-
-#Create plot
-#Whether to downsample of not from this
-#hmmmmm
-#Also could do the other way
-#May want to make this out of sample next, but this is really cool
-fi_beta_all <- ggplot(auc_perms_ssr_dat) +
-  geom_bar( aes(x=reorder(name, -value), y=value), stat="identity", fill="skyblue", alpha=0.7) +
-  geom_errorbar( aes(x=name, ymin=value-sd, ymax=value+sd), width=0.4, colour="orange", alpha=0.9, size=1.3) +
-  coord_cartesian(ylim = c(0,20)) +
-  xlab("Covariate") +
-  ylab("Average % Increase in MSE under Permutation") +
-  theme_bw() +
-  theme(axis.text.x = element_text( vjust = 1, hjust=.5, size = 8)) +
-  ggtitle("All Social and Familial Relationships") 
-```
-
-Test for species
-```{r}
-
-hist(Downsamp_all$jaccard_sim, breaks = 50)
-
-Downsamp_all_importance <- Downsamp_all %>%
-  select(-c(ego, alter, tp, strain_sharing_rate, bray_curtis_sim, village_code_w3, predicted))
-
-auc_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 10))
-colnames(auc_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
-                             "education_difference","average_education","related")
-
-#Adjust values to be within 0 and 1
-Downsamp_all_importance$jaccard_sim[Downsamp_all_importance$jaccard_sim == 0] <- .01
-
-Downsamp_all_importance$jaccard_sim[Downsamp_all_importance$jaccard_sim == 1] <- .99
-
-beta.mod <- betareg(jaccard_sim ~ ., data = Downsamp_all_importance)
-
-lm.mod <- lm(jaccard_sim ~ ., data = Downsamp_all_importance)
-
-summary(lm.mod)
-
-mean((fitted(beta.mod) - Downsamp_all_importance$jaccard_sim)^2)
-
-plot(lm.mod$fitted.values, Downsamp_all_importance$related)
-
-hist(lm.mod$fitted.values)
-plot(lm.mod$fitted.values, Downsamp_all_importance$jaccard_sim)
-plot(fitted(lm.mod),
-     residuals(lm.mod))
-
-
-#Gender
-print("gender")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  gender_cols <- dat_permuted[,c("gender.mm", "gender.mf")]
-  gender_cols <- gender_cols[sample(nrow(gender_cols)),]
-  dat_permuted[,c("gender.mm", "gender.mf")] <- gender_cols
-  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
-  auc_perms_ssr$gender[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
-}
-
-#indigenous status
-print("indigenous status")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  indigenous_cols <- dat_permuted[,c("indigenous.both", "indigenous.one")]
-  indigenous_cols <- indigenous_cols[sample(nrow(indigenous_cols)),]
-  dat_permuted[,c("indigenous.both", "indigenous.one")] <- indigenous_cols
-  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
-  auc_perms_ssr$indigenous_status[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
-}
-#religion
-print("religion")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$religion.same <- sample(dat_permuted$religion.same)
-  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
-  auc_perms_ssr$religion[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
-}
-#age difference
-print("age difference")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$age_difference_abs <- sample(dat_permuted$age_difference_abs)
-  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
-  auc_perms_ssr$age_difference[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
-}
-#average age
-print("average age")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$average_age <- sample(dat_permuted$average_age)
-  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
-  auc_perms_ssr$average_age[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
-}
-#wealth difference
-print("wealth difference")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$wealth_difference_abs <- sample(dat_permuted$wealth_difference_abs)
-  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
-  auc_perms_ssr$wealth_difference[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
-}
-#average wealth
-print("average wealth")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$average_wealth <- sample(dat_permuted$average_wealth)
-  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
-  auc_perms_ssr$average_wealth[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
-}
-#education
-print("education")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$education_difference_abs <- sample(dat_permuted$education_difference_abs)
-  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
-  auc_perms_ssr$education_difference[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
-}
-#average education
-print("average education")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$average_education <- sample(dat_permuted$average_education)
-  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
-  auc_perms_ssr$average_education[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
-}
-#social relationship
-print("social relationship")
-dat_permuted <- Downsamp_all_importance
-for(i in 1:100){
-  dat_permuted$related <- sample(dat_permuted$related)
-  beta.mod <- betareg(jaccard_sim ~ ., data = dat_permuted)
-  auc_perms_ssr$related[i] <- mean((fitted(beta.mod) - dat_permuted$jaccard_sim)^2)
-}
-
-#Get original bet regression model
-beta.mod <- betareg(jaccard_sim ~ ., data = Downsamp_all_importance)
-
-mean((fitted(beta.mod) - Downsamp_all_importance$jaccard_sim)^2)
-#Summary of beta regression
-summary(beta.mod)
-
-# #Calculate VIF for validity of permutation null
-# library(car)
-# #All relatively low, good to go
-# vif(logit_ssr)
-# vif_values <- vif(logit_ssr)
-# 
-# #create horizontal bar chart to display each VIF value
-# par(mar=c(5.1, 4.1, 4.1, 2.1))
-# barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue", las = 2)
-# 
-# #add vertical line at 5
-# abline(v = 5, lwd = 3, lty = 2)
-
-#Get original MSE
-auc_ssr <-  mean((fitted(beta.mod) - Downsamp_all_importance$jaccard_sim)^2)
-
-#Get percent change in auc from original under permutation
-auc_perms_percent_ssr <- auc_perms_ssr
-auc_perms_percent_ssr <- (as.numeric(auc_ssr) - auc_perms_percent_ssr) / as.numeric(auc_ssr)
-
-#Get mean drop and standard devation in dataframe
-auc_perms_ssr_dat <- data.frame(name = names(auc_perms_percent_ssr),
-                                value = colMeans(auc_perms_percent_ssr),
-                                sd = apply(auc_perms_percent_ssr,2,sd))
-auc_perms_ssr_dat$value <- auc_perms_ssr_dat$value*(-1)
-auc_perms_ssr_dat$value <- auc_perms_ssr_dat$value *100
-#Change Name to Make More Readable
-auc_perms_ssr_dat$name <-c("Gender",
-                           "Indigenous\nStatus",
-                           "Religion",
-                           "Age\nDifference",
-                           "Average\nAge",
-                           "Wealth\nDifference",
-                           "Average\nWealth",
-                           "Education\nDifference",
-                           "Average\nEducation",
-                           "Social or \nFamilial\nRelationship")
-
-
-#Create plot
-#Whether to downsample of not from this
-#hmmmmm
-#Also could do the other way
-#May want to make this out of sample next, but this is really cool
-#WTF it get's better for most
-#Maybe AUC is a bad metrics R^2
-#Or this model is horribly misspecified
-fi_beta_all_jc <- ggplot(auc_perms_ssr_dat) +
-  geom_bar( aes(x=reorder(name, -value), y=value), stat="identity", fill="skyblue", alpha=0.7) +
-  geom_errorbar( aes(x=name, ymin=value-sd, ymax=value+sd), width=0.4, colour="orange", alpha=0.9, size=1.3) +
-  coord_cartesian(ylim = c(-2.5,2.5)) +
-  xlab("Covariate") +
-  ylab("Average % Increase in MSE under Permutation") +
-  theme_bw() +
-  theme(axis.text.x = element_text( vjust = 1, hjust=.5, size = 8)) +
-  ggtitle("All Social and Familial Relationships") 
 ```

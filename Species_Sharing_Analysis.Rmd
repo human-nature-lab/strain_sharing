@@ -272,7 +272,6 @@ SN_All_Relationship_DF$relationship <- reorder(as.factor(SN_All_Relationship_DF$
                                                FUN = median)
 
 #Change names for plotting
-#Make sure this is correct still
 #For bray-Curtis
 levels(SN_All_Relationship_DF$relationship) <- c("Partner",
                                                  "Same Building",
@@ -289,8 +288,7 @@ levels(SN_All_Relationship_DF$relationship) <- c("Partner",
                                                  "No-Nom\nSame-Vil",
                                                  "No-Nom\nDif-Vil")
 
-#Get means by group or strain sharing rate
-#May want to change to median
+
 median_rels_ssr <- aggregate(bray_curtis_sim ~  relationship, SN_All_Relationship_DF, median)
 
 #Get test statistics
@@ -354,7 +352,6 @@ SN_All_Relationship_DF$relationship <- reorder(as.factor(SN_All_Relationship_DF$
                                                FUN = median)
 
 #Change names for plotting
-#Make sure this is correct still
 #For Jaccard
 levels(SN_All_Relationship_DF$relationship) <- c("Same Building",
                                                  
@@ -372,8 +369,7 @@ levels(SN_All_Relationship_DF$relationship) <- c("Same Building",
                                                  "No-Nom\nSame-Vil",
                                                  "No-Nom\nDif-Vil")
 
-#Get means by group or strain sharing rate
-#May want to change to median
+
 median_rels_ssr <- aggregate(jaccard_sim ~  relationship, SN_All_Relationship_DF, median)
 
 #Get test statistics
@@ -815,17 +811,6 @@ SN_Greeting <- SN_Greeting %>%
   ungroup() %>% distinct(pair_key, .keep_all = TRUE)
 
 #Reverse map on values from survey
-# SN_Greeting <- SN_Greeting %>% mutate(
-#   Riskiest_Greeting = case_when(
-#     max_greeting == 7 ~ "Kiss on\nthe cheek",
-#     max_greeting == 6 ~ "Hug",
-#     max_greeting == 5 ~ "Pat on\nthe back",
-#     max_greeting == 4 ~ "Handshake\nor hi-five",
-#     max_greeting == 3 ~ "Verbal salute\n(Hello)",
-#     max_greeting == 2 ~ "A gesture\n(wave, nod, etc.)",
-#     max_greeting == 1 ~ "A smile",
-#     max_greeting == 0 ~ "Other/Refused",
-#   ))
 
 
 
@@ -845,25 +830,6 @@ SN_Greeting <- SN_Greeting %>% mutate(
 table(SN_Greeting$Riskiest_Greeting)
 SN_Greeting <- SN_Greeting %>% filter(Riskiest_Greeting != "Other/Refused")
 
-
-
-# SN_Greeting$Riskiest_Greeting <- factor(SN_Greeting$Riskiest_Greeting,
-#                                         levels=c("A gesture\n(wave, nod, etc.)",
-#                                                  "A smile",
-#                                                  "Verbal salute\n(Hello)",
-#                                                  "Handshake\nor hi-five",
-#                                                  "Pat on\nthe back",
-#                                                  "Hug",
-#                                                  "Kiss on\nthe cheek"))
-
-# SN_Greeting$Riskiest_Greeting <- factor(SN_Greeting$Riskiest_Greeting,
-#                                         levels=c("A gesture (wave, nod, etc.)",
-#                                                  "A smile",
-#                                                  "Verbal salute (Hello)",
-#                                                  "Handshake or hi-five",
-#                                                  "Pat on the back",
-#                                                  "Hug",
-#                                                  "Kiss on the cheek"))
 
 SN_Greeting$Riskiest_Greeting <- factor(SN_Greeting$Riskiest_Greeting,
                                         levels=c("Kiss on the cheek",

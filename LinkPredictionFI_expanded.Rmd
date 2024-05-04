@@ -2,7 +2,11 @@
 title: "LinkPrediction"
 author: "Jackson Pullman"
 date: "2024-04-25"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -142,11 +146,11 @@ foreach(v = village_names, .combine = rbind) %dopar% {
   #Check progress
   print(v)
   Village_NoRels
-} -> All_NoRel_Covars     #Get covariated for people without relationship ties
+} -> All_NoRel_Covars     #Get covariates for people without relationship ties
 
 parallel::stopCluster(cl)
 
-#Set Un-nominated same village realtionship
+#Set Un-nominated same village relationship
 All_NoRel_Covars$relationship <- "Un-Nominated Same Village"
 
 #Attach strain sharing data to non-nominated relationships
@@ -160,12 +164,6 @@ for(i in 1:nrow(All_NoRel_Covars)){
   All_NoRel_Covars$bray_curtis_sim[i] <- species_bray[rownames(species_bray) == All_NoRel_Covars$ego[i],
                                                          colnames(species_bray) == All_NoRel_Covars$alter[i]]
 }
-
-# for(i in 1:nrow(All_NoRel_Covars)){
-#   All_NoRel_Covars$jaccard_sim[i] <- species_jaccard_sim[rownames(species_jaccard_sim) == All_NoRel_Covars$ego[i],
-#                                                          colnames(species_jaccard_sim) == All_NoRel_Covars$alter[i]]
-# }
-
 
 #Get dataframe of all known relationships into format for regression
 SN_All_Covars_for_Regression <- SN_All_Covars |> 
@@ -244,7 +242,6 @@ All_for_Regression <- rbind(All_NoRel_Covars_for_Regression, SN_All_Covars_for_R
 Non_Kin_House_for_Regression <- rbind(All_NoRel_Covars_for_Regression,
                                       SN_Non_Kin_Dif_House_Covars_for_Regression_complete)
 
-#May want to check if this is missing completely at random or input columns
 #filter to complete cases
 All_for_Regression_complete <- All_for_Regression[complete.cases(All_for_Regression),]
 
@@ -506,8 +503,7 @@ pred.all.acc[pred.all.acc <.5] <- 0
 
 Downsamp_all$predicted <- pred.all.acc
 
-#Create ROC object weird it got worse, could do this over multiple downsamples as well
-#I think my predictions will be fairly consistent
+#Create ROC object
 logit.base.roc <- pROC::roc(Downsamp_all$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
@@ -792,8 +788,10 @@ roc.plot.nkh <- roc.plot.nkh + theme(
   legend.text = element_text(size = 8)
 )
 ```
+
+Illustrative visualizations
 ```{r}
-#Mariposal and Carrizalito 1 do well and Quesaras
+#Illustrative visualizations
 Downsamp_all <- Downsamp_all %>% mutate(tp = predicted == related)
 
 
@@ -807,13 +805,10 @@ E(pred_graph)$size <- pred_colors*1.5+3.5
 pred_colors[pred_colors == 1] <- "#027fffff"
 pred_colors[pred_colors == 0] <- "grey"
 
-#Good ad predictig within cluster
 E(pred_graph)$color <- pred_colors
 par(mar=c(0,0,0,0)+.1)
 set.seed(1993)
 layout <- layout.fruchterman.reingold(pred_graph)
-
-#svglite("../Figures/Figure3/Prediction_Network_All.svg")
 
 plot(pred_graph,
      vertex.label = NA,
@@ -827,7 +822,6 @@ legend("topleft",
        lwd = 2,
        bty = "n")
 
-#dev.off()
 
 ```
 
@@ -845,7 +839,6 @@ E(pred_graph_nkh)$size <- pred_colors*1.5+3.5
 pred_colors[pred_colors == 1] <- "#027fffff"
 pred_colors[pred_colors == 0] <- "grey"
 
-#Good ad predictig within cluster
 E(pred_graph_nkh)$color <- pred_colors
 
 #Set layout
@@ -863,7 +856,6 @@ layout <- as.matrix(layout %>% select(-vertex_name))
 par(mar=c(0,0,0,0)+.1)
 set.seed(1993)
 
-#svglite("../Figures/Figure3/Prediction_Network_NKH.svg")
 
 plot(pred_graph_nkh,
      vertex.label = NA,
@@ -877,7 +869,6 @@ legend("topleft",
        lwd = 2,
        bty = "n")
 
-#dev.off()
 ```
 
 Make network prediction figure
@@ -956,6 +947,7 @@ dev.off()
 
 
 ```
+
 ```{r}
 rocs_1_ext <-ggarrange(roc.plot, roc.plot.nkh, nrow = 1, labels = c("A", "B"))
 
@@ -1738,7 +1730,7 @@ mse_ssr <- mean(lm_ssr$residuals^2)
 #mse_perms_percent_ssr <- (as.numeric(mse_ssr) - mse_perms_percent_ssr) / as.numeric(mse_ssr) * 100
 mse_perms_percent_ssr <- mse_perms_ssr - as.numeric(mse_ssr)
 
-#Get mean drop and standard devation in dataframe
+#Get mean drop and standard deviation in dataframe
 mse_perms_ssr_dat_all_rel <- data.frame(name = names(mse_perms_percent_ssr),
                                 value = colMeans(mse_perms_percent_ssr),
                                 sd = apply(mse_perms_percent_ssr,2,sd))

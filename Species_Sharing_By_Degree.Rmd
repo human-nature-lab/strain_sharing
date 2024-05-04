@@ -3,6 +3,8 @@ title: "Species_Sharing_by_Degree"
 author: "Jackson Pullman"
 date: "2023-03-05"
 output: html_notebook
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -355,7 +357,6 @@ deg_df <- data.frame(Model = rep(c("Bray Network", "Null Network"), each = 4),
                      SD = c(0,0,0,0,sd(perm_null_weights_1), sd(perm_null_weights_2), sd(perm_null_weights_3), sd(perm_null_weights_4)))
 
 
-#Damn doesn't change, wrird the 4th degree has gone down more, I noow have mroe 4th degree from the bigger networks
 
 deg_df$Model[deg_df$Model == "Bray Network"] <- "Bray-Curtis Network"
 #deg_df$Model[deg_df$Model == "Strain Network"] <- "Species-Sharing Network"
@@ -379,7 +380,6 @@ bray_by_degree_plot <- ggplot(deg_df, aes(x=Degree, y=Precision, group=Model, co
         axis.title.y = element_text(size = 12)) + 
   labs_pubr()
 
-#Damn it's true
 SN %>% distinct(pair_key, .keep_all = TRUE) %>% pull(bray_curtis_sim) %>% median(na.rm= TRUE)
 bray_by_degree_plot
 ```
@@ -701,7 +701,6 @@ deg_df <- data.frame(Model = rep(c("Jaccard Network", "Null Network"), each = 4)
                      SD = c(0,0,0,0,sd(perm_null_weights_1), sd(perm_null_weights_2), sd(perm_null_weights_3), sd(perm_null_weights_4)))
 
 
-#Damn doesn't change, wrird the 4th degree has gone down more, I noow have mroe 4th degree from the bigger networks
 
 deg_df$Model[deg_df$Model == "Jaccard Network"] <- "Jaccard Index Network"
 #deg_df$Model[deg_df$Model == "Strain Network"] <- "Species-Sharing Network"
@@ -725,7 +724,6 @@ jaccard_by_degree_plot <- ggplot(deg_df, aes(x=Degree, y=Precision, group=Model,
         axis.title.y = element_text(size = 12)) + 
   labs_pubr()
 
-#Damn it's true
 SN %>% distinct(pair_key, .keep_all = TRUE) %>% pull(jaccard_sim) %>% median(na.rm= TRUE)
 jaccard_by_degree_plot
 ```

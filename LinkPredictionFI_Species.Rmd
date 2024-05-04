@@ -245,8 +245,6 @@ All_for_Regression <- rbind(All_NoRel_Covars_for_Regression, SN_All_Covars_for_R
 Non_Kin_House_for_Regression <- rbind(All_NoRel_Covars_for_Regression,
                                       SN_Non_Kin_Dif_House_Covars_for_Regression_complete)
 
-#May want to check if this is missing completely at random or input columns
-#filter to complete cases
 All_for_Regression_complete <- All_for_Regression[complete.cases(All_for_Regression),]
 
 All_NoRel_Covars_for_Regression_complete <- All_NoRel_Covars_for_Regression[complete.cases(All_NoRel_Covars_for_Regression),]
@@ -481,8 +479,7 @@ pred.all.acc[pred.all.acc <.5] <- 0
 
 Downsamp_all$predicted <- pred.all.acc
 
-#Create ROC object weird it got worse, could do this over multiple downsamples as well
-#I think my predictions will be fairly consistent
+#Create ROC object
 logit.base.roc <- pROC::roc(Downsamp_all$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
@@ -645,8 +642,7 @@ pred.all.acc[pred.all.acc <.5] <- 0
 
 Downsamp_all$predicted <- pred.all.acc
 
-#Create ROC object weird it got worse, could do this over multiple downsamples as well
-#I think my predictions will be fairly consistent
+#Create ROC object
 logit.base.roc <- pROC::roc(Downsamp_all$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
@@ -810,8 +806,7 @@ pred.all.acc[pred.all.acc <.5] <- 0
 
 Downsamp_all_nkh$predicted <- pred.all.acc
 
-#Create ROC object weird it got worse, could do this over multiple downsamples as well
-#I think my predictions will be fairly consistent
+#Create ROC object
 logit.base.roc <- pROC::roc(Downsamp_all_nkh$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
@@ -973,8 +968,7 @@ pred.all.acc[pred.all.acc <.5] <- 0
 
 Downsamp_all_nkh$predicted <- pred.all.acc
 
-#Create ROC object weird it got worse, could do this over multiple downsamples as well
-#I think my predictions will be fairly consistent
+#Create ROC object
 logit.base.roc <- pROC::roc(Downsamp_all_nkh$related, pred.all, ci=TRUE, plot=FALSE,
                 levels=c("0","1"), direction = "<")
 
