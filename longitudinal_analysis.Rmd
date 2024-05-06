@@ -527,14 +527,15 @@ foreach(i = 1:4) %do% {
     
     ratio_plot <- wide_ssr |>
     #pivot_longer(cols = c(T1,T2), names_to = 'timepoint', values_to = 'ssr') |>
-    mutate(delta_ssr = abs(T2-T1),
+    #mutate(delta_ssr = abs(T2-T1),
+    mutate(delta_ssr = T2-T1,
            tie = factor(wide_ssr$tie, labels = c('No','Yes'))) |>
     ggplot() + 
     geom_boxplot(aes(tie, delta_ssr, fill=tie)) + 
     coord_flip() +
     cowplot::theme_cowplot() + 
     xlab('Is tie present?') + ylab(bquote('Δ Strain-sharing' ~ rate[T])) +
-    ylim(c(0,0.5)) + 
+    ylim(c(-0.5,0.5)) + 
     guides(fill='none') +
     scale_fill_manual(values = c('white', '#027fffff'))
 
