@@ -511,6 +511,80 @@ dotplot_compare_models
 dev.off()
 ```
 
+```{r}
+foreach(i = 1:4) %do% {
+  v = unique(metadata_followup$village_code)[i]
+  g <- get(paste0('sn_vil_graph_',match(v, village_names)))
+  sg <- igraph::subgraph(g, match(intersect(unique(master_key_fw[subset_samples_fw |> filter(village == str_pad(v, 3, pad = 0)) |> pull(sample_id),'respondent_master_id']), V(g)$name), V(g)$name))
+  
+  sharing_rate |> 
+    select(ego, alter, pair, tie, timepoint, n1) |>
+    filter(ego %in% V(sg)$name & alter %in% V(sg)$name) |>
+    pivot_wider(names_from = timepoint, values_from = n1) -> wide_ssr
+
+    wide_ssr |>
+    group_by(tie) |> summarize(median(T1), median(T2), mean(T1), mean(T2))
+    
+    ratio_plot <- wide_ssr |>
+    #pivot_longer(cols = c(T1,T2), names_to = 'timepoint', values_to = 'ssr') |>
+    mutate(delta_ssr = abs(T2-T1),
+           tie = factor(wide_ssr$tie, labels = c('No','Yes'))) |>
+    ggplot() + 
+    geom_boxplot(aes(tie, delta_ssr, fill=tie)) + 
+    coord_flip() +
+    cowplot::theme_cowplot() + 
+    xlab('Is tie present?') + ylab(bquote('Δ Strain-sharing' ~ rate[T])) +
+    ylim(c(0,0.5)) + 
+    guides(fill='none') +
+    scale_fill_manual(values = c('white', '#027fffff'))
+
+    wide_ssr |>
+    filter(tie == 'yes') |>
+    mutate(c = T1 > median(T1, na.rm = TRUE)) |> 
+    graph_from_data_frame(directed=FALSE) -> sg_t1
+  
+    wide_ssr |>
+    filter(tie == 'yes') |>
+    mutate(c = T2 > median(T1, na.rm = TRUE)) |>
+    graph_from_data_frame(directed=FALSE) -> sg_t2
+  
+  pred_colors <- edge_attr(sg_t1, "c")
+  E(sg_t1)$size <- 2
+  pred_colors[pred_colors == TRUE] <- "#027fffff"
+  pred_colors[pred_colors == FALSE] <- "grey"  
+  E(sg_t1)$color <- pred_colors
+
+  pred_colors <- edge_attr(sg_t2, "c")
+  E(sg_t2)$size <- 2
+  pred_colors[pred_colors == TRUE] <- "#027fffff"
+  pred_colors[pred_colors == FALSE] <- "grey"  
+  E(sg_t2)$color <- pred_colors
+
+  # par(mar=c(0,0,0,0)+.1)
+  set.seed(1993)
+  layout <- layout.fruchterman.reingold(sg_t1)
+  v_t1 <- as.ggplot(expression(par(mar=c(0,0,0,0)+.1),plot(sg_t1,
+       vertex.label = NA,
+       vertex.size = 3,
+       layout = layout,
+       edge.width = E(sg_t1)$size,
+       main = paste('T1', village_map[village_map$village_code == v,'village_name_deid', TRUE]))
+      ))
+  v_t2 <- as.ggplot(expression(par(mar=c(0,0,0,0)+.1), plot(sg_t2,
+       vertex.label = NA,
+       vertex.size = 3,
+       layout = layout,
+       edge.width = E(sg_t2)$size, 
+       main = paste('T2', village_map[village_map$village_code == v,'village_name_deid', TRUE])),
+  legend("topleft",
+         legend=c(">median", "<median"),
+         col=c("#027fffff", "grey"),
+         lty = c(1,1),
+         lwd = 2,
+         bty = "n")))
+  ggarrange(v_t1, v_t2, ratio_plot, nrow =3, heights = c(1,1,0.35))
+} -> plots_t1t2
+```
 
 ```{r}
 svglite(filename = 'Figures/timepoint_ssr_difference1.svg', width = 17, height = 10, bg='transparent', pointsize = 10, fix_text_size = FALSE)
