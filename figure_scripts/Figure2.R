@@ -6,7 +6,7 @@ library(dplyr)
 library(pROC)
 library(igraph)
 
-Downsamp_all <- readr::read_tsv('data/export/Downsamp_all.tsv')
+Downsamp_all <- readr::read_tsv('../data/export/Downsamp_all.tsv')
 
 cl <- parallel::makeCluster(5)
 doParallel::registerDoParallel(cl)
@@ -199,7 +199,7 @@ roc.plot <- roc.plot + theme(
 )
 
 
-Downsamp_all_nkh <- readr::read_tsv('data/export/Downsamp_all_nkh.tsv')
+Downsamp_all_nkh <- readr::read_tsv('../data/export/Downsamp_all_nkh.tsv')
 
 cl <- parallel::makeCluster(5)
 doParallel::registerDoParallel(cl)
@@ -393,7 +393,7 @@ roc.plot.nkh <- roc.plot.nkh + theme(
 )
 
 
-pred_graph <- readr::read_tsv('data/export/pred_graph_all_rel.tsv') |>
+pred_graph <- readr::read_tsv('../data/export/pred_graph_all_rel.tsv') |>
     mutate(tp = predicted == related) |>
     igraph::graph_from_data_frame(directed = FALSE) 
 
@@ -408,7 +408,7 @@ par(mar=c(0,0,0,0)+.1)
 set.seed(1993)
 layout <- layout.fruchterman.reingold(pred_graph)
 
-pred_graph_nkh <- readr::read_tsv('data/export/pred_graph_nk.tsv') |>
+pred_graph_nkh <- readr::read_tsv('../data/export/pred_graph_nk.tsv') |>
     mutate(tp = predicted == related) |>
   graph_from_data_frame(directed = FALSE)
 
@@ -476,8 +476,8 @@ p2_test <- as.ggplot(expression(
   )
 )) 
 
-Downsamp_all_stable_ties <- readr::read_tsv('data/export/Downsamp_all_stable_ties.tsv')
-Downsamp_all_stable_ties_nkh <- readr::read_tsv('data/export/Downsamp_all_stable_ties_nkh.tsv')
+Downsamp_all_stable_ties <- readr::read_tsv('../data/export/Downsamp_all_stable_ties.tsv')
+Downsamp_all_stable_ties_nkh <- readr::read_tsv('../data/export/Downsamp_all_stable_ties_nkh.tsv')
 
 cl <- parallel::makeCluster(5)
 doParallel::registerDoParallel(cl)

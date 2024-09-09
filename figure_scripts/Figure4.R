@@ -4,7 +4,7 @@ library(dplyr)
 library(igraph)
 library(ggplotify)
 
-centrality_sim_df <- readr::read_tsv('data/export/centrality_sim_df.tsv')
+centrality_sim_df <- readr::read_tsv('../data/export/centrality_sim_df.tsv')
 deg_c_sharing_first <-
   ggplot(centrality_sim_df, aes(x = degree_c, y = sim_deg_one)) +
   geom_point() +
@@ -27,7 +27,7 @@ deg_c_sharing_all <-
   theme_pubr() +
   labs_pubr()
 
-deg_df <- readr::read_tsv('data/export/ssr_by_degree_plot_df.tsv')
+deg_df <- readr::read_tsv('../data/export/ssr_by_degree_plot_df.tsv')
 ssr_by_degree_plot <- ggplot(deg_df, aes(x=Degree, y=Precision, group=Model, color = Model)) +
   geom_line(aes(color=Model, linetype = Model))+
   geom_pointrange(aes(ymin=Precision-SD, ymax=Precision+SD))+
@@ -48,7 +48,7 @@ ssr_by_degree_plot <- ggplot(deg_df, aes(x=Degree, y=Precision, group=Model, col
 ssr_by_degree_plot <- ggarrange(ssr_by_degree_plot, labels = "A")
 
 set.seed(22)
-test <- readr::read_csv('data/export/village_15_adj_mat.tsv')
+test <- readr::read_csv('../data/export/village_15_adj_mat.tsv')
 test <- test[,-1]
 test <- as.matrix(test)
 rownames(test) <- colnames(test)

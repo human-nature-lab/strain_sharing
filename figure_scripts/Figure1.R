@@ -5,7 +5,7 @@ library(ggpubr)
 library(dplyr)
 library(svglite)
 
-SN_All_Relationship_DF <- readr::read_tsv('data/export/SN_All_Relationship_DF.tsv')
+SN_All_Relationship_DF <- readr::read_tsv('../data/export/SN_All_Relationship_DF.tsv')
 
 #Make relationship factor variable for plotting
 SN_All_Relationship_DF$relationship <- reorder(as.factor(SN_All_Relationship_DF$relationship),
@@ -83,7 +83,7 @@ relationships_all_plot <-
 "#d0a39e",
 "#403642"))
 
-SN_Symmetrized <- readr::read_tsv('data/export/SN_Symmetrized.tsv') |> mutate(
+SN_Symmetrized <- readr::read_tsv('../data/export/SN_Symmetrized.tsv') |> mutate(
   Free_Time = case_when(
     a2701_numeric_max == 4 ~ "Every day",
     a2701_numeric_max == 3 ~ "A few days a week",
@@ -224,7 +224,7 @@ free_time_all_plot <- ggplot(SN_Symmetrized_2, aes(Free_Time, strain_sharing_rat
                                 "#9216ff"
                                 ))
 
-SN_Greeting <- readr::read_tsv('data/export/SN_Greeting.tsv')
+SN_Greeting <- readr::read_tsv('../data/export/SN_Greeting.tsv')
 
 SN_Greeting <- SN_Greeting %>% mutate(
   Riskiest_Greeting = case_when(
@@ -300,7 +300,7 @@ greeting_plot <- ggplot(SN_Greeting, aes(Riskiest_Greeting, strain_sharing_rate,
                                 )
 )
 
-Downsamp_all_importance <- readr::read_tsv('data/export/Downsamp_all_importance.tsv')
+Downsamp_all_importance <- readr::read_tsv('../data/export/Downsamp_all_importance.tsv')
 
 mse_perms_ssr_all <- data.frame(matrix(nrow = 100, ncol = 17))
 colnames(mse_perms_ssr_all) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
@@ -533,7 +533,7 @@ fi_all <- ggplot(mse_perms_ssr_dat_all_rel) +
   )
 
 
-Downsamp_all_importance_nk <- readr::read_tsv('data/export/Downsamp_all_importance_nk.tsv')
+Downsamp_all_importance_nk <- readr::read_tsv('../data/export/Downsamp_all_importance_nk.tsv')
 
 mse_perms_ssr_nk <- data.frame(matrix(nrow = 1000, ncol = 17))
 colnames(mse_perms_ssr_nk) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",

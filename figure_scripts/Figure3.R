@@ -7,7 +7,7 @@ library(ggpubr)
 library(foreach)
 library(svglite)
 
-wide_ssr <- readr::read_tsv('data/export/longitudinal_networks_long_ssr.tsv')
+wide_ssr <- readr::read_tsv('../data/export/longitudinal_networks_long_ssr.tsv')
 
 village_map <- tribble(~village_code, ~village_name_deid,
   21 , "Azpeitia",
@@ -65,7 +65,7 @@ foreach(i = c(26, 162, 21, 116)) %do% {
 
 plots_t1t2 <- ggarrange(plotlist = plots_t1t2, nrow = 1)
 
-sharing_rate_only_followup <- readr::read_tsv('data/export/longitudinal_sharing_rate.tsv')
+sharing_rate_only_followup <- readr::read_tsv('../data/export/longitudinal_sharing_rate.tsv')
 sharing_rate_only_followup$village_code_ego <- as.factor(sharing_rate_only_followup$village_code_ego)
 sharing_rate_only_followup$T2 <- scale(sharing_rate_only_followup$T2)
 sharing_rate_only_followup$T1 <- scale(sharing_rate_only_followup$T1)

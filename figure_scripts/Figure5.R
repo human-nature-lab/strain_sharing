@@ -3,7 +3,7 @@ library(ggpubr)
 library(dplyr)
 library(igraph)
 
-centrality_sim_df <- readr::read_tsv('data/export/centrality_sim_df.tsv')
+centrality_sim_df <- readr::read_tsv('../data/export/centrality_sim_df.tsv')
 centrality_sim_df$cluster_bucket <- case_when(
   centrality_sim_df$cluster_coef_all <= .25 ~ "0 - .25",
   centrality_sim_df$cluster_coef_all <= .5 ~ ".25 - .5",
@@ -53,8 +53,8 @@ add.alpha <- function(col, alpha = 1) {
           rgb(x[1], x[2], x[3], alpha = alpha))
 }
 
-SN_Village <- read.csv('data/export/sn_basauri.tsv')
-strain_vil <- read.csv('data/export/mbiome_basauri.tsv', check.names = FALSE)
+SN_Village <- read.csv('../data/export/sn_basauri.tsv')
+strain_vil <- read.csv('../data/export/mbiome_basauri.tsv', check.names = FALSE)
 rownames(strain_vil) <- strain_vil[,1]
 strain_vil <- strain_vil[,-1]
 
@@ -138,16 +138,16 @@ illustrative_village_mbiome <- as.ggplot(expression(plot(
 ),
 title("Microbiome Similarity Clusters",line = 0)))
 
-master_key <- readr::read_tsv('data/export/master_key.tsv')
+master_key <- readr::read_tsv('../data/export/master_key.tsv')
 
-species_data <- readr::read_tsv("data/mpa4_merged_profiles.tsv", skip = 1) |> 
+species_data <- readr::read_tsv("../data/mpa4_merged_profiles.tsv", skip = 1) |> 
   filter(stringr::str_detect(clade_name, 't__')) |> 
   select(clade_name, ends_with('-05')) |> 
   tibble::column_to_rownames('clade_name') 
 species_data <- species_data[,master_key$mb_m05]
 colnames(species_data) <- master_key$respondent_master_id[match(colnames(species_data), master_key$mb_m05)]
 
-vil_graph <- readr::read_csv('data/export/village_15_adj_mat.tsv')
+vil_graph <- readr::read_csv('../data/export/village_15_adj_mat.tsv')
 vil_graph <- vil_graph[,-1]
 vil_graph <- as.matrix(vil_graph)
 rownames(vil_graph) <- colnames(vil_graph)
@@ -244,8 +244,8 @@ legend(
   bty    = "n"
 )))
 
-observed <- readr::read_tsv('data/export/observed_clusters.tsv')
-null_clusters <- readr::read_tsv('data/export/null_clusters.tsv')
+observed <- readr::read_tsv('../data/export/observed_clusters.tsv')
+null_clusters <- readr::read_tsv('../data/export/null_clusters.tsv')
 
 p_vals <- data.frame(
   vils = observed$vils,
