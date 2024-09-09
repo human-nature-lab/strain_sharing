@@ -1,6 +1,6 @@
 ---
 title: "Longitudinal Analysis"
-author: "Francesco Beghini"
+author: "Francesco Beghini, Jackson Pullman, Marcus Alexander, Shivkumar Vishnempet Shridhar, Drew Prinster, Adarsh Singh, Rigoberto Matute Juárez, Edoardo M. Airoldi, Ilana L. Brito, Nicholas A. Christakis"
 output: pdf_document
 ---
 
@@ -12,6 +12,10 @@ library(lmerTest)
 
 ```{r, echo=FALSE}
 sharing_rate_only_followup <- readRDS('sharing_rate_only_followup.Rds')
+sharing_rate_only_followup$village_code_ego <- as.factor(sharing_rate_only_followup$village_code_ego)
+sharing_rate_only_followup$T2 <- scale(sharing_rate_only_followup$T2)
+sharing_rate_only_followup$T1 <- scale(sharing_rate_only_followup$T1)
+sharing_rate_only_followup$maha_dist <- scale(sharing_rate_only_followup$maha_dist)
 xcov <- readRDS('xcov.RDS')
 ```
 

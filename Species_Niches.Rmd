@@ -154,22 +154,17 @@ species_for_niche <- species_data[,j]
 
 Illustrative Relative abundance graphs
 ```{r}
-vil_graph <- sn_vil_graph_6
+vil_graph <- sn_vil_graph_15
 #Get species
-species_for_niche <- species_data[, 651]
+species_for_niche <- unlist(species_data["k__Bacteria|p__Firmicutes|c__Bacilli|o__Lactobacillales|f__Enterococcaceae|g__Enterococcus|s__Enterococcus_faecium|t__SGB7967",])
 #Get village clusters
-clusters <- sn_member_6
+clusters <- sn_member_15
 #Filter species to village members
 ordered_species <-
   species_for_niche[match(names(clusters), names(species_for_niche))]
 
 pal <- colorRampPalette(c("red", "yellow"))
-my_pal <- pal(length(ordered_species))
-
-pal <- colorRampPalette(c("red", "yellow"))
 my_pal <- pal(2)
-
-test_cols <- my_pal[rank(ordered_species, ties.method = "min")]
 
 test_cols <- my_pal[ceiling(ordered_species)+1]
 V(vil_graph)$color <- test_cols[match(names(V(vil_graph)),
@@ -181,6 +176,7 @@ set.seed(1)
 par(mar= c(0,0,0,0))
 plot(
   vil_graph,
+  vertex.size = log2(ordered_species*100000+5)+2,
   vertex.label = NA
 )
 title(paste0("Differentially Abundant Species: Enterococcus_faecium (SGB7967)"),
@@ -215,24 +211,18 @@ legend(
   bty    = "n"
 )))
 
-colnames(species_data)[651]
 ```
 
 
 ```{r}
-vil_graph <- sn_vil_graph_6
+vil_graph <- sn_vil_graph_15
 #Get species
-species_for_niche <- species_data[, 112]
+species_for_niche <- unlist(species_data["k__Bacteria|p__Actinobacteria|c__Coriobacteriia|o__Coriobacteriales|f__Coriobacteriaceae|g__GGB9379|s__GGB9379_SGB14372|t__SGB14372",])
 #Get village clusters
-clusters <- sn_member_6
+clusters <- sn_member_15
 #Filter species to village members
 ordered_species <-
   species_for_niche[match(names(clusters), names(species_for_niche))]
-
-pal <- colorRampPalette(c("red", "yellow"))
-my_pal <- pal(length(ordered_species))
-
-test_cols <- my_pal[rank(ordered_species, ties.method = "min")]
 
 pal <- colorRampPalette(c("red", "yellow"))
 my_pal <- pal(2)
@@ -290,16 +280,3 @@ legend(
 )))
 
 ```
-
-
-
-```{r}
-# fig5_2<- ggarrange(species_da_1, species_da_2,niche_hist,
-#           labels = c("F", "G", "H"), nrow = 1)
-
-svglite("../FiguresNew/SFigure12/fig_12.svg", width = 11)
-ggarrange(niche_hist, niche_hist_rand,
-          labels = c("A", "B"), nrow = 1)
-dev.off()
-```
-

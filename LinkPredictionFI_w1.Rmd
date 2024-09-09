@@ -270,6 +270,10 @@ Downsamp_all_stable_ties_nkh <- rbind(Downsamp_all_stable_ties_nkh, SN_Non_Kin_D
 Downsamp_all_stable_ties_nkh <- Downsamp_all_stable_ties_nkh[complete.cases(Downsamp_all_stable_ties_nkh),]
 ```
 
+```{r}
+readr::write_tsv(Downsamp_all_stable_ties |>select(-ego,-alter), 'data/export/Downsamp_all_stable_ties.tsv')
+readr::write_tsv(Downsamp_all_stable_ties_nkh |>select(-ego,-alter), 'data/export/Downsamp_all_stable_ties_nkh.tsv')
+```
 
 
 ```{r oos_5cv, message=FALSE, warning=FALSE, include=FALSE}

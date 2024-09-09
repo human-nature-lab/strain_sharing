@@ -50,7 +50,7 @@ master_key_fw <- bind_rows(metadata_baseline,metadata_followup) |> dplyr::select
 SN_w1 <- read_csv("~/F_BEGHINI_G/WAVE1/v8/honduras_connections_WAVE1_v8_F_BEGHINI_2023-11-01.csv",show_col_types = FALSE) |> 
               filter(relationship %in% c('child_over12_other_house','closest_friend','father','free_time','mother','partner','personal_private','sibling') #Remove not get along
                      ) |>
-              mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
+              mutate(pair = vapply(stringi::stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stringi::stri_c(x[stringi::stri_order(x)], collapse = ''), ''),
                      wave = 1)
 
 reduced_SN_w1 <- SN_w1 |> 
@@ -118,7 +118,8 @@ species_per_sample <- readRDS('~/species_per_sample_acc') |>
 inner_join(subset_samples_fw, by=join_by('sample' == 'sample_id')) |>
 distinct(species, village, subject, .keep_all = TRUE) |>
 count(species) |>
-filter(n > 10)
+#filter(n > 10)
+filter(n > 3)
 
 kk <- combn(as.list(readRDS('~/species_per_sample_acc') |> mutate(present=TRUE) %>%
      pivot_wider(names_from=sample, values_from=present, values_fill=list(present=FALSE)) |> select(-species)),2, simplify = FALSE)
@@ -273,6 +274,7 @@ sub_covar <- covariates |>
                                 "Some secondary" = 7, "Secondary" = 8, "More than secondary" = 9),
            religion = recode(religion, "Catholic" = 1, "No Religion" = 0, "Protestant" =2 ),
            building_id = as.numeric(factor(building_id)),
+           watersource = as.numeric(as.factor(watersource)),
            bristol = as.numeric(as.factor(str_sub(bristol, 6, 6)))
       )
 
@@ -298,8 +300,9 @@ sub_covar$indigenous_status <- ifelse(sub_covar$indigenous_status=='None of the 
 sub_covar$genderm <- ifelse(sub_covar$gender == 'man', 1, 0)
 
 sub_covar_mat <- sub_covar |> 
-  select(-gender) |> 
-  tibble::column_to_rownames('respondent_master_id')
+  select(-gender,-med_zinc) |> 
+  tibble::column_to_rownames('respondent_master_id') |>
+  as.matrix()
 pairwise_mahalanomis_long <- biotools::D2.dist(sub_covar_mat, cov = cov(sub_covar_mat, use='complete')) |> 
   as.matrix() |> as.data.frame() |>
   tibble::rownames_to_column('s1') |>
@@ -405,6 +408,10 @@ sharing_rate_only_followup <- sharing_rate |>
   left_join((pairwise_mahalanomis_long |> select(pair, maha_dist)), by = 'pair') |> 
   mutate(village_code_ego = as.factor(village_code_ego))
   
+sharing_rate_only_followup$village_code_ego <- as.factor(sharing_rate_only_followup$village_code_ego)
+sharing_rate_only_followup$T2 <- scale(sharing_rate_only_followup$T2)
+sharing_rate_only_followup$T1 <- scale(sharing_rate_only_followup$T1)
+sharing_rate_only_followup$maha_dist <- scale(sharing_rate_only_followup$maha_dist)
 
 sharing_rate_followup_metadata <- merge(merge(sharing_rate_only_followup, sub_covar, by.x = "ego", by.y = 'respondent_master_id', ), sub_covar, by.x = 'alter', by.y = 'respondent_master_id', suffixes = c('_ego','_alter'))
 sharing_rate_followup_metadata$gender.mm <- sharing_rate_followup_metadata$gender_ego == "man" & sharing_rate_followup_metadata$gender_alter == "man"
@@ -457,7 +464,6 @@ lmer_first_model_expanded  <- lmer(T2 ~ T1 + relationship +
                                       same_usage_antidiarrheal +
                                       same_usage_antiparasite +
                                       same_usage_vitamins +
-                                      same_usage_zinc +
                                       same_usage_antifungal  + (1|village_code_ego) + (1|ego), data = sharing_rate_followup_metadata)
 
 lmer_second_model <- lmer(T2 ~ T1*relationship + maha_dist + (1|village_code_ego) + (1|ego), data = sharing_rate_only_followup)
@@ -489,11 +495,22 @@ summary(lmer_thirdplus_model)
 ```
 
 ```{r}
-dotplot_compare_models <- bind_rows(data.frame(summary(lmer_first_model)$coef[2:4,1:2], class = 'no_interact'), data.frame(class = 'interact', summary(lmer_second_model)$coef[2:4,1:2])) |>
+dotplot_compare_models <- data.frame(summary(lmer_first_model)$coef[2:4,1:2], class = 'no_interact') |>
   tibble::rownames_to_column('term') |>
   mutate(term = str_remove(term, '...[0-9]')) |>
   rename(SE = `Std..Error`) |>
-  bind_rows(list(term='relationshipyes', class='interact', Estimate = fixef(lmer_second_model)[[5]], SE = summary(lmer_second_model)$coef[5,2])) |>
+  mutate(term = factor(term, levels = unique(term))) |>
+  ggplot(aes(reorder(term, desc(term)), Estimate, group=class)) +
+  geom_errorbar(aes(ymin=Estimate-1.96*SE, ymax=Estimate+1.96*SE, color = class),size = 1.5, width=.2, position = position_dodge(width = 0.4)) +
+  geom_point(aes(color = class), size = 4, position = position_dodge(width = 0.4)) +
+  coord_flip() +
+  cowplot::theme_cowplot() + xlab('Terms') +
+  scale_color_manual( values = c('orange', '#440154'))
+
+dotplot_full_models <- data.frame(summary(lmer_first_model_expanded)$coef[2:26,1:2], class = 'no_interact') |>
+  tibble::rownames_to_column('term') |>
+  mutate(term = str_remove(term, '...[0-9]')) |>
+  rename(SE = `Std..Error`) |>
   mutate(term = factor(term, levels = unique(term))) |>
   ggplot(aes(reorder(term, desc(term)), Estimate, group=class)) +
   geom_errorbar(aes(ymin=Estimate-1.96*SE, ymax=Estimate+1.96*SE, color = class),size = 1.5, width=.2, position = position_dodge(width = 0.4)) +
@@ -512,33 +529,23 @@ dev.off()
 ```
 
 ```{r}
+svglite('Figures/dotplot_compare_models.svg', fix_text_size = FALSE, bg='transparent')
+dotplot_full_models
+dev.off()
+```
+
+
+```{r}
 foreach(i = 1:4) %do% {
   v = unique(metadata_followup$village_code)[i]
   g <- get(paste0('sn_vil_graph_',match(v, village_names)))
   sg <- igraph::subgraph(g, match(intersect(unique(master_key_fw[subset_samples_fw |> filter(village == str_pad(v, 3, pad = 0)) |> pull(sample_id),'respondent_master_id']), V(g)$name), V(g)$name))
   
   sharing_rate |> 
-    select(ego, alter, pair, tie, timepoint, n1) |>
+    select(ego, alter, pair, tie, timepoint, n1, village_code_ego, village_code_alter) |>
     filter(ego %in% V(sg)$name & alter %in% V(sg)$name) |>
     pivot_wider(names_from = timepoint, values_from = n1) -> wide_ssr
-
-    wide_ssr |>
-    group_by(tie) |> summarize(median(T1), median(T2), mean(T1), mean(T2))
     
-    ratio_plot <- wide_ssr |>
-    #pivot_longer(cols = c(T1,T2), names_to = 'timepoint', values_to = 'ssr') |>
-    #mutate(delta_ssr = abs(T2-T1),
-    mutate(delta_ssr = T2-T1,
-           tie = factor(wide_ssr$tie, labels = c('No','Yes'))) |>
-    ggplot() + 
-    geom_boxplot(aes(tie, delta_ssr, fill=tie)) + 
-    coord_flip() +
-    cowplot::theme_cowplot() + 
-    xlab('Is tie present?') + ylab(bquote('Δ Strain-sharing' ~ rate[T])) +
-    ylim(c(-0.5,0.5)) + 
-    guides(fill='none') +
-    scale_fill_manual(values = c('white', '#027fffff'))
-
     wide_ssr |>
     filter(tie == 'yes') |>
     mutate(c = T1 > median(T1, na.rm = TRUE)) |> 
@@ -583,7 +590,7 @@ foreach(i = 1:4) %do% {
          lty = c(1,1),
          lwd = 2,
          bty = "n")))
-  ggarrange(v_t1, v_t2, ratio_plot, nrow =3, heights = c(1,1,0.35))
+  ggarrange(v_t1, v_t2, nrow =2, heights = c(1,1))
 } -> plots_t1t2
 ```
 
@@ -593,59 +600,3 @@ ggarrange(plotlist = plots_t1t2, nrow = 1)
 dev.off()
 ```
 
-
-# Stability w1 w3
-```{r overall_stability_across_waves}
-pruned_SN_w3_graph <- subgraph(SN_w3_graph, intersect(names(V(SN_w3_graph)),names(V(SN_w1_graph))))
-pruned_SN_w1_graph <- subgraph(SN_w1_graph, intersect(names(V(SN_w3_graph)),names(V(SN_w1_graph))))
-```
-
-```{r pervillage_stability_across_waves}
-foreach(village = unique(reduced_SN_w1$village_code_w1), .combine = rbind) %do% {
-  tmp_w3 <- subgraph(pruned_SN_w3_graph, subset(V(pruned_SN_w3_graph), V(pruned_SN_w3_graph)$village_code_w3 == village))
-  tmp_w1 <- subgraph(pruned_SN_w1_graph, subset(V(pruned_SN_w1_graph), V(pruned_SN_w1_graph)$village_code_w1 == village))
-  data.frame(village_code = as.character(village), stability=length(E(tmp_w3 %s% tmp_w1)) / length(E(tmp_w3 %u% tmp_w1)))
-} |> bind_rows(data.frame(village_code = 'overall', stability=length(E(pruned_SN_w3_graph %s% pruned_SN_w1_graph)) / length(E(pruned_SN_w3_graph %u% pruned_SN_w1_graph))))
-```
-
-# New egdes in W3
-```{r}
-new_edges <- igraph::difference(pruned_SN_w3_graph, pruned_SN_w1_graph)
-new_edges_attr_df <- data.frame(edge.attributes(new_edges))
-nrow(lost_edges_attr_df)
-```
-# Egdes lost in W3
-```{r}
-lost_edges <- igraph::difference(pruned_SN_w1_graph, pruned_SN_w3_graph)
-lost_edges_attr_df <- data.frame(edge.attributes(lost_edges))
-nrow(lost_edges_attr_df)
-```
-
-# Number of ties retained
-```{r eval=FALSE, include=FALSE}
-w1w3_intersection <-  graph.intersection(pruned_SN_w1_graph, pruned_SN_w3_graph, byname = TRUE)
-length(E(w1w3_intersection))
-```
-
-
-## Types of new relationships now disclosed in w3
-```{r eval=FALSE, include=FALSE}
-foreach(e = edge_attr(w1w3_intersection)$pair_1, .combine = c) %do% {
-  setdiff(
-    reduced_SN_w3 |> filter(pair == e ) |> pull(relationship) |> str_split(pattern = ',', simplify = TRUE) |> c(), 
-    reduced_SN_w1 |> filter(pair == e ) |> pull(relationship) |> str_split(pattern = ',', simplify = TRUE) |> c()
-  )
-} |> table()
-
-```
-
-## Types of relationships not disclosed anymore in w3
-```{r eval=FALSE, include=FALSE}
-foreach(e = edge_attr(w1w3_intersection)$pair_1, .combine = c) %do% {
-  setdiff(
-    reduced_SN_w1 |> filter(pair == e ) |> pull(relationship) |> str_split(pattern = ',', simplify = TRUE) |> c(), 
-    reduced_SN_w3 |> filter(pair == e ) |> pull(relationship) |> str_split(pattern = ',', simplify = TRUE) |> c()
-  )
-} |> table()
-
-```

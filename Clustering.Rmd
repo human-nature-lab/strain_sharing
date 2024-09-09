@@ -19,7 +19,6 @@ library(mclust)
 #citation("mclust")
 #Get observed metric
 
-set.seed(1)
 #Louvain clustering does not work with NA edge weights, set to zero
 E(strain_rate_vil_graph_1)$weight[is.na(E(strain_rate_vil_graph_1)$weight)] <- 0
 E(strain_rate_vil_graph_2)$weight[is.na(E(strain_rate_vil_graph_2)$weight)] <- 0
@@ -44,7 +43,7 @@ for(i in 1:length(village_names)){
   assign(paste0("strain_rate_vil_graph_scram_", i), get(paste0("strain_rate_vil_graph_", i)))
 }
 
-
+set.seed(1)
 strain_rate_cluster_1 <- cluster_louvain(strain_rate_vil_graph_1, weights = E(strain_rate_vil_graph_1)$weight)
 strain_rate_cluster_2 <- cluster_louvain(strain_rate_vil_graph_2, weights = E(strain_rate_vil_graph_2)$weight)
 strain_rate_cluster_3 <- cluster_louvain(strain_rate_vil_graph_3, weights = E(strain_rate_vil_graph_3)$weight)
@@ -281,14 +280,10 @@ mean(cluster_ties_all)
 ```
 
 ```{r}
-rand_stat_strain_rate <- mclust::adjustedRandIndex(all_mbiome_membership, all_sn_membership)
-
-null_rands_strain_rate <- numeric(10000)
-
 #Create null distribution metrics
-cl <- parallel::makeCluster(10)
+cl <- parallel::makeCluster(100)
 doParallel::registerDoParallel(cl)
-foreach(i= c(1:10000), .combine=rbind, .packages = c('igraph') ) %dopar% {
+foreach(i= c(1:10000), .combine=rbind, .packages = c('igraph')) %dopar% {
   #Scramble microbiome
   strain_rate_vil_graph_scram_1 <- set.vertex.attribute(strain_rate_vil_graph_scram_1, "name",
                                                         value = sample(vertex_attr(strain_rate_vil_graph_scram_1, "name")))
@@ -407,9 +402,6 @@ foreach(i= c(1:10000), .combine=rbind, .packages = c('igraph') ) %dopar% {
                             mbiome_member_17_scram,
                             mbiome_member_18_scram)
 
-  #Get null statistic
-  null_rands_strain_rate[i] <- mclust::adjustedRandIndex(all_mbiome_membership_scram, all_sn_membership)
-
     data.frame(rand_inds = c(mclust::adjustedRandIndex(mbiome_member_1_scram, sn_member_1),
                                               mclust::adjustedRandIndex(mbiome_member_2_scram, sn_member_2),
                                               mclust::adjustedRandIndex(mbiome_member_3_scram, sn_member_3),
@@ -522,16 +514,7 @@ p_vals <- data.frame(
   )
 )
 
-for(i in 1:nrow(p_vals)){
-  if(p_vals$p_val[i] == 0){
-    p_vals$p_val[i] <- paste0("p <= .0001")
-  }
-  else{
-    p_vals$p_val[i] <- paste0("p = ", p_vals$p_val[i])
-  }
-}
-
-null_clusters$dummy = null_clusters$rand_inds
+p_vals$p_val = paste0('p = ', p_vals$p_val)
 ```
 
 ```{r}
@@ -689,8 +672,10 @@ mbiome_all <-
   simplify(graph_from_adjacency_matrix(strain_vil, mode = "undirected", weighted = TRUE))
 
 #Cluster
+set.seed(450)
+set.seed(769)
 mbiome_cluster <-  cluster_louvain(mbiome_all, weights = E(mbiome_all)$weight )
-sn_cluster <- cluster_louvain(sn_vil)
+sn_cluster <- cluster_louvain(sn_vil, resolution = 1)
 
 max_cluster <-
   max(max(membership(mbiome_cluster)), max(membership(sn_cluster)))
@@ -767,7 +752,7 @@ mbiome_cols_rect <- colors
 mbiome_cols_rect <- mbiome_cols_rect[c(3,4,2,5)]
 V(mbiome_all)$color <- mbiome_cols
 
-set.seed(1)
+set.seed(15)
 plot(
   mbiome_cluster,
   mbiome_all,
@@ -782,7 +767,7 @@ plot(
   main = "Microbiome Similarity Clusters"
 )
 
-
+set.seed(15)
 illustrative_village_mbiome <- as.ggplot(expression(plot(
   mbiome_cluster,
   mbiome_all,

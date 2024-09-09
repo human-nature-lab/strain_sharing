@@ -273,6 +273,7 @@ dif_vil_unrelated <- data.frame(relationship = rep("No Nomination - Different Vi
 
 SN_All_Relationship_DF <- rbind(SN_DF_simple,SN_Non_Kin_House_simple,SN_Same_Building_simple, same_vil_unrelated, dif_vil_unrelated)
 
+readr::write_tsv(SN_All_Relationship_DF,'data/export/SN_All_Relationship_DF.tsv')
 
 #Make relationship factor variable for plotting
 SN_All_Relationship_DF$relationship <- reorder(as.factor(SN_All_Relationship_DF$relationship),
@@ -412,6 +413,9 @@ SN_Symmetrized <- SN %>%
   mutate(a2701_numeric_max = max(a2701_numeric),
          a2702_numeric_max = max(a2702_numeric)) %>%
   ungroup() %>% distinct(pair_key, .keep_all = TRUE)
+
+readr::write_tsv(SN_Symmetrized  |>
+select(a2701_numeric_max, a2702_numeric_max, strain_sharing_rate),'data/export/SN_Symmetrized.tsv')
 
 SN_Non_Kin_House_Symmetrized <- SN_Non_Kin_House %>%
   group_by(pair_key) %>% 
@@ -814,6 +818,8 @@ SN_Greeting <- SN_Greeting %>%
   group_by(pair_key) %>%
   mutate(max_greeting = max(max_greeting)) %>%
   ungroup() %>% distinct(pair_key, .keep_all = TRUE)
+
+readr::write_tsv(SN_Greeting,'data/export/SN_Greeting.tsv')
 
 SN_Greeting <- SN_Greeting %>% mutate(
   Riskiest_Greeting = case_when(

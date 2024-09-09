@@ -311,6 +311,8 @@ Downsamp_all_nkh <- Downsamp_all_nkh[complete.cases(Downsamp_all_nkh),]
 ```{r}
 #Test out of sample
 #Average over 5 CVs
+# write_tsv(Downsamp_all |> select(-ego, -alter), 'data/export/Downsamp_all.tsv')
+
 cl <- parallel::makeCluster(5)
 doParallel::registerDoParallel(cl)
 foreach(i = c(1:5)) %dopar% {
@@ -506,6 +508,7 @@ roc.plot <- roc.plot + theme(
 
 Non-Kin different house model
 ```{r}
+# write_tsv(Downsamp_all_nkh |> select(-ego, -alter), 'data/export/Downsamp_all_nkh.tsv')
 cl <- parallel::makeCluster(5)
 doParallel::registerDoParallel(cl)
 foreach(i = c(1:5)) %dopar% {
@@ -839,7 +842,7 @@ Make network prediction figure
 ```{r}
 
 library("ggplotify")
-set.seed(1993)
+set.seed(1)
 p1_test <- as.ggplot(expression(
   plot(
     pred_graph,

@@ -1555,6 +1555,8 @@ dev.off()
 Downsamp_all_importance <- Downsamp_all %>%
   select(-c(ego, alter, bray_curtis_sim, predicted))
 
+readr::write_tsv(Downsamp_all_importance, 'data/export/Downsamp_all_importance.tsv')
+
 mse_perms_ssr <- data.frame(matrix(nrow = 100, ncol = 17))
 colnames(mse_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",
                              "education_difference","average_education","household_same","related","average_diet", "different_diet", 'average_bristol','different_bristol',
@@ -1792,6 +1794,8 @@ fi_all <- ggplot(mse_perms_ssr_dat_all_rel) +
 ```{r}
 Downsamp_all_importance <- Downsamp_all_nkh %>%
   select(-c(ego, alter, bray_curtis_sim, predicted))
+
+readr::write_tsv(Downsamp_all_importance, 'data/export/Downsamp_all_importance_nk.tsv')
 
 mse_perms_ssr <- data.frame(matrix(nrow = 1000, ncol = 17))
 colnames(mse_perms_ssr) <- c("gender", "indigenous_status", "religion", "age_difference","average_age","wealth_difference", "average_wealth",

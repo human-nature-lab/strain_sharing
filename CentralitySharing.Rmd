@@ -128,7 +128,7 @@ for( i in 1:length(V(SN_Graph_all))){
 
 
 sim_deg_one_df <- data.frame(sim_deg_one = sim_deg_one,
-                            respondent_master_id = name_vec))
+                            respondent_master_id = name_vec)
 
 centrality_sim_df <- merge(centrality_df,sim_deg_one_df)
 centrality_sim_df <- merge(centrality_sim_df, diversity_df)
@@ -262,15 +262,6 @@ clustering_coef_fig <-
   theme_minimal()
 
 
-deg_c_sharing_fig <- ggarrange(deg_c_sharing_all + stat_cor() ,
-                               deg_c_sharing_first + stat_cor(),
-                               labels = c("4a", "4b"))
-
-annotate_figure(deg_c_sharing_fig,
-                bottom = text_grob("Degree Centrality",
-                                   size = 12))
-
-
 species_pop_deg_c <-
   ggplot(centrality_sim_df, aes(x = degree_c, y = avg_species_prev)) +
   geom_point() +
@@ -306,6 +297,126 @@ dev.off()
 
 ```
 
+```{r}
+set.seed(22)
+test <- sn_vil_graph_15
+
+
+vertex_attr(test)$similarity <- centrality_sim_df$strain_sim_all[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)]
+
+
+palette <- heat.colors(3)
+
+palette <- rev(palette)
+
+
+#Trichotomize sharing
+vertex_attr(test)$color <- case_when(
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .33) ~ palette[1],
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .66) ~ palette[2],
+  TRUE ~ palette[3],
+)
+
+vertex_attr(test)$size <- (centrality_sim_df$degree_c[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)] +1)/3
+
+par(mar=c(0,0,0,0))
+set.seed(22)
+plot(test,
+     vertex.label = NA,
+     layout = layout_with_fr)
+legend('topleft',
+       legend = c(">= 4.6% (Top Tertile)",
+                  ">= 3.9% (Middle Tertile)",
+                  ">= 0% (Bottom Tertile)"),
+       #fill = rev(palette),
+       pt.bg  = rev(palette),
+       pch    = 21,
+       cex    = 1,
+       border = NA,
+       bty    = "n",
+       title = "Average Strain-Sharing Rate With\nAll Village Members")
+
+set.seed(22)
+strain_sim_cent_network <- as.ggplot(expression(
+  plot(
+    test,
+    vertex.label = NA,
+    layout = layout_with_fr(test)
+  ),
+  legend(x = -.5,
+         y = 1.4,
+    #'topleft',
+    legend = c(">= 4.6% (Top Tertile)",
+                  ">= 3.9% (Middle Tertile)",
+                  ">= 0% (Bottom Tertile)"),
+    pt.bg  = rev(palette),
+    pch    = 21,
+    cex    = .75,
+    bty    = "n",
+    y.intersp = 1.25,
+    title = "Average Strain-Sharing Rate With\nAll Village Members"
+  )
+))
+
+set.seed(22)
+
+vertex_attr(test)$similarity <- centrality_sim_df$sim_deg_one[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)]
+palette <- heat.colors(3)
+palette <- rev(palette)
+
+vertex_attr(test)$color <- palette[order(vertex_attr(test)$similarity)]
+
+#Trichotomize sharing
+vertex_attr(test)$color <- case_when(
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .33) ~ palette[1],
+  vertex_attr(test)$similarity <= quantile(vertex_attr(test)$similarity, .66) ~ palette[2],
+  TRUE ~ palette[3],
+)
+
+vertex_attr(test)$size <- (centrality_sim_df$degree_c[match(names(V(test)),
+                                           centrality_sim_df$respondent_master_id)] +1)/3
+
+set.seed(22)
+plot(test,
+     vertex.label = NA,
+#     vertex.size = 5,
+     layout = layout_with_fr(test))
+legend('topleft',
+       legend = c(">= 9.7% (Top Tertile)",
+                  ">= 7.3% (Middle Tertile)",
+                  ">= 0% (Bottom Tertile)"),
+       pt.bg  = rev(palette),
+       pch    = 21,
+       cex    = 1,
+       bty    = "n",
+       title = "Average Strain-Sharing Rate With\nFirst Degree Connections")
+
+set.seed(22)
+sim_deg_one_network <- as.ggplot(expression(
+  plot(
+    test,
+    vertex.label = NA,
+    layout = layout_with_fr
+  ),
+  legend(x = -.5,
+         y = 1.4,
+    #'topleft',
+    legend = c(">= 9.7% (Top Tertile)",
+                  ">= 7.3% (Middle Tertile)",
+                  ">= 0% (Bottom Tertile)"),
+    pt.bg  = rev(palette),
+    pch    = 21,
+    cex    = .75,
+    bty    = "n",
+    y.intersp = 1.25,
+    title = "Average Strain-Sharing Rate With\nFirst Degree Connections"
+  )
+))
+
+```
 
 ```{r}
 
