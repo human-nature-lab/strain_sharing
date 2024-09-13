@@ -1,0 +1,197 @@
+---
+title: "Social Network Position and Strain Network Position"
+author: 
+    - "Francesco Beghini, Jackson Pullman, Marcus Alexander, Shivkumar Vishnempet Shridhar,"
+    - "Drew Prinster, Adarsh Singh, Rigoberto Matute Juárez,"
+    - "Edoardo M. Airoldi, Ilana L. Brito, Nicholas A. Christakis"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+
+```{r, echo=FALSE}
+centrality_sim_df_covars_all <- readRDS('centrality_sim_df_covars_all.RDS')
+sub_covar_centrality <- readRDS('sub_covar_centrality.RDS')
+```
+
+## Simple model
+### Average strain-sharing rate to the rest of the villages, betweeness centrality
+```{r}
+lm.1 <- lmerTest::lmer(strain_sim_all ~ between_c_all + age_at_survey + household_wealth_index_w3 +
+                         gender + DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads + (1 | village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+
+\newpage
+
+### Average strain-sharing rate to the rest of the village, eigenvector centrality
+```{r}
+lm.1 <- lmerTest::lmer(strain_sim_all ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+### Average strain-sharing rate to the rest of the village, degree
+```{r}
+lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads + (1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+
+### First degree connections, clustering coefficient
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ cluster_coef_all + age_at_survey +household_wealth_index_w3 +
+                         gender +  DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village_name) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+### First degree connections, eigenvector centrality
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+ DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+### First degree connections, betweeness centrality
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ between_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+  DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+### First degree connections, degree
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + age_at_survey +household_wealth_index_w3 +
+                         gender+  DNA_conc + BMI + l0400 + mb_m0300 + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+## Separate covariates
+
+## Average strain-sharing rate to the rest of the villages, betweeness centrality, use separate covariates
+```{r}
+lm.1 <- lmerTest::lmer(strain_sim_all ~ between_c_all + age_at_survey +household_wealth_index_w3 +DDS +med_painkillers +med_antibiotics+ med_antidiarrheal+ med_antiparasite+ med_vitamins+ med_zinc+ med_antifungal+ med_antihypertensives+ med_antidiabetics+ med_antiacids+ med_laxatives+ l0400+ mb_m0300 +
+                         gender + DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+## Average strain-sharing rate to the rest of the village, eigenvector centrality, use separate covariates
+```{r}
+lm.1 <- lmerTest::lmer(strain_sim_all ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +DDS +med_painkillers +med_antibiotics+ med_antidiarrheal+ med_antiparasite+ med_vitamins+ med_zinc+ med_antifungal+ med_antihypertensives+ med_antidiabetics+ med_antiacids+ med_laxatives+ l0400+ mb_m0300 +
+                         gender+ DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+## Average strain-sharing rate to the rest of the village, degree, use separate covariates
+```{r}
+lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c_all + age_at_survey +household_wealth_index_w3 +DDS +med_painkillers +med_antibiotics+ med_antidiarrheal+ med_antiparasite+ med_vitamins+ med_zinc+ med_antifungal+ med_antihypertensives+ med_antidiabetics+ med_antiacids+ med_laxatives+ l0400+ mb_m0300 +
+                         gender+ DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads + (1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+
+## First degree connections, clustering coefficient, use separate covariates
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ cluster_coef_all + age_at_survey +household_wealth_index_w3 +DDS +med_painkillers +med_antibiotics+ med_antidiarrheal+ med_antiparasite+ med_vitamins+ med_zinc+ med_antifungal+ med_antihypertensives+ med_antidiabetics+ med_antiacids+ med_laxatives+ l0400+ mb_m0300 +
+                         gender +  DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village_name) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+## First degree connections, eigenvector centrality, use separate covariates
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ eigen_c_all + age_at_survey +household_wealth_index_w3 +DDS +med_painkillers +med_antibiotics+ med_antidiarrheal+ med_antiparasite+ med_vitamins+ med_zinc+ med_antifungal+ med_antihypertensives+ med_antidiabetics+ med_antiacids+ med_laxatives+ l0400+ mb_m0300 +
+                         gender+ DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+## First degree connections, betweeness centrality, use separate covariates
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ between_c_all + age_at_survey +household_wealth_index_w3 +DDS +med_painkillers +med_antibiotics+ med_antidiarrheal+ med_antiparasite+ med_vitamins+ med_zinc+ med_antifungal+ med_antihypertensives+ med_antidiabetics+ med_antiacids+ med_laxatives+ l0400+ mb_m0300 +
+                         gender+  DNA_conc + BMI + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+## First degree connections, degree, use separate covariates
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + age_at_survey +household_wealth_index_w3 +DDS +med_painkillers +med_antibiotics+ med_antidiarrheal+ med_antiparasite+ med_vitamins+ med_zinc+ med_antifungal+ med_antihypertensives+ med_antidiabetics+ med_antiacids+ med_laxatives+ l0400+ mb_m0300 +
+                         gender+  DNA_conc + BMI + l0400 + mb_m0300 + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = centrality_sim_df_covars_all)
+summary(lm.1)
+```
+\newpage
+
+## Mahalanobis
+## Average strain-sharing rate to the rest of the villages, betweeness centrality, use Mahalanobis distance
+```{r}
+lm.1 <- lmerTest::lmer(strain_sim_all ~ between_c_all + maha_social + DNA_conc + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = dplyr::bind_cols(centrality_sim_df_covars_all, maha_social = mahalanobis(sub_covar_centrality, FALSE, var(sub_covar_centrality, na.rm=TRUE)))
+)
+summary(lm.1)
+```
+\newpage
+## Average strain-sharing rate to the rest of the village, eigenvector centrality, use Mahalanobis distance
+```{r}
+lm.1 <- lmerTest::lmer(strain_sim_all ~ eigen_c_all + maha_social + DNA_conc + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = dplyr::bind_cols(centrality_sim_df_covars_all, maha_social = mahalanobis(sub_covar_centrality, FALSE, var(sub_covar_centrality, na.rm=TRUE)))
+)
+summary(lm.1)
+```
+\newpage
+## Average strain-sharing rate to the rest of the village, degree, use Mahalanobis distance
+```{r}
+lm.1 <- lmerTest::lmer(strain_sim_all ~ degree_c_all + maha_social + DNA_conc + sampling_date + shipment_batch + Plate + WIKI + Reads + (1|village) + (1|building_id),
+             data = dplyr::bind_cols(centrality_sim_df_covars_all, maha_social = mahalanobis(sub_covar_centrality, FALSE, var(sub_covar_centrality, na.rm=TRUE)))
+)
+summary(lm.1)
+```
+\newpage
+
+## First degree connections, clustering coefficient, use Mahalanobis distance
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ cluster_coef_all + maha_social + DNA_conc + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village_name) + (1|building_id),
+             data = dplyr::bind_cols(centrality_sim_df_covars_all, maha_social = mahalanobis(sub_covar_centrality, FALSE, var(sub_covar_centrality, na.rm=TRUE)))
+)
+summary(lm.1)
+```
+\newpage
+## First degree connections, eigenvector centrality, use Mahalanobis distance
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ eigen_c_all + maha_social + DNA_conc + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = dplyr::bind_cols(centrality_sim_df_covars_all, maha_social = mahalanobis(sub_covar_centrality, FALSE, var(sub_covar_centrality, na.rm=TRUE)))
+)
+summary(lm.1)
+```
+\newpage
+## First degree connections, betweeness centrality, use Mahalanobis distance
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ between_c_all + maha_social + DNA_conc  + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = dplyr::bind_cols(centrality_sim_df_covars_all, maha_social = mahalanobis(sub_covar_centrality, FALSE, var(sub_covar_centrality, na.rm=TRUE)))
+)
+summary(lm.1)
+```
+\newpage
+## First degree connections, degree, use Mahalanobis distance
+```{r}
+lm.1 <- lmerTest::lmer(sim_deg_one ~ degree_c_all + maha_social + DNA_conc + sampling_date + shipment_batch + Plate + WIKI + Reads +(1|village) + (1|building_id),
+             data = dplyr::bind_cols(centrality_sim_df_covars_all, maha_social = mahalanobis(sub_covar_centrality, FALSE, var(sub_covar_centrality, na.rm=TRUE)))
+             )
+
+summary(lm.1)
+```

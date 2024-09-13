@@ -574,24 +574,24 @@ for(i in 1:length(village_names)){
   assign(paste0("bray_vil_graph_scram_", i),
          get(paste0("bray_vil_graph_", i)))  
   
-  # #Create jaccard adjacency
-  # assign(paste0("jaccard_vil_", i),
-  #        species_jaccard_sim[rownames(species_jaccard_sim) %in% get(paste0("village_ids_", i)),
-  #                    colnames(species_jaccard_sim) %in% get(paste0("village_ids_", i))])
-  # 
-  # #Create jaccard graph
-  # assign(
-  #   paste0("jaccard_vil_graph_", i),
-  #   igraph::simplify(graph_from_adjacency_matrix(
-  #     get(paste0("jaccard_vil_", i)),
-  #     weighted = TRUE,
-  #     mode = c("undirected")
-  #   ))
-  # )
-  # 
-  # #Create jaccard graph for scrambling
-  # assign(paste0("jaccard_vil_graph_scram_", i),
-  #        get(paste0("jaccard_vil_graph_", i))) 
+  #Create jaccard adjacency
+  assign(paste0("jaccard_vil_", i),
+         species_jaccard_sim[rownames(species_jaccard_sim) %in% get(paste0("village_ids_", i)),
+                     colnames(species_jaccard_sim) %in% get(paste0("village_ids_", i))])
+  
+  #Create jaccard graph
+  assign(
+    paste0("jaccard_vil_graph_", i),
+    igraph::simplify(graph_from_adjacency_matrix(
+      get(paste0("jaccard_vil_", i)),
+      weighted = TRUE,
+      mode = c("undirected")
+    ))
+  )
+  
+  #Create jaccard graph for scrambling
+  assign(paste0("jaccard_vil_graph_scram_", i),
+         get(paste0("jaccard_vil_graph_", i))) 
   
 }
 

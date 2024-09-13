@@ -567,8 +567,9 @@ meal_pvals_nkh <- compare_means(strain_sharing_rate ~ Meals,
                             method = "wilcox.test",
                             p.adjust.method = "BH")
 
-meal_pvals_nkh <- meal_pvals_nkh %>% filter(p.signif == "ns") %>%
-  mutate(y.position = c(26,28,30,26))
+meal_pvals_nkh <- meal_pvals_nkh %>% 
+  filter(p.signif != "ns") %>%
+  mutate(y.position = c(27, 29))
 
 #Plot differences between groups for meals based on strain sharing rate
 
@@ -603,7 +604,7 @@ meals_all_plot_nkh <- ggplot(SN_Non_Kin_House_Symmetrized, aes(Meals, strain_sha
     table(SN_Non_Kin_House_Symmetrized$Meals),
     ")"
   )) +
-  stat_pvalue_manual(meal_pvals_nkh, label = "p.signif", tip.length = 0, bracket.size = 0.7, size = 5) +
+  stat_pvalue_manual(meal_pvals_nkh, label = "p.adj", tip.length = 0, bracket.size = 0.7, size = 5) +
   font("ylab", face = "bold", size = 12) +
     scale_color_manual(values = c("#01b0f8",
                                 "#33d600",
@@ -714,8 +715,9 @@ free_time_pvals_nkh <- compare_means(strain_sharing_rate ~ Free_Time,
                             method = "wilcox.test",
                             p.adjust.method = "BH")
 
-free_time_pvals_nkh <- free_time_pvals_nkh %>% filter(p.signif == "ns") %>%
-  mutate(y.position = c(28))
+free_time_pvals_nkh <- free_time_pvals_nkh %>% 
+  filter(p.signif != "ns") %>%
+  mutate(y.position = c(27, 29))
 
 #Plot differences between groups for meals based on strain sharing rate
 
@@ -750,7 +752,7 @@ free_time_all_plot_nkh <- ggplot(SN_Non_Kin_House_Symmetrized_2, aes(Free_Time, 
     table(SN_Non_Kin_House_Symmetrized_2$Meals),
     ")"
   )) +
-  stat_pvalue_manual(free_time_pvals_nkh, label = "p.signif", tip.length = 0, bracket.size = 0.7, size = 5)+
+  stat_pvalue_manual(free_time_pvals_nkh, label = "p.adj", tip.length = 0, bracket.size = 0.7, size = 5)+
   font("ylab", face = "bold", size = 12) +
     scale_color_manual(values = c("#01b0f8",
                                 "#33d600",
@@ -1095,7 +1097,7 @@ fig1_nkh <- ggarrange(p2_nkh,greeting_plot_nkh, nrow = 2)
 # fig1
 # dev.off()
 
-svglite("Figures/sfigure4_full.svg", width = 12, fix_text_size = FALSE)
+svglite("Figures/sfigure4_full.svg", width = 14, height = 12, fix_text_size = FALSE)
 fig1_nkh
 dev.off()
 

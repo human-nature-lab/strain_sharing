@@ -24,8 +24,7 @@ library(lme4)
 metadata_followup <- read_csv('~/F_BEGHINI_HM/COHORT1_FOLLOWUP/v2/hmb_respondents_cohort1_followup_v2_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
   mutate(mb_m05 = str_replace(mb_m00, '-00$', '-15'),
   marital_name = if_else(!is.na(mb_c004),mb_c004, 'Married')) |> 
-  filter(!is.na(mb_m05)) |> 
-  mutate(BMI = (mb_d0100 / mb_d0200 **2) * 10000) 
+  filter(!is.na(mb_m05))
 
 metadata_baseline <- read_csv('~/F_BEGHINI_HM/COHORT1/v3/hmb_respondents_cohort1_baseline_v3_f_beghini_2022-11-08.csv', na = c('NA','Dont_Know','Refused'),show_col_types = FALSE) |> 
   filter(respondent_master_id %in% metadata_followup$respondent_master_id,
@@ -68,7 +67,7 @@ SN_w3 <- read_csv("~/F_BEGHINI_G/WAVE3/v3/honduras_connections_WAVE3_v3_F_BEGHIN
                      ego %in% metadata_baseline$respondent_master_id, 
                      alter %in% metadata_baseline$respondent_master_id
                      ) |> 
-                mutate(pair = vapply(stri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
+                mutate(pair = vapply(stringistri_split_boundaries(str_c(ego, alter), type='character'), function(x) stri_c(x[stri_order(x)], collapse = ''), ''),
                        wave = 3)
 ```
 
@@ -118,7 +117,7 @@ species_per_sample <- readRDS('~/species_per_sample_acc') |>
 inner_join(subset_samples_fw, by=join_by('sample' == 'sample_id')) |>
 distinct(species, village, subject, .keep_all = TRUE) |>
 count(species) |>
-#filter(n > 10)
+# filter(n > 10)
 filter(n > 3)
 
 kk <- combn(as.list(readRDS('~/species_per_sample_acc') |> mutate(present=TRUE) %>%
@@ -241,7 +240,7 @@ covariates <- inner_join(metadata_baseline, demographics, by="respondent_master_
          DDS = rowSums(across(starts_with('dds_')))
   )
 
-  covariates <- inner_join(covariates, (metadata_baseline |> select(respondent_master_id, 
+covariates <- inner_join(covariates, (metadata_baseline |> select(respondent_master_id, 
 med_painkillers = mb_b1100a,
 med_antibiotics = mb_b1100b,
 med_antidiarrheal = mb_b1100c,
@@ -441,7 +440,7 @@ sharing_rate_followup_metadata$same_usage_antiparasite <- sharing_rate_followup_
 sharing_rate_followup_metadata$same_usage_vitamins <- sharing_rate_followup_metadata$med_vitamins_alter == sharing_rate_followup_metadata$med_vitamins_ego
 sharing_rate_followup_metadata$same_usage_zinc <- sharing_rate_followup_metadata$med_zinc_alter == sharing_rate_followup_metadata$med_zinc_ego
 sharing_rate_followup_metadata$same_usage_antifungal <- sharing_rate_followup_metadata$med_antifungal_alter == sharing_rate_followup_metadata$med_antifungal_ego
-saveRDS(sharing_rate_followup_metadata, 'sharing_rate_only_followup.Rds')
+# saveRDS(sharing_rate_followup_metadata, 'sharing_rate_only_followup.Rds')
 ```
 
 

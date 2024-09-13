@@ -1,6 +1,9 @@
 ---
 title: "Longitudinal Analysis"
-author: "Francesco Beghini, Jackson Pullman, Marcus Alexander, Shivkumar Vishnempet Shridhar, Drew Prinster, Adarsh Singh, Rigoberto Matute Juárez, Edoardo M. Airoldi, Ilana L. Brito, Nicholas A. Christakis"
+author: 
+    - "Francesco Beghini, Jackson Pullman, Marcus Alexander, Shivkumar Vishnempet Shridhar,"
+    - "Drew Prinster, Adarsh Singh, Rigoberto Matute Juárez,"
+    - "Edoardo M. Airoldi, Ilana L. Brito, Nicholas A. Christakis"
 output: pdf_document
 ---
 
@@ -27,14 +30,15 @@ summary(lmer_zero_model)
 ```
 \newpage
 -->
-
+# First regression model
+## Model the strain-sharing rate at timepoint 2 using the Mahalanobis distance as covariate
 ```{r}
 lmer_first_model <- lmer(T2 ~ T1 + relationship + maha_dist + (1|village_code_ego) + (1|ego), 
                           sharing_rate_only_followup)
 summary(lmer_first_model)
 ```
 \newpage
-
+## Model the strain-sharing rate at timepoint 2 using the separate sociodemographic variables
 ```{r, echo=FALSE}
 lmer_first_model_expanded  <- lmer(T2 ~ T1 + relationship + 
                                       gender.mm + gender.ff + 
@@ -56,6 +60,8 @@ lmer_first_model_expanded  <- lmer(T2 ~ T1 + relationship +
 summary(lmer_first_model_expanded)
 ```
 \newpage
+# Second regression model
+# Model each species sharing status at timepoint 2 using the Mahalanobis distance as covariate
 ```{r}
 lmer_species_rand <- glmer(data = xcov, T2_t ~ T1_t + relationship + maha_dist + (1|species) + (1|village_code_ego) + (1|ego), family = binomial, nAGQ=0)
 summary(lmer_species_rand)

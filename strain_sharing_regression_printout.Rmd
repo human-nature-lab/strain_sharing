@@ -1,7 +1,9 @@
 ---
 title: "Strain-sharing prediction"
-author: "Francesco Beghini"
-date: "2024-05-1"
+author: 
+    - "Francesco Beghini, Jackson Pullman, Marcus Alexander, Shivkumar Vishnempet Shridhar,"
+    - "Drew Prinster, Adarsh Singh, Rigoberto Matute Juárez,"
+    - "Edoardo M. Airoldi, Ilana L. Brito, Nicholas A. Christakis"
 output: pdf_document
 ---
 
@@ -12,8 +14,8 @@ Downsamp_all <- readRDS('Downsamp_all.Rds')
 Downsamp_all_nkh <- readRDS('Downsamp_all_nkh.Rds')
 ```
 
-# Calculate R2 for all relationships
-```{r}
+# Calculate R^2 for all relationships
+```{r, echo=FALSE}
 llm_all_kin_for2 <- lmerTest::lmer(strain_sharing_rate ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_diet + different_diet + average_bristol + different_bristol + watersource_same + 
@@ -27,9 +29,9 @@ summary(llm_all_kin_for2)
 ```{r}
 r2glmm::r2beta(llm_all_kin_for2, method = 'nsj')
 ```
-
-# Calculate R2 for non-kin relationships
-```{r}
+\newpage
+# Calculate R^2 for non-kin relationships
+```{r, echo=FALSE}
 llm_non_kin_for2 <- lmerTest::lmer(strain_sharing_rate ~ gender.mm + gender.mf + indigenous.both +
                         indigenous.one + religion.same + age_difference_abs +
                         average_diet + different_diet + average_bristol + different_bristol + watersource_same + 

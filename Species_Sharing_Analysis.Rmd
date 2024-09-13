@@ -30,7 +30,7 @@ gatherpairs <- function(data, ...,
 ```
 
 
-MDS of BC-dissimilarity of species per village
+MDS of BC-Dissimilarity of species per village
 ```{r}
 mds_bc <- cmdscale(species_bray) |> 
   as.data.frame() |> 
@@ -72,26 +72,26 @@ mds_bc |>
 
 tSNE of species per village
 ```{r, fig.height=12, fig.width=15}
-set.seed(0)
-tnse_species <- Rtsne::Rtsne(t(species_data_clr), num_threads = 10, perplexity =5)
+# set.seed(0)
+# tnse_species <- Rtsne::Rtsne(t(species_data_clr), num_threads = 10, perplexity =5)
 
-rownames(tnse_species$Y) <- colnames(species_data_clr)
-tsne_ds <- tnse_species$Y |> 
-  as.data.frame() |> 
-  tibble::rownames_to_column('respondent_master_id') |> 
-  inner_join(hmb_census) |> 
-  filter(village_name_deid %in% names(sort(table(hmb_census$village_name_deid), decreasing = TRUE)[1:5])) |> 
-  select(respondent_master_id, V1, V2, village_name_deid)
+# rownames(tnse_species$Y) <- colnames(species_data_clr)
+# tsne_ds <- tnse_species$Y |> 
+#   as.data.frame() |> 
+#   tibble::rownames_to_column('respondent_master_id') |> 
+#   inner_join(hmb_census) |> 
+#   filter(village_name_deid %in% names(sort(table(hmb_census$village_name_deid), decreasing = TRUE)[1:5])) |> 
+#   select(respondent_master_id, V1, V2, village_name_deid)
 
-lapply(combn(unique(tsne_ds$village_name_deid), 2, simplify = FALSE), function(k){
-  tsne_ds |> 
-    filter(village_name_deid %in% k) |> 
-    mutate(pair1 = k[1], pair2=k[2])
-}) |> 
-  bind_rows() |> 
-ggplot() +
-  geom_point(aes(V1,V2, color=village_name_deid)) +
-  facet_grid(pair1~pair2)
+# lapply(combn(unique(tsne_ds$village_name_deid), 2, simplify = FALSE), function(k){
+#   tsne_ds |> 
+#     filter(village_name_deid %in% k) |> 
+#     mutate(pair1 = k[1], pair2=k[2])
+# }) |> 
+#   bind_rows() |> 
+# ggplot() +
+#   geom_point(aes(V1,V2, color=village_name_deid)) +
+#   facet_grid(pair1~pair2)
 ```
 
 
@@ -107,7 +107,7 @@ shared_summary <- SN %>%
 
 #Get shared strain rates for unnominated individuals in the same village
 for(i in 1:length(village_names)){
-  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  SN_Village <- SN %>% filter(village_code_w3 == village_names[i])
   village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
   bc_vil <- species_bray[rownames(species_bray) %in% village_ids ,
                          colnames(species_bray) %in% village_ids]
@@ -140,7 +140,7 @@ species_bray_2 <- species_bray
 species_jaccard_sim_2 <- species_jaccard_sim
 
 for(i in 1:length(village_names)){
-  SN_Village <- SN %>% filter(village_name_w3 == village_names[i])
+  SN_Village <- SN %>% filter(village_code_w3 == village_names[i])
   village_ids <- unique(c(SN_Village$ego, SN_Village$alter))
   for(j in 1:length(village_ids)-1){
     for(k in j:length(village_ids)){
@@ -244,7 +244,7 @@ SN_Non_Kin_House_simple <- SN_Non_Kin_House %>%
 SN_Non_Kin_House_simple$relationship <- "Non-Kin and Different House"
 
 SN_Same_Building_simple <- SN %>%
-  filter(same_building == 1) %>%
+  filter(SN$building_id_ego == SN$building_id_alter) %>%
   distinct(pair_key,.keep_all = TRUE) %>% 
   dplyr::select(relationship, jaccard_sim, bray_curtis_sim)
 
@@ -268,7 +268,7 @@ Bray-Curtis
 ```{r}
 #Make relationship factor variable for plotting
 SN_All_Relationship_DF$relationship <- reorder(as.factor(SN_All_Relationship_DF$relationship),
-                                               -SN_All_Relationship_DF$bray_curtis_sim,
+                                               SN_All_Relationship_DF$bray_curtis_sim,
                                                FUN = median)
 
 #Change names for plotting
@@ -280,9 +280,7 @@ levels(SN_All_Relationship_DF$relationship) <- c("Partner",
                                                  "Free Time",
                                                  "Child",
                                                  "Personal/Private",
-                                                 
                                                  "Mother",
-                                                 
                                                  "Non-Kin\nDif-House",
                                                  "Close Friend",
                                                  "No-Nom\nSame-Vil",
@@ -299,9 +297,6 @@ rels_pvals <- compare_means(bray_curtis_sim ~ relationship,
                    data = SN_All_Relationship_DF,
                    method = "wilcox.test",
                    p.adjust.method = "BH")
-
-
-
 ```
 
 ```{r}
@@ -314,9 +309,9 @@ relationships_all_plot_bc <- ggboxplot(
   show.legend = FALSE
 ) + 
   xlab("Relationship") +
-  ylab("Bray-Curtis Similarity") +
-  theme_minimal() +
-  coord_cartesian(ylim = c(0, .75)) +
+  ylab("Bray-Curtis Dissimilarity") +
+  theme_pubr() +
+  labs_pubr() +
   theme(
     axis.text.x = element_text(
       vjust = 1,
@@ -324,15 +319,14 @@ relationships_all_plot_bc <- ggboxplot(
       size = 10
     ),
     plot.title = element_text(hjust = 0.5),
-    plot.subtitle = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
     legend.position = "none"
-  ) +
-  #stat_pvalue_manual(rels_pvals, label = "p.signif", tip.length = 0)   +
+  ) +  #stat_pvalue_manual(rels_pvals, label = "p.signif", tip.length = 0)   +
   geom_text(data = median_rels_ssr,
             aes(label = sprintf(
               "%0.3f", round(bray_curtis_sim, digits = 3)
             ),
-            y = .75,
+            y = .70,
             fontface = "bold")) +
   scale_x_discrete(labels = paste0(
     levels(SN_All_Relationship_DF$relationship),
@@ -399,7 +393,9 @@ relationships_all_plot_j <- ggboxplot(
   xlab("Relationship") +
   ylab("Jaccard Index") +
   theme_minimal() +
-  coord_cartesian(ylim = c(0, .75)) +
+  # coord_cartesian(ylim = c(0, .75)) +
+  theme_pubr() +
+  labs_pubr() +
   theme(
     axis.text.x = element_text(
       vjust = 1,
@@ -407,7 +403,7 @@ relationships_all_plot_j <- ggboxplot(
       size = 10
     ),
     plot.title = element_text(hjust = 0.5),
-    plot.subtitle = element_text(hjust = 0.5),
+    axis.title.x = element_text(size = 10),
     legend.position = "none"
   ) +
   #stat_pvalue_manual(rels_pvals, label = "p.signif", tip.length = 0)   +
@@ -495,7 +491,7 @@ meals_ssr_median <- aggregate(bray_curtis_sim ~  Meals, SN_Symmetrized, median)
 
 #Reorder relationship factor variable for plotting
 SN_Symmetrized$Meals <- reorder(as.factor(SN_Symmetrized$Meals),
-                                -SN_Symmetrized$bray_curtis_sim,
+                                SN_Symmetrized$bray_curtis_sim,
                                 median)
 
 #Get test-statistics
@@ -525,12 +521,12 @@ meals_all_plot_bc <- ggboxplot(
               width = .25,
               show.legend = FALSE) +
   xlab("Shared Meal Frequency") +
-  ylab("Bray Curtis Similarity") +
-  coord_cartesian(ylim = c(0, .75)) +
-  theme_minimal() +
+  ylab("Bray Curtis Dissimilarity") +
+  # coord_cartesian(ylim = c(0, .75)) +
+  theme_pubr() +
+  labs_pubr() +
   theme(
     axis.text.x = element_text(
-      angle = 0,
       vjust = 1,
       hjust = .5,
       size = 10
@@ -593,11 +589,11 @@ meals_all_plot_j <- ggboxplot(
               show.legend = FALSE) +
   xlab("Shared Meal Frequency") +
   ylab("Jaccard Index") +
-  coord_cartesian(ylim = c(0, .75)) +
-  theme_minimal() +
+  # coord_cartesian(ylim = c(0, .75)) +
+  theme_pubr() +
+  labs_pubr() +
   theme(
     axis.text.x = element_text(
-      angle = 0,
       vjust = 1,
       hjust = .5,
       size = 10
@@ -630,7 +626,7 @@ free_time_ssr_median <- aggregate(bray_curtis_sim ~  Free_Time, SN_Symmetrized_2
 
 #Reorder relationship factor variable for plotting
 SN_Symmetrized_2$Free_Time <- reorder(as.factor(SN_Symmetrized_2$Free_Time),
-                                              -SN_Symmetrized_2$bray_curtis_sim,
+                                              SN_Symmetrized_2$bray_curtis_sim,
                                                median)
 
 #Get test statistics
@@ -661,12 +657,12 @@ free_time_all_plot_bc <-ggboxplot(
               width = .25,
               show.legend = FALSE) +
   xlab("Frequency of Contact") +
-  ylab("Bray-Curtis Similarity") +
-  coord_cartesian(ylim = c(0, .75)) +
-  theme_minimal() +
+  ylab("Bray-Curtis Dissimilarity") +
+  # coord_cartesian(ylim = c(0, .75)) +
+  theme_pubr() +
+  labs_pubr() +
   theme(
     axis.text.x = element_text(
-      angle = 0,
       vjust = 1,
       hjust = .5,
       size = 10
@@ -727,11 +723,11 @@ free_time_all_plot_j <-ggboxplot(
               show.legend = FALSE) +
   xlab("Frequency of Contact") +
   ylab("Jaccard Index") +
-  coord_cartesian(ylim = c(0, .75)) +
-  theme_minimal() +
+  # coord_cartesian(ylim = c(0, .75)) +
+  theme_pubr() +
+  labs_pubr() +
   theme(
     axis.text.x = element_text(
-      angle = 0,
       vjust = 1,
       hjust = .5,
       size = 10
@@ -875,8 +871,8 @@ greeting_plot_bc <- ggboxplot(
     table(SN_Greeting$Riskiest_Greeting),
     ")"
   )) +
-  ylab("Bray-Curtis Similarity") +
-  coord_cartesian(ylim = c(0, .75)) +
+  ylab("Bray-Curtis Dissimilarity") +
+  # coord_cartesian(ylim = c(0, .75)) +
   theme_pubr() +
   labs_pubr() +
   theme(
@@ -936,7 +932,7 @@ greeting_plot_j <- ggboxplot(
     ")"
   )) +
   ylab("Jaccard Index") +
-  coord_cartesian(ylim = c(0, .75)) +
+  # coord_cartesian(ylim = c(0, .75)) +
   theme_pubr() +
   labs_pubr() +
   theme(
@@ -989,9 +985,10 @@ sfig1_bc <- ggarrange(p1_bc, p2_bc,greeting_plot_bc, nrow = 3,
           heights = c(1.5,1,1))
 
 
-svglite("../FiguresNew/SFigure2/sfigure2_full_bray.svg",
+svglite("Figures/EDFigure2.svg",
         width = 13,
-        height = 10)
+        height = 10,
+        fix_text_size = FALSE)
 sfig1_bc
 dev.off()
 ```
